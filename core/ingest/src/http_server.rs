@@ -297,16 +297,13 @@ async fn handle_linux_ingest(
             &ppid.map(|v| v as i32),
             &uid.map(|v| v as i32),
             &gid.map(|v| v as i32),
-            &username.as_deref(),
-            &process_name.as_deref(),
-            &process_path.as_deref(),
-            &cmdline.as_deref(),
-            // &file_path REMOVED - using NULL in SQL
+            // All Option<String> TEXT fields removed - using NULL in SQL
+            // &username, &process_name, &process_path, &cmdline, &file_path, &protocol
             &network_src_ip.as_deref(),
             &network_src_port.map(|v| v as i32),
             &network_dst_ip.as_deref(),
             &network_dst_port.map(|v| v as i32),
-            &protocol.as_deref(),
+            // &protocol removed
             &payload_json, // Use pre-allocated string
             &payload_sha256, // Use pre-computed hash
         ],
