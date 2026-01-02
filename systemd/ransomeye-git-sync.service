@@ -1,0 +1,29 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-git-sync.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service for automatic git sync to GitHub
+
+[Unit]
+Description=RansomEye Git Sync Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+Environment="HOME=/home/ransomeye"
+ExecStart=/bin/bash -c '\
+  cd /home/ransomeye/rebuild && \
+  git add -A && \
+  if ! git diff --cached --quiet; then \
+    git commit -m "Auto-sync: $(date +\"%%Y-%%m-%%d %%H:%%M:%%S\")" && \
+    git push origin main; \
+  fi'
+StandardOutput=journal
+StandardError=journal
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
+
