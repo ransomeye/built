@@ -277,8 +277,8 @@ async fn handle_linux_ingest(
             network_dst_ip, network_dst_port, protocol, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, NULL, $20::inet, $21, $22::inet, $23, $24, $25::jsonb, $26
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NULL,
+            NULL, NULL, NULL, NULL, $16::inet, $17, $18::inet, $19, NULL, $20::jsonb, $21
         )
         "#,
         &[
@@ -297,16 +297,16 @@ async fn handle_linux_ingest(
             &ppid.map(|v| v as i32),
             &uid.map(|v| v as i32),
             &gid.map(|v| v as i32),
-            &username.as_deref().unwrap_or(""),
-            &process_name.as_deref().unwrap_or(""),
-            &process_path.as_deref().unwrap_or(""),
-            &cmdline.as_deref().unwrap_or(""),
+            &username.as_deref(),
+            &process_name.as_deref(),
+            &process_path.as_deref(),
+            &cmdline.as_deref(),
             // &file_path REMOVED - using NULL in SQL
-            &network_src_ip.as_deref().unwrap_or(""),
+            &network_src_ip.as_deref(),
             &network_src_port.map(|v| v as i32),
-            &network_dst_ip.as_deref().unwrap_or(""),
+            &network_dst_ip.as_deref(),
             &network_dst_port.map(|v| v as i32),
-            &protocol.as_deref().unwrap_or(""),
+            &protocol.as_deref(),
             &payload_json, // Use pre-allocated string
             &payload_sha256, // Use pre-computed hash
         ],
