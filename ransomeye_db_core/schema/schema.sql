@@ -187,9 +187,17 @@ CREATE TABLE IF NOT EXISTS components (
   started_at             timestamptz NULL,
   last_heartbeat_at      timestamptz NULL,
   created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT components_name_uniq UNIQUE (component_type, component_name, COALESCE(instance_id, ''))
+  updated_at             timestamptz NOT NULL DEFAULT now()
 );
+
+-- Unique constraint replacement: PostgreSQL 17 doesn't allow expressions in UNIQUE constraints
+CREATE UNIQUE INDEX components_name_uniq_idx
+ON components (component_type, component_name, instance_id)
+WHERE instance_id IS NOT NULL;
+
+CREATE UNIQUE INDEX components_name_uniq_null_idx
+ON components (component_type, component_name)
+WHERE instance_id IS NULL;
 
 COMMENT ON TABLE components IS
 'Purpose: Canonical identity record for RansomEye services (Core, AI, LLM, etc.) to support health, ops telemetry, and audit attribution.\n'
@@ -253,9 +261,17 @@ CREATE TABLE IF NOT EXISTS policies (
   owner_component_id     uuid NULL REFERENCES components(component_id) ON UPDATE RESTRICT ON DELETE SET NULL,
   is_active              boolean NOT NULL DEFAULT true,
   created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT policies_name_uniq UNIQUE (COALESCE(policy_namespace,''), policy_name)
+  updated_at             timestamptz NOT NULL DEFAULT now()
 );
+
+-- Unique constraint replacement: PostgreSQL 17 doesn't allow expressions in UNIQUE constraints
+CREATE UNIQUE INDEX policies_name_uniq_idx
+ON policies (policy_namespace, policy_name)
+WHERE policy_namespace IS NOT NULL;
+
+CREATE UNIQUE INDEX policies_name_uniq_null_idx
+ON policies (policy_name)
+WHERE policy_namespace IS NULL;
 
 COMMENT ON TABLE policies IS
 'Purpose: Canonical policy identity record (stable ID), decoupled from versioned content.\n'

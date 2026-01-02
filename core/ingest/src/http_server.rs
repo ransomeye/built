@@ -21,8 +21,6 @@ use chrono::{DateTime, Utc};
 use hostname;
 use ring::rand::{SecureRandom, SystemRandom};
 use hex;
-use ring::rand::{SecureRandom, SystemRandom};
-use hex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedEvent {
@@ -251,6 +249,24 @@ async fn handle_linux_ingest(
         })?;
     let nonce = hex::encode(nonce_bytes);
     
+    // Diagnostic logging for all extracted values before insert
+    error!("PRE-INSERT DIAGNOSTICS:");
+    error!("  file_path (param 20): {:?}", file_path);
+    error!("  network_src_ip (param 21/inet): {:?}", network_src_ip);
+    error!("  network_dst_ip (param 23/inet): {:?}", network_dst_ip);
+    error!("  Data JSON keys: {:?}", data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    
+    // Pre-allocate strings that need to live for the duration of the query
+    let host_id = hostname::get().unwrap_or_default().to_string_lossy().to_string();
+    let signature_alg = "Ed25519".to_string();
+    let payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
+    let payload_sha256 = {
+        let data_json_bytes = serde_json::to_vec(data).unwrap_or_default();
+        let mut data_hasher = Sha256::new();
+        data_hasher.update(&data_json_bytes);
+        Some(data_hasher.finalize().to_vec())
+    };
+    
     let result = db.execute(
         r#"
         INSERT INTO linux_agent_telemetry (
@@ -262,7 +278,7 @@ async fn handle_linux_ingest(
         )
         VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
+            $17, $18, $19, NULL, $20::inet, $21, $22::inet, $23, $24, $25::jsonb, $26
         )
         "#,
         &[
@@ -270,35 +286,29 @@ async fn handle_linux_ingest(
             &message_id_uuid,
             &nonce,
             &component_id,
-            &hostname::get().unwrap_or_default().to_string_lossy().to_string(), // host_id
+            &host_id,
             &payload.signature,
-            &Some("Ed25519".to_string()), // Agent uses Ed25519, not RSA-PSS-SHA256
+            &signature_alg,
             &payload.payload_hash,
             &timestamp, // Use extracted timestamp, not payload.timestamp
             &event_name,
-            &event_category,
+            &event_category.as_deref().unwrap_or(""),
             &pid.map(|v| v as i32),
             &ppid.map(|v| v as i32),
             &uid.map(|v| v as i32),
             &gid.map(|v| v as i32),
-            &username,
-            &process_name,
-            &process_path,
-            &cmdline,
-            &file_path,
-            &network_src_ip,
+            &username.as_deref().unwrap_or(""),
+            &process_name.as_deref().unwrap_or(""),
+            &process_path.as_deref().unwrap_or(""),
+            &cmdline.as_deref().unwrap_or(""),
+            // &file_path REMOVED - using NULL in SQL
+            &network_src_ip.as_deref().unwrap_or(""),
             &network_src_port.map(|v| v as i32),
-            &network_dst_ip,
+            &network_dst_ip.as_deref().unwrap_or(""),
             &network_dst_port.map(|v| v as i32),
-            &protocol,
-            &data, // Use extracted data, not payload.data
-            &{
-                // Compute payload_sha256 from data JSON bytes
-                let data_json_bytes = serde_json::to_vec(data).unwrap_or_default();
-                let mut data_hasher = Sha256::new();
-                data_hasher.update(&data_json_bytes);
-                Some(data_hasher.finalize().to_vec())
-            },
+            &protocol.as_deref().unwrap_or(""),
+            &payload_json, // Use pre-allocated string
+            &payload_sha256, // Use pre-computed hash
         ],
     ).await;
 
@@ -362,9 +372,29 @@ async fn handle_linux_ingest(
             error!("  $2 (source_message_id): {:?}", message_id_uuid);
             error!("  $3 (source_nonce): {:?}", nonce);
             error!("  $4 (source_component_identity): {:?}", component_id);
+            error!("  $5 (host_id): {:?}", host_id);
+            error!("  $6 (signature): {:?}", payload.signature);
+            error!("  $7 (signature_alg): {:?}", signature_alg);
+            error!("  $8 (payload_hash): {:?}", payload.payload_hash);
             error!("  $9 (observed_at): {:?}", timestamp);
             error!("  $10 (event_name): {:?}", event_name);
             error!("  $11 (event_category): {:?}", event_category);
+            error!("  $12 (pid): {:?}", pid);
+            error!("  $13 (ppid): {:?}", ppid);
+            error!("  $14 (uid): {:?}", uid);
+            error!("  $15 (gid): {:?}", gid);
+            error!("  $16 (username): {:?}", username);
+            error!("  $17 (process_name): {:?}", process_name);
+            error!("  $18 (process_path): {:?}", process_path);
+            error!("  $19 (cmdline): {:?}", cmdline);
+            error!("  $20 (file_path): {:?}", file_path);
+            error!("  $21 (network_src_ip): {:?}", network_src_ip);
+            error!("  $22 (network_src_port): {:?}", network_src_port);
+            error!("  $23 (network_dst_ip): {:?}", network_dst_ip);
+            error!("  $24 (network_dst_port): {:?}", network_dst_port);
+            error!("  $25 (protocol): {:?}", protocol);
+            error!("  $26 (payload_json): {} bytes", payload_json.len());
+            error!("  $27 (payload_sha256): {:?}", payload_sha256);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -479,8 +509,8 @@ async fn handle_dpi_ingest(
             http_host, http_method, http_path, iface_name, flow_id, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, $23, $24, $25
+            $1, $2, $3, $4, $5, $6, $7, $8, CAST($9 AS inet), $10, CAST($11 AS inet), $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21, $22, CAST($23 AS jsonb), $24, $25
         )
         "#,
         &[
@@ -507,7 +537,7 @@ async fn handle_dpi_ingest(
             &http_path,
             &iface_name,
             &flow_id,
-            &data,
+            &serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string()), // Serialize JsonValue to string for JSONB
             &Some(hex::decode(&payload.payload_hash).unwrap_or_default()),
         ],
     ).await;
