@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Path and File Name: /home/ransomeye/rebuild/ransomeye_windows_agent/installer/RansomEyeWindowsAgent.wxs -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU -->
+<!-- Details: WiX installer project for Windows Agent (MSI installer) -->
+<!-- 
+    This is the CORE installer logic (NOT PowerShell).
+    PowerShell scripts are only wrappers.
+    Build with: candle RansomEyeWindowsAgent.wxs && light RansomEyeWindowsAgent.wixobj
+-->
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" 
+           Name="RansomEye Windows Agent" 
+           Language="1033" 
+           Version="1.0.0" 
+           Manufacturer="RansomEye.Tech" 
+           UpgradeCode="YOUR-UPGRADE-GUID-HERE">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="RansomEye Windows Agent - Endpoint telemetry collection"
+             Manufacturer="RansomEye.Tech" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of RansomEye Windows Agent is already installed." />
+    
+    <MediaTemplate />
+
+    <!-- EULA -->
+    <WixVariable Id="WixUILicenseRtf" Value="EULA.rtf" />
+
+    <!-- Installation directory -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLDIR" Name="RansomEye">
+          <Directory Id="AGENTDIR" Name="WindowsAgent" />
+        </Directory>
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="DATADIR" Name="RansomEye">
+          <Directory Id="AGENTDATADIR" Name="WindowsAgent">
+            <Directory Id="CONFIGDIR" Name="config" />
+            <Directory Id="LOGDIR" Name="logs" />
+            <Directory Id="BUFFERDIR" Name="buffer" />
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <!-- Components -->
+    <ComponentGroup Id="ProductComponents" Directory="AGENTDIR">
+      <!-- Binary -->
+      <Component Id="BinaryComponent" Guid="YOUR-GUID-HERE">
+        <File Id="AgentBinary" 
+              Source="$(var.SourceDir)\target\release\ransomeye_windows_agent.exe" 
+              KeyPath="yes">
+          <Permission User="Everyone" GenericAll="yes" />
+        </File>
+      </Component>
+      
+      <!-- Install receipt -->
+      <Component Id="ReceiptComponent" Guid="YOUR-GUID-HERE">
+        <File Id="InstallReceipt" 
+              Source="$(var.SourceDir)\installer\receipt.json" 
+              KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Windows Service -->
+    <ComponentGroup Id="ServiceComponents" Directory="AGENTDIR">
+      <Component Id="ServiceComponent" Guid="YOUR-GUID-HERE">
+        <File Id="ServiceBinary" 
+              Source="$(var.SourceDir)\target\release\ransomeye_windows_agent.exe" 
+              KeyPath="yes" />
+        
+        <ServiceInstall Id="AgentService"
+                        Type="ownProcess"
+                        Name="RansomEyeWindowsAgent"
+                        DisplayName="RansomEye Windows Agent"
+                        Description="RansomEye Windows Agent - Endpoint telemetry collection"
+                        Start="auto"
+                        Account="LocalSystem"
+                        ErrorControl="normal"
+                        Interactive="no">
+          <ServiceDependency Id="Tcpip" />
+        </ServiceInstall>
+        
+        <ServiceControl Id="StartService"
+                        Stop="both"
+                        Remove="uninstall"
+                        Name="RansomEyeWindowsAgent"
+                        Wait="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="RansomEye Windows Agent" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="ServiceComponents" />
+    </Feature>
+
+    <!-- UI -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+    <!-- Custom actions for EULA acceptance -->
+    <CustomAction Id="SetAcceptEULA" Property="ACCEPTEULA" Value="1" />
+    <Property Id="ACCEPTEULA" Value="0" />
+
+    <!-- Install sequence -->
+    <InstallExecuteSequence>
+      <Custom Action="SetAcceptEULA" Before="InstallInitialize">
+        ACCEPTEULA="0"
+      </Custom>
+    </InstallExecuteSequence>
+
+  </Product>
+</Wix>
+

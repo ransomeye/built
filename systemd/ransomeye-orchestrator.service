@@ -1,0 +1,109 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-orchestrator.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Core Orchestrator with enterprise-grade hardening and fail-closed behavior
+# CRITICAL: Rootless runtime enforcement - MUST NOT run as root (UID 0)
+# RUNTIME: Uses /opt/ransomeye (not /home/ransomeye/rebuild)
+# FAIL-CLOSED: Restart=no ensures service fails loudly on non-zero exit
+
+[Unit]
+Description=RansomEye Core Orchestrator
+After=network.target
+Wants=network.target
+# Pre-start validation: fail-closed if runtime layout invalid
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye_orchestrator
+ConditionPathExists=/etc/ransomeye/ransomeye.runtime.env
+ConditionPathExists=/usr/share/ransomeye/schema/ransomeye_schema.sql
+
+[Service]
+Type=simple
+# CRITICAL: Fail-closed behavior - no automatic restarts
+# Service MUST fail loudly if orchestrator exits non-zero
+Restart=no
+# Rootless execution - no privilege escalation
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+RuntimeDirectory=ransomeye/orchestrator ransomeye/policy
+StateDirectory=ransomeye/orchestrator ransomeye/policy
+# Pre-start validation: verify runtime layout ownership and binary exists
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -x /opt/ransomeye/bin/ransomeye_orchestrator || exit 1'
+ExecStartPre=/bin/sh -c 'test -f /etc/ransomeye/ransomeye.runtime.env || exit 1'
+ExecStart=/opt/ransomeye/bin/ransomeye_orchestrator
+StandardOutput=journal
+StandardError=journal
+
+# ============================================================================
+# ENTERPRISE-GRADE SECURITY HARDENING (MANDATORY)
+# ============================================================================
+# NoNewPrivileges: Prevents privilege escalation via setuid/setgid
+NoNewPrivileges=true
+
+# ProtectSystem: Makes /usr, /boot, /etc read-only (strict = all except /dev, /proc, /sys, /run, /tmp)
+ProtectSystem=strict
+
+# ProtectHome: Makes /home, /root, /run/user read-only
+ProtectHome=true
+
+# PrivateTmp: Uses private /tmp and /var/tmp (isolated from other services)
+PrivateTmp=true
+
+# PrivateDevices: Removes access to physical devices (/dev/* except /dev/null, /dev/zero, /dev/random, /dev/urandom)
+PrivateDevices=true
+
+# ProtectKernelTunables: Prevents modification of kernel parameters via /proc/sys, /sys
+ProtectKernelTunables=true
+
+# ProtectKernelModules: Prevents loading/unloading kernel modules
+ProtectKernelModules=true
+
+# ProtectControlGroups: Prevents modification of control group settings
+ProtectControlGroups=true
+
+# RestrictAddressFamilies: Limits socket address families (AF_UNIX, AF_INET, AF_INET6 only)
+# This prevents use of other address families (e.g., AF_NETLINK, AF_PACKET)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# LockPersonality: Prevents changing Linux personality (prevents ABI emulation)
+LockPersonality=true
+
+# MemoryDenyWriteExecute: Prevents creating writable and executable memory mappings
+# This prevents code injection attacks
+MemoryDenyWriteExecute=true
+
+# RestrictRealtime: Prevents real-time scheduling (prevents DoS via CPU starvation)
+RestrictRealtime=true
+
+# RestrictNamespaces: Prevents creating new namespaces (prevents container escape)
+RestrictNamespaces=true
+
+# SystemCallArchitectures: Limits system calls to native architecture only
+SystemCallArchitectures=native
+
+# Runtime paths: /opt/ransomeye and state directories (read-write access required)
+# NOTE: Policy engine persists version state under /var/lib/ransomeye/policy (mandatory)
+ReadWritePaths=/opt/ransomeye /var/lib/ransomeye/orchestrator /var/lib/ransomeye/policy /var/log/ransomeye /run/ransomeye/orchestrator /run/ransomeye/policy /etc/ransomeye
+
+# Capability-based privileges (minimal set - no root required)
+# Orchestrator does not require elevated capabilities
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateUsers=false
+
+# Environment
+Environment="RANSOMEYE_ROOT=/opt/ransomeye"
+Environment="PYTHONUNBUFFERED=1"
+# Authoritative DB schema source (single source of truth)
+Environment="RANSOMEYE_SCHEMA_SQL_PATH=/usr/share/ransomeye/schema/ransomeye_schema.sql"
+# Explicit environment files (runtime first, then secrets)
+# SECURITY: runtime.env (0640) contains non-secret runtime variables readable by ransomeye user
+# SECURITY: ransomeye.env (0600) contains secrets and is root-only
+# ORDER: runtime.env loaded first, then ransomeye.env (secrets override if needed)
+EnvironmentFile=/etc/ransomeye/ransomeye.runtime.env
+# DB ENVIRONMENT (MANDATORY): systemd reads as root and injects DB_* into the service
+EnvironmentFile=/etc/ransomeye/db.env
+EnvironmentFile=/etc/ransomeye/ransomeye.env
+
+[Install]
+WantedBy=multi-user.target
+

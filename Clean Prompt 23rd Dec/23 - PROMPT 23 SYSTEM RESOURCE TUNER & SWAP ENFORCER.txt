@@ -1,0 +1,97 @@
+PROMPT 23: SYSTEM RESOURCE TUNER & SWAP ENFORCER
+Role: Senior Linux Kernel Engineer Target Path: /home/ransomeye/rebuild/ops/tuner/ Goal: Build the ransomeye-tuner crate. Context: You have strict requirements: Minimum 16GB Swap, Multi-threading, and CPU Pinning. This module enforces them at the OS level before the main application starts. If it cannot guarantee these resources (e.g., disk full), it must prevent the Core from starting (Fail-Closed).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/ops/tuner/
+
+Workspace: You must add "ops/tuner" to the [workspace.members] list in the root Cargo.toml.
+
+Swap Enforcement (STRICT):
+
+The system MUST have Swap enabled.
+
+Formula: Target_Swap = MAX(16GB, Total_RAM).
+
+If current swap is insufficient, the tool must automatically create a /swapfile, format it, and enable it.
+
+CPU Pinning & Threading:
+
+Use core_affinity or cgroups-rs to detect NUMA nodes.
+
+Rule: If Cores >= 8:
+
+Isolate 2 cores specifically for "AI Training" (preventing starvation of the DB).
+
+Isolate 2 cores specifically for "DPI Capture".
+
+Generate a systemd drop-in file cpu-isolation.conf to enforce this.
+
+Fail-Closed:
+
+If the tool cannot allocate Swap (e.g., disk full), it must Prevent Core Startup by creating a lock file /var/lock/ransomeye-resource-fail.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/ops/tuner/:
+
+Plaintext
+
+ops/tuner/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # CLI Entrypoint
+    ├── swap.rs                 # Swapfile creation & validation
+    ├── cpu.rs                  # Core enumeration & Cgroup generation
+    ├── kernel.rs               # Sysctl tuning (vm.swappiness=10)
+    └── systemd.rs              # Drop-in generation
+
+
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Swap Enforcement (src/swap.rs)
+Logic:
+
+Read /proc/swaps.
+
+Calculate Required_Swap = std::cmp::max(16 * 1024 * 1024 * 1024, sys_info::mem_info().total).
+
+If Current < Required:
+
+Check Disk Space using fs2.
+
+Run: fallocate -l {Required} /swapfile -> chmod 600 -> mkswap -> swapon.
+
+Add to /etc/fstab if missing to ensure persistence.
+
+B. CPU Isolation (src/cpu.rs)
+Logic:
+
+Detect Core Count using num_cpus.
+
+Generate AllowedCPUs= configurations for systemd.
+
+Output:
+
+Write /etc/systemd/system/ransomeye-core.service.d/affinity.conf pinning Core to CPUs 0 to (N-3).
+
+Write /etc/systemd/system/ransomeye-training.service.d/affinity.conf pinning Training to CPUs (N-2, N-1).
+
+C. Kernel Tuning (src/kernel.rs)
+Logic:
+
+Apply sysctl settings dynamically:
+
+vm.swappiness = 10 (Aggressively keep application memory in RAM, push idle data to Swap).
+
+
+vm.vfs_cache_pressure = 50.
+
+4. ✅ ACCEPTANCE CRITERIA
+Swap Test: Running the tool on a 4GB RAM VM creates a 16GB /swapfile.
+
+Pinning Test: On an 8-core machine, it generates systemd configs that reserve the last 2 cores specifically for AI tasks.
+
+Safety: The tool fails gracefully if the disk is full, logging a critical error and creating the failure lock file.
+
+
+Build: cargo build -p ransomeye-tuner succeeds.

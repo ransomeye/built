@@ -1,0 +1,27 @@
+[package]
+name = "threat_feed"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "threat_feed"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+ring = "0.17"
+base64 = "0.21"
+hex = "0.4"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+parking_lot = "0.12"
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3.8"
+tokio-test = "0.4"

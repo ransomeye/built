@@ -1,0 +1,31 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_policy/policies/lateral_movement.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Lateral movement policy
+id: lateral_movement
+version: 1.0.1
+name: Lateral Movement Policy
+description: Policy for responding to lateral movement alerts
+enabled: true
+priority: 80
+match_conditions:
+- field: kill_chain_stage
+  operator: equals
+  value: command_control
+- field: alert_severity
+  operator: in
+  value:
+  - high
+  - medium
+decision:
+  action: quarantine
+  allowed_actions:
+  - quarantine
+  - monitor
+  - escalate
+  reasoning: Lateral movement detected - quarantine affected assets
+required_approvals:
+- security_team
+signature: eJpSJR82JXJrkWIMZwWEYOHX9vnhqF1cTxTdGHz43zHeZ8Ylt/37/vGoDuaehpdPnTnWqjwIKD6NMY48Y8xAwlD+wQ4mTdPdgYJ1x+vpE1MHwzWe2PmO+KtQu1RvYbrM+QXXuS8WO7LDuSQaCtwAFgfh81d6vB0VizQSbnioixAhW+yr1ULh/aXb2z0CGGpMG4j8+043eWWvDj7PoSKZNi2i+0Q0Hrw1tbKhZP/hJWTryLlWMc3uLrL+zbuNEn0kv2yRavS7mL0JSU2FdSYutyRldIcCGQ0gkdQxh45EullR+xBLXNKIuaXGMy4wLmAJOzinAQb2Htf8Hfp6/PNC6hglpU+DDh5ZAiVJ4OnFE9kZnb6N+Irmaf1raTDSTOCs2A9Xw7rO3Bo7OUUVkGOuDlBOHznRs2SWJYQBsyFxTcxXauFmbAziTHKjXmOcb0uEHpbgAjW5GE18jzAhGa6EvBYOD1FjXzKNapCaiD71FPv49X3IXeCo+BiO5ew4Ciml+wGcaiOF1JwNNKazKhY/ojJNHC6dZR5qNyGu8yJFHA5m0jlCi9Y7gOCSzfWSTGDjBti/TALU5XktB3Pt9Gp/58lz/NjhPk7n2IJd8OHU2GETwDa543+PNMmgs0UACuAScxNlTtLnVtPVfM5S/wDLJ5VOHL1BzrVmuHIZGVA48U8=
+signature_hash: e5d685dbb7574bbd72af610f3a28b6ba235977e79597a02d5f05f384720f51b1
+signature_alg: RSA-4096-SHA256
+key_id: policy_root_v1

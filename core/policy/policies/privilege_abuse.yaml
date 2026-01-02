@@ -1,0 +1,31 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_policy/policies/privilege_abuse.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Privilege abuse policy
+id: privilege_abuse
+version: 1.0.1
+name: Privilege Abuse Policy
+description: Policy for responding to privilege abuse alerts
+enabled: true
+priority: 70
+match_conditions:
+- field: kill_chain_stage
+  operator: equals
+  value: exploitation
+- field: alert_severity
+  operator: in
+  value:
+  - high
+  - medium
+decision:
+  action: block
+  allowed_actions:
+  - block
+  - monitor
+  - escalate
+  reasoning: Privilege abuse detected - block unauthorized access
+required_approvals:
+- security_team
+signature: mZrlBz/d2ZroCrurF+9SfupbD7QO1lzp8i0a47ad/AElmtYk1t+xHg3pWpt72rVXvdo8+w0aQLOB0g6ms4/+3FRALOjdNIqD+Nb3zSONUjf+mEBEmwqGdPbbuaiuZ+KND8fnlpoZp+wW9ITkOk5Pvk/59F0LCRYU8+NWmmiaGSSPON9EB9+1O6zZ2AnjGq4/F6GDipZtT8PKjTl+QVqPoJru1t5wFeZvaO4somoe5HM2qNv3IIEn0ijU/QvBFjpmbkqvXaW7rY1n2I7Na/z9MTKkHJBO08pduEaXKkD0rI8rhdmPnKnLpbcuBj3UIGo/1VfkNhyFObQhh9T1s2GOKHuT24/0r7yJRcXcszMGl1gM5744iTV+5wo+h1a3VrczzbAFQnzemS0riHP0bcsKXk6dNnH/3Cn3pK3Q7fnQ5JHGQZMyBcEZxFNCmb/g90JRM2rVG34ShX11iO4F8bAZwrJuNUZss/NceNEf+Quea+3eYlve+dFDoW6sF6SeVyzpaJ1brb9zYM9e64+v07Rw7Rg51myxybuxD43hJzYGMa/W8XAcFcIQYJ2rpzo1Finq7uLD+8KHxGRf5JvIQO6IzQ81mX3HFSTeV8L2kO5duulKeOwiMxDLH2p6/ek3bxh8JFQm1l6u27x6XaedeLWHyLHHesjxwwPPU+9yyNuhL9A=
+signature_hash: 99e5b9c2861542e391f5314b3a61104dc2d13b872ce9210fcffc90b2cdbc19ad
+signature_alg: RSA-4096-SHA256
+key_id: policy_root_v1

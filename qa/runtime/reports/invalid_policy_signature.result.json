@@ -1,0 +1,25 @@
+{
+  "test_name": "invalid_policy_signature",
+  "timestamp": "2025-12-30T08:32:08Z",
+  "expected_behavior": {
+    "policy_engine_refuses_init": true,
+    "orchestrator_aborts_before_ready": true,
+    "exit_code_non_zero": true,
+    "service_remains_failed": true
+  },
+  "observed_behavior": {
+    "service_status": "failed
+failed",
+    "exit_code": "1",
+    "restart_count": "0",
+    "failure_detection_time_seconds": ".286617991",
+    "error_visible_in_journal": true
+  },
+  "test_results": {
+    "failed_correctly": false,
+    "exit_code_correct": true,
+    "no_restart": true,
+    "error_visible": true
+  },
+  "pass": false
+}

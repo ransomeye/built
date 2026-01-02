@@ -1,0 +1,112 @@
+PROMPT 24: UNIFIED TRAINING ORCHESTRATOR (Disk-Aware)
+Role: MLOps Engineer & Systems Architect Target Path: /home/ransomeye/rebuild/core/trainer/
+
+Goal: Build the ransomeye-trainer crate. Context: We need machine learning models ready immediately ("Day 1"), but training generates large files. This service manages the lifecycle to ensuring that the Core, DPI, and Agent training processes never exceed their allocated Disk Storage quotas. It also runs them strictly sequentially to avoid thrashing the disk I/O.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/trainer/
+
+Workspace: Add "core/trainer" to the [workspace.members] list in the root Cargo.toml.
+
+Storage Limits (STRICT):
+
+Core Training: Must be capped at 3GB Disk Space (Models + Temp Data).
+
+DPI Training: Must be capped at 3GB Disk Space.
+
+Agent Training: Must be capped at 200MB Disk Space.
+
+Enforcement: Before starting, check available space. During/After training, verify the output directory size. If it exceeds the limit, Prune the oldest checkpoints immediately.
+
+Concurrency:
+
+Sequential Only: NEVER run Core, DPI, and Agent training simultaneously.
+
+Queue: Core -> DPI -> Agent.
+
+Day 1 Logic:
+
+On first boot, check for models/*.onnx.
+
+If missing, trigger Initial Seed Training.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/trainer/:
+
+Plaintext
+
+core/trainer/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # Scheduler Loop
+    ├── storage.rs              # Disk Usage & Pruning Logic
+    ├── queue.rs                # Sequential Scheduler
+    └── jobs/
+        ├── mod.rs
+        ├── core_job.rs         # Invokes core/ai/train
+        ├── dpi_job.rs          # Invokes edge/dpi/train
+        └── agent_job.rs        # Invokes edge/agent/train
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Disk Usage Enforcement (src/storage.rs)
+Logic:
+
+Check: pub fn check_usage(path: &Path) -> u64. Use walkdir to sum the size of all files in the target directory.
+
+Enforce: pub fn enforce_limit(path: &Path, limit_mb: u64) -> Result<(), TrainerError>.
+
+If usage > limit:
+
+Identify .checkpoint or .tmp files.
+
+Sort by modification time (Oldest first).
+
+Delete until usage < limit.
+
+If valid models still exceed limit: Log Critical Error "Model too large for quota".
+
+B. Job Queue (src/queue.rs)
+Logic:
+
+Poll: Check system_load (optional, to be polite).
+
+Sequence:
+
+Step 1: Run jobs::core_job::run().
+
+Arguments: --max-disk-mb 3072.
+
+Wait for completion.
+
+Step 2: Run jobs::dpi_job::run().
+
+Arguments: --max-disk-mb 3072.
+
+Wait for completion.
+
+Step 3: Run jobs::agent_job::run().
+
+Arguments: --max-disk-mb 200.
+
+Wait for completion.
+
+C. Job Execution (src/jobs/core_job.rs)
+Logic:
+
+Define target path: /var/lib/ransomeye/models/core/.
+
+Pre-Flight: Call storage::enforce_limit() to clean up old junk before starting.
+
+Execute: Spawn the training binary/script.
+
+Post-Flight: Call storage::enforce_limit() again to ensure the result fits the budget.
+
+4. ✅ ACCEPTANCE CRITERIA
+Quota Enforcement: A mock training job that produces a 4GB file triggers the storage::enforce_limit logic, which deletes the file or logs a violation error.
+
+Agent Limit: The Agent training job strictly respects the 200MB limit (verified by mocking the disk check).
+
+Sequential Execution: Logs show that DPI training does NOT start until Core training has finished (Exit Code 0).
+
+Build: cargo build -p ransomeye-trainer succeeds.

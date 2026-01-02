@@ -1,0 +1,55 @@
+Phase 7A: The Standalone Linux Agent
+Role: Systems Programmer & Linux Security Researcher
+
+Target Path: /home/ransomeye/rebuild/edge/ransomeye_agent/
+
+
+Goal: Build the self-contained Linux Agent binary capable of process monitoring, file integrity checking, and network deception.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+Standalone Architecture: The Linux build must include its own standalone installer and systemd unit files.
+
+
+
+Port Registry: Honeyport listener defaults to 8080. If 8080 is occupied, it must fail-over to 8088.
+
+
+
+
+
+Security: Verify Ed25519 signatures for all incoming CommandRequest packets against the Core Public Key.
+
+
+
+Linux Specifics: Utilize libc for signal handling (SIGTERM) and iptables for network isolation.
+
+
+2. 📂 DIRECTORY STRUCTURE
+Plaintext
+
+edge/ransomeye_agent/
+├── src/
+│   ├── main.rs                 # Event Loop & Signal Handling
+│   ├── telemetry/
+│   │   ├── process_linux.rs    # /proc/ filesystem polling
+│   │   └── file_mon.rs         # Inotify-based file watching
+│   ├── deception/
+│   │   ├── honeyport.rs        # TCP Listener (8080)
+│   │   └── honeyfile.rs        # Fake sensitive files
+│   └── command_exec_linux.rs   # iptables & process kill logic
+├── installer/
+│   ├── install_linux.sh        # Standalone Bash Installer
+│   └── uninstall_linux.sh      # Clean removal script
+└── systemd/
+    └── ransomeye-agent.service # Linux Service Unit
+3. ⚙️ IMPLEMENTATION DETAILS
+
+Deception Engine: The honeyport.rs module opens a raw TCP socket. If any IP connects, it emits an IMMEDIATE_ALERT to the Bus.
+
+
+
+Isolation Logic: When a CommandRequest::Isolate is received and verified, the agent executes iptables -A OUTPUT -p tcp --dport 8000 -j ACCEPT followed by iptables -P OUTPUT DROP to lock down the host while maintaining the management link.
+
+
+Installer: The install_linux.sh must detect the init system (Systemd), copy the binary to /opt/ransomeye/bin, and establish the persistence link.

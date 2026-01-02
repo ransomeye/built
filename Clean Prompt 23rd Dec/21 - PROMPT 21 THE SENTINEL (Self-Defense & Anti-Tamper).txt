@@ -1,0 +1,102 @@
+PROMPT 21: THE SENTINEL (Self-Defense & Anti-Tamper)
+Role: Kernel Security Engineer & Windows Internals Specialist Target Path: /home/ransomeye/rebuild/edge/sentinel/ Goal: Build the ransomeye-sentinel crate. Context: Sophisticated ransomware attempts to "blind" security tools by killing their processes or deleting their config before encryption. The Sentinel ensures resilience. It uses OS-specific hardening (PPL, Kernel Callbacks, Immutable Flags) to survive these "Kill Attempts." If it detects an unavoidable termination, it triggers a "Dead Man's Switch" to alert the Core immediately.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/edge/sentinel/
+
+Workspace: You must add "edge/sentinel" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+windows (crate): For ACL/DACL manipulation and PPL (Protected Process Light) checks on Windows.
+
+libc: For Linux signal handling (SIGTERM monitoring).
+
+notify: To watch config.toml for unauthorized file access/deletion.
+
+sha2: To constantly verify the integrity of the running binary (Self-Hashing).
+
+core/bus: To emit a "Tamper Alert" or "Health Check Failure".
+
+OS Specifics:
+
+Windows: You must implement logic to adjust the DACL (Discretionary Access Control List) of the process to DENY PROCESS_TERMINATE rights to Everyone (including Admin).
+
+Linux: You must use O_TMPFILE logic or check chattr +i (immutable bit) for config files.
+
+Fail-Safe:
+
+If the Sentinel detects a kill attempt, it must trigger a "Dead Man's Switch": Flush all logs to disk and send a final high-priority Alert to the backend before dying.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/edge/sentinel/:
+
+Plaintext
+
+edge/sentinel/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports the Sentinel
+    ├── watchdog.rs             # Monitors the main Agent thread
+    ├── integrity.rs            # Hashes own binary/config on loop
+    └── os/
+        ├── mod.rs
+        ├── windows_harden.rs   # DACL / PPL Logic
+        └── linux_harden.rs     # Anti-Debug / Immutable Files
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Watchdog (src/watchdog.rs)
+Logic:
+
+Spawn a separate thread (or process context) that strictly monitors the Main Agent Engine.
+
+Heartbeat: If the Main Engine stops responding for > 5 seconds, the Sentinel attempts to restart it (Self-Healing).
+
+Dead Man's Switch: If the Sentinel itself receives a termination signal (SIGTERM / CTRL_CLOSE_EVENT), it writes a TAMPER_DETECTED event to crashing_artifacts.json and attempts to push to the Bus.
+
+B. Windows Hardening (src/os/windows_harden.rs)
+Function: pub fn harden_process() Logic:
+
+Get the current Process Handle (GetCurrentProcess).
+
+Modify DACL:
+
+Deny: PROCESS_TERMINATE, PROCESS_VM_WRITE (Code Injection), PROCESS_SUSPEND_RESUME.
+
+Target: S-1-1-0 (Everyone), including Administrators.
+
+Note: This blocks 90% of user-mode malware (e.g., Task Manager "End Task").
+
+C. Linux Hardening (src/os/linux_harden.rs)
+Function: pub fn protect_resources() Logic:
+
+Config Locking: Check if config.toml has the immutable attribute (lsattr). If not, log a warning (requires root to set).
+
+Anti-Debug: Check /proc/self/status for TracerPid.
+
+If TracerPid != 0, a debugger (gdb, strace) or malware is attaching.
+
+Action: Panic immediately (Crash to prevent analysis) and emit Alert.
+
+D. Integrity Checker (src/integrity.rs)
+Logic:
+
+Store the SHA256 of config.toml and the ransomeye-agent binary in memory at startup.
+
+Loop (every 10s): Re-hash the file on disk.
+
+Check: If Disk Hash != Memory Hash, it means someone replaced the binary or config behind our back (Persistence Attack).
+
+Action: bus.send(Alert::Critical("Integrity Violation: Binary Replaced")).
+
+4. ✅ ACCEPTANCE CRITERIA
+Tamper Test (Config): Manually modifying config.toml triggers an "Integrity Violation" alert within 10 seconds.
+
+Tamper Test (Kill): (On Windows) Attempting to "End Task" via Task Manager is denied (Access Denied).
+
+Anti-Debug: Attaching strace or gdb to the process triggers a detection event or immediate exit.
+
+Resilience: The Sentinel runs with minimal CPU usage (< 0.1%) while polling.
+
+Build: cargo build -p ransomeye-sentinel succeeds.

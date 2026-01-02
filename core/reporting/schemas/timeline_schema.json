@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forensic Timeline Schema",
+  "description": "Schema for RansomEye forensic timelines - deterministic chronological ordering with source attribution",
+  "type": "object",
+  "required": [
+    "events"
+  ],
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TimelineEvent"
+      },
+      "description": "Chronologically ordered timeline events"
+    }
+  },
+  "definitions": {
+    "TimelineEvent": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "source",
+        "source_type",
+        "event_type",
+        "description",
+        "evidence_id",
+        "metadata"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp in UTC (ISO 8601)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source system that produced this event"
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "dpi_probe",
+            "linux_agent",
+            "windows_agent",
+            "correlation_engine",
+            "alert_engine",
+            "forensic_engine",
+            "threat_intel",
+            "manual"
+          ],
+          "description": "Type of source system"
+        },
+        "event_type": {
+          "type": "string",
+          "description": "Type of event (e.g., evidence, alert, correlation)"
+        },
+        "kill_chain_stage": {
+          "type": ["string", "null"],
+          "enum": [
+            "reconnaissance",
+            "weaponization",
+            "delivery",
+            "exploitation",
+            "installation",
+            "command_and_control",
+            "actions_on_objectives",
+            null
+          ],
+          "description": "MITRE ATT&CK kill chain stage"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable event description"
+        },
+        "evidence_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for associated evidence"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional event metadata (structure depends on event_type)"
+        }
+      }
+    }
+  }
+}
+

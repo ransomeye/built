@@ -1,0 +1,55 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-retention-enforcer.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for periodic runtime DB retention enforcement (purge-only) with fail-closed behavior and immutable audit logging.
+# CRITICAL: Rootless runtime enforcement - MUST NOT run as root (UID 0)
+# RUNTIME: Uses /opt/ransomeye (not /home/ransomeye/rebuild)
+
+[Unit]
+Description=RansomEye Runtime Retention Enforcer (DB purge-only)
+After=network.target ransomeye-orchestrator.service
+Requires=network.target ransomeye-orchestrator.service
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye_retention_enforcer
+ConditionPathExists=/etc/ransomeye/ransomeye.runtime.env
+ConditionPathExists=/etc/ransomeye/ransomeye.env
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+RuntimeDirectory=ransomeye/retention
+StateDirectory=ransomeye/retention
+
+# Pre-start validation: fail-closed if runtime layout invalid
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -x /opt/ransomeye/bin/ransomeye_retention_enforcer || exit 1'
+ExecStartPre=/bin/sh -c 'test -f /etc/ransomeye/ransomeye.runtime.env || exit 1'
+ExecStartPre=/bin/sh -c 'test -f /etc/ransomeye/ransomeye.env || exit 1'
+
+# LIVE mode is explicit; deletes are bounded via env (batch size + max batches)
+ExecStart=/opt/ransomeye/bin/ransomeye_retention_enforcer --live
+
+Restart=always
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ransomeye /var/lib/ransomeye/retention /var/log/ransomeye /run/ransomeye/retention /etc/ransomeye
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateUsers=false
+
+# Environment
+Environment="RANSOMEYE_ROOT=/opt/ransomeye"
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=/etc/ransomeye/ransomeye.runtime.env
+EnvironmentFile=/etc/ransomeye/ransomeye.env
+
+[Install]
+WantedBy=multi-user.target
+
+

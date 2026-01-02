@@ -1,0 +1,65 @@
+[package]
+name = "auditor"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+ring = { workspace = true }
+ed25519-dalek = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+crossbeam-channel = { workspace = true }
+once_cell = { workspace = true }
+rand = "0.8"
+futures = "0.3"
+async-trait = "0.1"
+rusqlite = "0.30"
+postgres = "0.19"
+tokio-stream = "0.1"
+bytes = "1.5"
+regex = "1.10"
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3.8"
+mockall = "0.12"
+tokio-test = "0.4"
+proptest = "1.4"
+
+[lib]
+name = "auditor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "auditor"
+path = "src/main.rs"
+
+[[bin]]
+name = "chaos"
+path = "tools/chaos.rs"
+
+[[bin]]
+name = "replay"
+path = "tools/replay.rs"
+
+[[bin]]
+name = "verifier"
+path = "tools/verifier.rs"
+
+[[bin]]
+name = "auditor_tool"
+path = "tools/auditor.rs"
+

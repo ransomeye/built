@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DPI Probe Telemetry Event Schema",
+  "description": "Schema for signed telemetry events emitted by RansomEye DPI Probe",
+  "type": "object",
+  "required": [
+    "message_id",
+    "timestamp",
+    "nonce",
+    "component_identity",
+    "data",
+    "signature",
+    "data_hash"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp in ISO-8601 format (UTC)"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "64-character hex-encoded nonce for replay protection"
+    },
+    "component_identity": {
+      "type": "string",
+      "pattern": "^dpi_probe_[0-9a-f]{32}$",
+      "description": "DPI Probe component identity hash"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "flow_id",
+        "src_ip",
+        "dst_ip",
+        "src_port",
+        "dst_port",
+        "protocol",
+        "packet_count",
+        "byte_count"
+      ],
+      "properties": {
+        "flow_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique flow identifier"
+        },
+        "src_ip": {
+          "type": "string",
+          "oneOf": [
+            {"format": "ipv4"},
+            {"format": "ipv6"}
+          ],
+          "description": "Source IP address"
+        },
+        "dst_ip": {
+          "type": "string",
+          "oneOf": [
+            {"format": "ipv4"},
+            {"format": "ipv6"}
+          ],
+          "description": "Destination IP address"
+        },
+        "src_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Source port number"
+        },
+        "dst_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Destination port number"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["TCP", "UDP", "ICMP", "PROTO_1", "PROTO_6", "PROTO_17"],
+          "description": "Transport protocol name"
+        },
+        "packet_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of packets in flow"
+        },
+        "byte_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of bytes in flow"
+        },
+        "classification": {
+          "type": "string",
+          "default": "unknown",
+          "description": "Flow classification (always 'unknown' from DPI Probe - classification done by Control Plane)"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional flow metadata"
+        }
+      }
+    },
+    "signature": {
+      "type": "string",
+      "description": "Base64-encoded RSA-4096-PSS-SHA256 signature"
+    },
+    "data_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hash of data field (hex-encoded)"
+    }
+  }
+}

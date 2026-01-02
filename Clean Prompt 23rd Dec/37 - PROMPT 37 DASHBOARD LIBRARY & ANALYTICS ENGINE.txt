@@ -1,0 +1,139 @@
+# 📊 PROMPT 37: DASHBOARD LIBRARY & ANALYTICS ENGINE
+
+**Role:** Data Visualization Engineer & Product Manager
+**Target Path:** `/home/ransomeye/rebuild/`
+
+**Goal:** Create a robust Analytics Engine that provisions **23 Default Dashboards** into the `ransomeye_db` and renders them dynamically in the `ransomeye_console`.
+
+**Context:**
+
+1. **The "Blank Slate" Problem:** Users assume a tool is broken if it installs with zero data/views. We must ship pre-built value.
+2. **Persona Mapping:**
+* **Leadership (CISO, SOC Head):** High-level KPI cards (Risk Score, SLA Status, Budget/ROI).
+* **Operational (Analyst):** Granular, tactical graphs (Packet Drops, Lateral Movement, Beaconing).
+
+
+3. **Data Integrity:** Every widget MUST map to the actual SQL Schema defined in Prompt 35 (`hosts`, `alerts`, `events`, `telemetry_edges`). No fake columns allowed.
+
+---
+
+### 1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+1. **Dashboard Count:** You must define JSON configuration blobs for exactly **23 Dashboards** (3 Leadership + 20 Operational).
+2. **Database Mapping (Strict):**
+* All SQL/Analytics queries must target existing tables: `hosts`, `events`, `alerts`, `telemetry_edges`, `audit_logs`.
+
+
+3. **Provisioning Mechanism:**
+* Create a **Seed Module** (`core/ransomeye_db/src/seeds/dashboards.rs`) that runs on startup.
+* It checks if the `dashboards` table is empty. If yes, it inserts the 23 JSON definitions.
+
+
+4. **Dynamic Rendering:**
+* The Frontend (`ransomeye_console`) must NOT hardcode these dashboards. It must fetch the JSON config from the API and render the layout dynamically. This allows you to add Dashboard #24 later without redeploying the UI.
+
+
+
+---
+
+### 2. 📂 DIRECTORY & FILE PLAN
+
+**A. Update `core/ransomeye_db`:**
+
+* `migrations/202512230002_create_dashboards.sql` (Schema)
+* `src/seeds/dashboards.rs` (The Library of 23 JSONs)
+* `src/lib.rs` (Export the seed function)
+
+**B. Update `core/ransomeye_api`:**
+
+* `src/routes/analytics.rs` (Endpoints to fetch Config + Execute Queries)
+
+**C. Update `ui/ransomeye_console`:**
+
+* `src/components/analytics/DashboardRenderer.tsx` (The Engine)
+* `src/components/analytics/WidgetFactory.tsx` (Maps JSON type -> Recharts Component)
+
+---
+
+### 3. ⚙️ IMPLEMENTATION DETAILS
+
+#### A. Database Schema (`core/ransomeye_db`)
+
+**Migration SQL:**
+
+```sql
+CREATE TABLE dashboards (
+    id UUID PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL, -- 'Executive', 'Tactical', 'Compliance'
+    role_required TEXT,     -- 'ciso', 'admin', 'analyst'
+    layout JSONB NOT NULL,  -- Grid coordinates (x, y, w, h)
+    widgets JSONB NOT NULL  -- Array of { title, type, sql_query, refresh_rate }
+);
+
+```
+
+#### B. The 23 Dashboard Definitions (`src/seeds/dashboards.rs`)
+
+You must construct a Rust `Vec<Dashboard>` containing these specific definitions:
+
+**I. Leadership Dashboards (3)**
+
+1. **CISO Executive View:**
+* *Widgets:* "Global Threat Level" (Gauge), "Active Critical Incidents" (Big Number), "MTTR (Mean Time to Resolve)" (Line Chart), "Compliance Score" (Bar Chart by Dept).
+
+
+2. **SOC Head Operations:**
+* *Widgets:* "Analyst Load Balancing" (Bar Chart), "False Positive Ratio" (Pie), "SLA Breaches > 24h" (List), "Shift Handoff Notes" (Text).
+
+
+3. **IT Security Compliance:**
+* *Widgets:* "Unmanaged Assets Detected" (Count from `telemetry_edges`), "Patch Status" (Pie: Patched vs Vulnerable), "Audit Failures" (Count from `audit_logs`), "Policy Violations" (Line).
+
+
+
+**II. Operational/Tactical Dashboards (20)**
+4.  **Ransomware Hunter:** "Encryption Velocity" (Files/sec graph), "Honeyport Trips" (Map).
+5.  **Lateral Movement:** "SMB/RDP Connections between Workstations" (Graph).
+6.  **Beaconing Detection:** "Top 10 Outbound DNS Frequency" (Bar).
+7.  **Data Exfiltration:** "Upload Volume > 500MB" (List).
+8.  **Process Injection:** "Memory Anomalies (Sentinel)" (Table).
+9.  **PowerShell Watch:** "Encoded Command Frequency" (Line).
+10. **User Behavior (UEBA):** "Logins at 2 AM - 5 AM" (Heatmap).
+11. **Privilege Escalation:** "Sudo Failures" (Bar).
+12. **Endpoint Health:** "High CPU/RAM (Miners)" (Scatter).
+13. **Asset Inventory:** "OS Distribution" (Pie: Linux/Windows/Mac).
+14. **Network Hygiene:** "Cleartext Passwords (HTTP/Telnet)" (Count).
+15. **SSL/TLS Status:** "Expired Certificates" (List).
+16. **Vulnerability Map:** "CVEs by Severity" (Stacked Bar).
+17. **Cloud Traffic:** "Connections to AWS/Azure non-corporate IPs" (Sankey).
+18. **Shadow IT:** "Dropbox/WeTransfer Usage" (Volume).
+19. **USB/Peripheral:** "Unauthorized Device Insertions" (Timeline).
+20. **Phishing/Mail:** "Suspicious Attachments Detected" (Count).
+21. **Threat Intel:** "IoC Matches from Feed" (World Map).
+22. **System Health:** "Core API Latency" & "DB Pool Usage" (Line).
+23. **Audit Trail:** "Recent Admin Actions" (Live Stream).
+
+#### C. React Renderer Engine (`ui/ransomeye_console`)
+
+**Logic (`DashboardRenderer.tsx`):**
+
+1. **Load:** `useEffect` calls `GET /api/v1/dashboards/{id}`.
+2. **Grid:** Use `react-grid-layout` to render the `layout` JSON.
+3. **Widget Factory:** For each item in `widgets`:
+* If `type == 'metric'`: Render `<BigNumberWidget value={data} />`
+* If `type == 'line'`: Render `<Recharts.LineChart data={data} />`
+* If `type == 'map'`: Render `<GeoMap data={data} />`
+
+
+4. **Data Layer:** Each widget triggers an individual SWR/TanStack Query to `/api/v1/analytics/execute` with its `sql_query` (sanitized on backend).
+
+---
+
+### 4. ✅ ACCEPTANCE CRITERIA
+
+1. **Seed Test:** Starting the `ransomeye_server` logs "Seeding 23 Default Dashboards... Success."
+2. **DB Check:** `SELECT count(*) FROM dashboards` returns 23.
+3. **Render Test:** Navigating to "CISO Executive View" in the UI renders the "Global Threat Level" gauge without crashing.
+4. **Data Validty:** The "Asset Inventory" pie chart correctly reflects the number of rows in the `hosts` table grouped by `os_type`.
+5. **Role Access:** A user with role `analyst` receives a 403 Forbidden when trying to load the `ciso` dashboard ID.

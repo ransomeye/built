@@ -1,0 +1,55 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-playbook-engine.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service file for Phase 6 Incident Response Playbook Engine
+
+[Unit]
+Description=RansomEye Phase 6: Incident Response Playbook Engine
+Documentation=https://ransomeye.tech
+After=network.target postgresql.service
+Wants=postgresql.service
+ConditionPathExists=/opt/ransomeye/config/install_state.json
+# Pre-start validation: fail-closed if runtime layout invalid
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye-playbook-engine
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+# Pre-start validation: verify runtime layout ownership
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -r /opt/ransomeye/bin/ransomeye-playbook-engine || exit 1'
+ExecStart=/opt/ransomeye/bin/ransomeye-playbook-engine
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ransomeye-playbook-engine
+
+# Environment variables
+Environment="RUST_LOG=info"
+Environment="RANSOMEYE_PLAYBOOK_DIR=/etc/ransomeye/playbooks"
+Environment="RANSOMEYE_POLICY_BINDING_FILE=/etc/ransomeye/config/policy_bindings.yaml"
+Environment="RANSOMEYE_PLAYBOOK_PUBLIC_KEY_PATH=/etc/ransomeye/keys/playbook_public_key.pem"
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Runtime paths: /opt/ransomeye and state directories
+ReadWritePaths=/opt/ransomeye /var/log/ransomeye /var/lib/ransomeye
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
+

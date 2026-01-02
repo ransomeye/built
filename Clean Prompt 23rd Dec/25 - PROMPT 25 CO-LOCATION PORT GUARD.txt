@@ -1,0 +1,86 @@
+PROMPT 25: CO-LOCATION PORT GUARD
+Role: Network Reliability Engineer Target Path: /home/ransomeye/rebuild/ops/portguard/
+
+Goal: Build the ransomeye-portguard crate. Context: In "All-in-One" deployments, the Core API and the Agent's "Honeyport" trap both attempt to bind to TCP 8080. This utility scans the environment at boot, detects the collision, and dynamically reconfigures the Agent to use a secondary port (e.g., 8088) without breaking the Core.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/ops/portguard/
+
+Workspace: You must add "ops/portguard" to the [workspace.members] list in the root Cargo.toml.
+
+Conflict Resolution Rules:
+
+Core API: Defaults to 8080. Priority: High (Cannot change; Clients expect it here).
+
+Postgres: Defaults to 5432. Priority: High.
+
+Agent Honeyport: Defaults to 8080. Priority: Low (Must yield if conflict).
+
+Mechanism:
+
+The tool MUST generate a runtime_config.env override file for the Agent.
+
+If 8080 is taken by the Core, reassign the Agent Honeyport to 8088 (or 8081).
+
+This check must happen before the Agent service starts.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/ops/portguard/:
+
+Plaintext
+
+ops/portguard/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # Entrypoint
+    ├── scan.rs                 # Netstat / TcpListener check
+    └── config_gen.rs           # Env var override generator
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Port Scanning (src/scan.rs)
+Logic:
+
+Check 8080: Attempt to bind a TcpListener to 0.0.0.0:8080.
+
+Result:
+
+If Ok(_): Port is free. (Core is likely down, or we are first).
+
+If Err(e) where e.kind() == AddrInUse: Port is Occupied.
+
+Heuristic: If Occupied, check if the process owning it is ransomeye-core (optional, or just assume Core owns it in this appliance context).
+
+B. Config Generation (src/config_gen.rs)
+Logic:
+
+Define Output Path: /etc/ransomeye/agent_overrides.env.
+
+Scenario A (Port 8080 Free):
+
+Do nothing, or write HONEYPORT_PORT=8080 (Explicit Default).
+
+Scenario B (Port 8080 Busy):
+
+Log: "Conflict Detected: Port 8080 in use. Moving Agent Honeyport to 8088."
+
+Write: HONEYPORT_PORT=8088 to the override file.
+
+4. ✅ ACCEPTANCE CRITERIA
+Conflict Test:
+
+Start a mock listener on port 8080 (simulating Core).
+
+Run ransomeye-portguard.
+
+Verify that /etc/ransomeye/agent_overrides.env is created and contains HONEYPORT_PORT=8088.
+
+Clean Test:
+
+Ensure port 8080 is free.
+
+Run ransomeye-portguard.
+
+Verify the override file sets the port to 8080 (or remains empty).
+
+Build: cargo build -p ransomeye-portguard succeeds.

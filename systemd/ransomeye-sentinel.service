@@ -1,0 +1,78 @@
+# Path and File Name: /home/ransomeye/rebuild/systemd/ransomeye-sentinel.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details: Systemd service unit for RansomEye Sentinel with runtime hardening
+
+[Unit]
+Description=RansomEye Sentinel - Runtime integrity monitor for Agent and DPI
+After=network.target ransomeye-linux-agent.service ransomeye-dpi-probe.service
+Wants=ransomeye-linux-agent.service ransomeye-dpi-probe.service
+ConditionPathExists=/opt/ransomeye/sentinel/bin/sentinel
+ConditionPathExists=/opt/ransomeye/sentinel/.install_receipt.json
+
+[Service]
+Type=notify
+# Rootless runtime enforcement - run as ransomeye user
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye/sentinel
+RuntimeDirectory=ransomeye/sentinel
+StateDirectory=ransomeye/sentinel
+ExecStart=/opt/ransomeye/sentinel/bin/sentinel
+# Watchdog timer - service must send heartbeat every 30 seconds
+WatchdogSec=30
+# Restart on failure (anti-kill protection)
+Restart=always
+RestartSec=10
+# Restart on watchdog timeout
+RestartForceExitStatus=143
+# Maximum restart attempts before escalation
+StartLimitIntervalSec=300
+StartLimitBurst=5
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=1G
+MemorySwapMax=0
+
+# Security hardening - Rootless runtime enforcement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ransomeye/sentinel /var/lib/ransomeye/sentinel /run/ransomeye/sentinel
+
+# Additional hardening
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateDevices=false
+# Network isolation - Sentinel should not open listeners
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Capability-based privileges (minimal - Sentinel only monitors)
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateUsers=false
+
+# Environment variables
+EnvironmentFile=-/opt/ransomeye/sentinel/config/environment.conf
+
+# Kill settings - fail-closed on kill attempts
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# Send alert on unexpected termination
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
+

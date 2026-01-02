@@ -1,0 +1,133 @@
+# Path and File Name : /home/ransomeye/rebuild/core/deception/schema/deception_asset.schema.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: YAML schema definition for signed deception assets
+
+$schema: http://json-schema.org/draft-07/schema#
+type: object
+required:
+  - asset_id
+  - asset_type
+  - deployment_scope
+  - visibility_level
+  - trigger_conditions
+  - telemetry_fields
+  - teardown_procedure
+  - max_lifetime
+  - signature
+  - signature_hash
+properties:
+  asset_id:
+    type: string
+    format: uuid
+    description: Unique identifier for the deception asset
+  asset_type:
+    type: string
+    enum:
+      - decoy_host
+      - decoy_service
+      - credential_lure
+      - filesystem_lure
+    description: Type of deception asset
+  deployment_scope:
+    type: string
+    enum:
+      - network
+      - host
+      - identity
+    description: Scope of deployment
+  visibility_level:
+    type: string
+    enum:
+      - low
+      - medium
+      - high
+    description: Visibility level of the asset
+  trigger_conditions:
+    type: object
+    required:
+      - interaction_types
+    properties:
+      interaction_types:
+        type: array
+        items:
+          type: string
+        description: Types of interactions that trigger signals
+      min_confidence:
+        type: number
+        minimum: 0.0
+        maximum: 1.0
+        default: 0.9
+        description: Minimum confidence threshold for signal generation
+  telemetry_fields:
+    type: object
+    required:
+      - source_ip
+      - destination_ip
+      - timestamp
+      - interaction_type
+    properties:
+      source_ip:
+        type: string
+        format: ipv4
+        description: Source IP address of interaction
+      destination_ip:
+        type: string
+        format: ipv4
+        description: Destination IP address (decoy)
+      timestamp:
+        type: string
+        format: date-time
+        description: Timestamp of interaction
+      interaction_type:
+        type: string
+        description: Type of interaction detected
+      additional_metadata:
+        type: object
+        description: Additional telemetry metadata
+  teardown_procedure:
+    type: object
+    required:
+      - steps
+    properties:
+      steps:
+        type: array
+        items:
+          type: object
+          required:
+            - action
+          properties:
+            action:
+              type: string
+              enum:
+                - stop_service
+                - remove_listener
+                - delete_file
+                - remove_credential
+            parameters:
+              type: object
+              description: Parameters for teardown action
+  max_lifetime:
+    type: integer
+    minimum: 1
+    description: Maximum lifetime in seconds
+  signature:
+    type: string
+    description: Ed25519 signature (base64 encoded)
+  signature_hash:
+    type: string
+    description: SHA-256 hash of asset content (before signature)
+  metadata:
+    type: object
+    properties:
+      created_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+      description:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+

@@ -1,0 +1,109 @@
+PROMPT 10: FORENSICS ENGINE & REPORTING
+Role: Forensic Analyst & Rust Developer Target Path: /home/ransomeye/rebuild/core/reporting/ Goal: Build the ransomeye-reporting library. Context: After an attack is detected, we need to know what happened and preserve evidence. This module creates a secure "Chain of Custody" for artifacts (files, memory dumps), performs automated analysis (e.g., "What registry keys changed?"), and allows exporting the entire incident data into a portable, encrypted file for legal/compliance teams.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/reporting/
+
+Workspace: You must add "core/reporting" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+zip: For creating the portable evidence bundle.
+
+ring: For encryption (ChaCha20-Poly1305) and hashing (SHA-256).
+
+serde, serde_json: For manifest generation.
+
+sqlx: To fetch event history from the DB.
+
+thiserror: For error handling.
+
+core/intel: For graph query support.
+
+core/kernel: For signing keys.
+
+Security/Performance:
+
+Chain of Custody: Every artifact stored MUST be hashed immediately. The hash and metadata must be signed by the Core Private Key.
+
+Encrypted Export: The exported ZIP file must be encrypted. Raw evidence should never leave the system in plaintext.
+
+Authorization: The Export function strictly requires an authenticated Administrator session.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/reporting/:
+
+Plaintext
+
+core/reporting/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── models.rs               # Incident & Artifact Structs
+    ├── custody.rs              # Hashing & Signing of Evidence
+    ├── analysis/
+    │   ├── mod.rs
+    │   ├── diffing.rs          # Registry/File Snapshot Diff Logic
+    │   └── memory.rs           # Basic Volatility/Memory Parsing Logic
+    └── bundle/
+        ├── mod.rs
+        ├── export.rs           # Create encrypted .zip.enc
+        └── import.rs           # Rehydrate from .zip.enc
+3.⚙️ IMPLEMENTATION DETAILS
+A. Chain of Custody (src/custody.rs)
+Goal: Prove evidence integrity in court. Logic:
+
+Input: Binary artifact (e.g., malware.exe captured by Agent).
+
+Process:
+
+Compute SHA-256 Hash immediately.
+
+Sign the Hash + Metadata (Timestamp, Source Agent) using the Core Private Key.
+
+Store: Save metadata to DB: { artifact_id, hash, signature, timestamp, source_agent }.
+
+B. Forensic Analysis (src/analysis/diffing.rs)
+Goal: Automated persistence detection. Logic:
+
+Input: Snapshot_T0 (Clean Baseline) vs Snapshot_T1 (Post-Infection).
+
+Algorithm:
+
+Identify new Registry Keys in Run, Services, Startup.
+
+Identify new Unsigned Binaries in System32 or /usr/bin.
+
+Output: A ForensicReport struct highlighting the differences (The "Diff").
+
+C. Incident Rehydration (src/bundle/)
+Goal: Portability. Move an incident from Production to an Analyst's laptop securely. Export Logic (export.rs):
+
+Select Incident ID.
+
+Fetch all related Events, Alerts, and Artifacts.
+
+Generate manifest.json.
+
+Create a ZIP file containing everything.
+
+Encrypt the ZIP stream using ChaCha20-Poly1305 with a generated symmetric key. Import Logic (import.rs):
+
+Decrypt bundle (user provides key).
+
+Verify Manifest signature.
+
+Insert events into a temporary "Investigation" table in the DB (do not mix with live production data).
+
+4. ✅ ACCEPTANCE CRITERIA
+Custody Test: Modifying a stored artifact file by 1 byte causes custody::verify() to return Tampered.
+
+Diffing Test: Comparing two mock registry snapshots correctly identifies a newly added "EvilService" key.
+
+Rehydration Test: Exporting a dummy incident to a ZIP and re-importing it results in an identical dataset in the DB.
+
+Security: The system refuses to export data if the requestor does not have the Admin role (mocked check).
+
+Build: cargo build -p ransomeye-reporting succeeds.

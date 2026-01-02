@@ -1,0 +1,173 @@
+PROMPT 16: NARRATIVE ENGINE (Contextual Storytelling)
+Role: Senior Backend Developer & Reporting Specialist Target Path: /home/ransomeye/rebuild/core/narrative/ Goal: Build the ransomeye-narrative crate.
+
+
+Context: Security analysts need clear stories ("X attacked Y via Z"), not just JSON dumps. This engine replaces legacy Python/Jinja2 systems with a high-speed Rust equivalent (Tera) that renders reports in sub-millisecond timeframes. It transforms complex graph data into executive summaries and technical IOC lists.
+
+
+
+
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/narrative/
+
+
+Workspace: You must add "core/narrative" to the [workspace.members] list in the root Cargo.toml.
+
+
+Dependencies (Strict):
+
+
+tera: For Jinja2-compatible, high-performance templating.
+
+
+
+serde, serde_json: For serializing context data.
+
+
+
+chrono: For time formatting.
+
+
+
+core/intel: To fetch graph context (Attacker IP, Blast Radius).
+
+Security/Performance:
+
+
+Compilation: Templates must be parsed and compiled once at initialization (using lazy_static or OnceCell), NOT per request.
+
+
+Bundling: Templates must be compiled into the binary (using include_str!) to ensure a single-file deployment. Do not rely on runtime file paths.
+
+
+
+XSS Safety: Enable tera's auto-escaping to prevent Cross-Site Scripting in HTML reports.
+
+
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/narrative/:
+
+Plaintext
+
+core/narrative/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports NarrativeEngine
+    ├── engine.rs               # Tera Setup & Render Logic
+    ├── context_builder.rs      # Fetches Data & Populates Structs
+    └── templates/
+        ├── incident_story.md.tera     # Markdown Story Template
+        ├── executive_brief.html.tera  # HTML C-Level Report
+        └── technical_ioc.json.tera    # JSON IOC Dump
+
+
+
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Template Engine (src/engine.rs)
+
+Struct: pub struct NarrativeEngine { tera: Tera }  Logic:
+
+
+
+Initialization (new()):
+
+Initialize Tera::default().
+
+Load templates using include_str! so they are embedded in the compiled binary.
+
+
+Example: tera.add_raw_template("incident_story", include_str!("templates/incident_story.md.tera")).
+
+
+Register custom filters if necessary (e.g., date_format).
+
+
+Rendering:
+
+pub fn render(&self, template_name: &str, context: &impl Serialize) -> Result<String, NarrativeError>.
+
+B. Context Builder (src/context_builder.rs)
+
+Goal: Gather all facts needed to tell the story from the core/intel graph. Struct:
+
+
+Rust
+
+#[derive(Serialize)]
+pub struct IncidentContext {
+    pub id: String,
+    pub severity: String,
+    pub attacker_ip: String,
+    pub patient_zero: String,
+    pub tactic: String,         // e.g., "Lateral Movement"
+    pub malware_family: String, // e.g., "WannaCry-Variant-B"
+    pub affected_hosts_count: usize,
+    pub dwell_time_human: String, // e.g., "2 minutes"
+    pub timestamp_utc: String,
+}
+ Logic:
+
+
+
+pub fn build_context(incident_id: &str) -> IncidentContext.
+
+(Stub logic for now): Query core/intel to find the root node (Attacker) and count victim nodes.
+
+
+Calculate dwell_time (Detection Time - First Event Time).
+
+C. The Templates (src/templates/)
+1. incident_story.md.tera (Markdown Report):
+
+Markdown
+
+# 🚨 Incident {{ id }} Analysis
+
+**Time:** {{ timestamp_utc }}
+**Threat Level:** {{ severity }}
+
+**Narrative Summary:**
+RansomEye detected unauthorized activity originating from **{{ attacker_ip }}**.
+The attack first compromised host **{{ patient_zero }}** using the **{{ tactic }}** technique.
+
+**Forensic Insight:**
+The malware payload has been identified as **{{ malware_family }}**.
+The threat attempted to spread to **{{ affected_hosts_count }}** other systems but was contained after {{ dwell_time_human }}.
+
+
+
+2. executive_brief.html.tera (HTML Report):
+
+Create a simple, clean HTML structure using basic CSS.
+
+
+Include a "Status Badge" (e.g., <span class="badge-red">{{ severity }}</span>).
+
+
+
+
+Security: Ensure standard auto-escaping is active to handle hostnames like <script>.
+
+
+
+4. ✅ ACCEPTANCE CRITERIA
+Render Test: Call engine.render("incident_story", context) with dummy data. Assert the output string contains the injected variables (e.g., "patient_zero" replaced with "Hostname-A").
+
+
+
+Compilation: The crate builds successfully with cargo build -p ransomeye-narrative.
+
+
+
+Performance: Generating 1,000 reports in a loop takes < 1 second.
+
+
+XSS Safety: Injecting <script>alert(1)</script> into the attacker_ip variable results in escaped HTML entities (&lt;script&gt;...) in the HTML report.
+
+
+
+Embedded Assets: The build succeeds even if the src/templates/ directory is deleted after compilation (proving templates are inside the binary).

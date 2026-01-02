@@ -1,0 +1,236 @@
+{
+  "agent_exclusions": [],
+  "binaries": [
+    {
+      "exists": false,
+      "name": "ransomeye-guardrails",
+      "path": "/usr/bin/ransomeye-guardrails",
+      "will_install": true
+    },
+    {
+      "exists": false,
+      "name": "ransomeye_operations",
+      "path": "/usr/bin/ransomeye_operations",
+      "will_install": true
+    },
+    {
+      "exists": false,
+      "name": "ransomeye-playbook-engine",
+      "path": "/usr/local/bin/ransomeye-playbook-engine",
+      "will_install": true
+    },
+    {
+      "exists": false,
+      "name": "ransomeye-network-scanner",
+      "path": "/usr/local/bin/ransomeye-network-scanner",
+      "will_install": true
+    }
+  ],
+  "config_paths": [
+    "/etc/ransomeye/",
+    "/var/lib/ransomeye/",
+    "/run/ransomeye/",
+    "/home/ransomeye/rebuild/ransomeye_installer/config/"
+  ],
+  "database_migrations": [],
+  "dry_run": true,
+  "guardrails_spec_hash": "32fb7f6b921ef36bf1ef0d4682228df43ee30153309eae9cda38132bc911524e",
+  "install_timestamp": "2025-12-28T09:09:30.882758Z",
+  "installer_version": "1.0.0",
+  "modules": {
+    "core/ai": {
+      "hash": "a379358c189a72be",
+      "path": "/home/ransomeye/rebuild/core/ai",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/audit": {
+      "hash": "672555b856a7e8f4",
+      "path": "/home/ransomeye/rebuild/core/audit",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/bus": {
+      "hash": "184ee95277b6e47c",
+      "path": "/home/ransomeye/rebuild/core/bus",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/deception": {
+      "hash": "66cf5c2b01e5c527",
+      "path": "/home/ransomeye/rebuild/core/deception",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/dispatch": {
+      "hash": "77021700b800f9da",
+      "path": "/home/ransomeye/rebuild/core/dispatch",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/engine": {
+      "hash": "8b042669f475cc63",
+      "path": "/home/ransomeye/rebuild/core/engine",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/forensics": {
+      "hash": "7a4ac91a7b67e717",
+      "path": "/home/ransomeye/rebuild/core/forensics",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/global_validator": {
+      "hash": "9ee215a0bba66cd4",
+      "path": "/home/ransomeye/rebuild/core/global_validator",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/governor": {
+      "hash": "121792f86880a5aa",
+      "path": "/home/ransomeye/rebuild/core/governor",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/guardrails": {
+      "hash": "545d4e3f4412da22",
+      "path": "/home/ransomeye/rebuild/core/guardrails",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/ingest": {
+      "hash": "4e59132e088464b5",
+      "path": "/home/ransomeye/rebuild/core/ingest",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/intel": {
+      "hash": "fe8db158490745e9",
+      "path": "/home/ransomeye/rebuild/core/intel",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/kernel": {
+      "hash": "867d9d9eea62d855",
+      "path": "/home/ransomeye/rebuild/core/kernel",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/narrative": {
+      "hash": "39e738ab119608c2",
+      "path": "/home/ransomeye/rebuild/core/narrative",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/network_scanner": {
+      "hash": "648c4fd608a5d8f0",
+      "path": "/home/ransomeye/rebuild/core/network_scanner",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/policy": {
+      "hash": "ca392352c3d75edf",
+      "path": "/home/ransomeye/rebuild/core/policy",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/reporting": {
+      "hash": "70ed6fbb373372cd",
+      "path": "/home/ransomeye/rebuild/core/reporting",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/response_playbooks": {
+      "hash": "b15ce59a7cf8baa7",
+      "path": "/home/ransomeye/rebuild/core/response_playbooks",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/tests": {
+      "hash": "fc5d09cf4453d6fc",
+      "path": "/home/ransomeye/rebuild/core/tests",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/threat_feed": {
+      "hash": "2445f3cf603e6fbe",
+      "path": "/home/ransomeye/rebuild/core/threat_feed",
+      "phase": null,
+      "type": "tool"
+    },
+    "core/trainer": {
+      "hash": "3b92aa841a04f33d",
+      "path": "/home/ransomeye/rebuild/core/trainer",
+      "phase": null,
+      "type": "tool"
+    },
+    "ransomeye_architecture": {
+      "hash": "34d3ab19f4184a87",
+      "path": "/home/ransomeye/rebuild/ransomeye_architecture",
+      "phase": 2,
+      "type": "tool"
+    },
+    "ransomeye_governance": {
+      "hash": "ec48488951bbba7b",
+      "path": "/home/ransomeye/rebuild/ransomeye_governance",
+      "phase": null,
+      "type": "tool"
+    },
+    "ransomeye_guardrails": {
+      "hash": "015dd4b0150bd888",
+      "path": "/home/ransomeye/rebuild/ransomeye_guardrails",
+      "phase": 0,
+      "type": "tool"
+    },
+    "ransomeye_installer": {
+      "hash": "a1c46b3c69cce0ce",
+      "path": "/home/ransomeye/rebuild/ransomeye_installer",
+      "phase": 1,
+      "type": "tool"
+    },
+    "ransomeye_intelligence": {
+      "hash": "1da400d254ebc515",
+      "path": "/home/ransomeye/rebuild/ransomeye_intelligence",
+      "phase": 3,
+      "type": "service"
+    },
+    "ransomeye_posture_engine": {
+      "hash": "dd3f54a6ee989f7a",
+      "path": "/home/ransomeye/rebuild/ransomeye_posture_engine",
+      "phase": null,
+      "type": "service"
+    },
+    "ransomeye_retention": {
+      "hash": "3eb2c5a609f4743f",
+      "path": "/home/ransomeye/rebuild/ransomeye_retention",
+      "phase": null,
+      "type": "tool"
+    },
+    "ransomeye_trust": {
+      "hash": "b1f61a543a4497c7",
+      "path": "/home/ransomeye/rebuild/ransomeye_trust",
+      "phase": null,
+      "type": "tool"
+    }
+  },
+  "ports": {
+    "BACKEND_API_PORT": 8080,
+    "CORE_API_PORT": 8443,
+    "FRONTEND_PORT": 3000
+  },
+  "project_root": "/home/ransomeye/rebuild",
+  "systemd_units": [
+    {
+      "module": "ransomeye_posture_engine",
+      "name": "ransomeye-posture_engine.service",
+      "source_path": "/home/ransomeye/rebuild/systemd/ransomeye-posture_engine.service",
+      "target_path": "/etc/systemd/system/ransomeye-posture_engine.service"
+    },
+    {
+      "module": "ransomeye_intelligence",
+      "name": "ransomeye-intelligence.service",
+      "source_path": "/home/ransomeye/rebuild/systemd/ransomeye-intelligence.service",
+      "target_path": "/etc/systemd/system/ransomeye-intelligence.service"
+    }
+  ]
+}

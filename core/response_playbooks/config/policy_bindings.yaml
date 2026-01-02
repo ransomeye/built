@@ -1,0 +1,22 @@
+# Path and File Name : /home/ransomeye/rebuild/core/response_playbooks/config/policy_bindings.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Policy outcome to playbook binding configuration
+
+- policy_outcome: deny
+  alert_severity: critical
+  kill_chain_stage: actions_on_objectives
+  playbook_id: 550e8400-e29b-41d4-a716-446655440001
+  priority: 100
+
+- policy_outcome: quarantine
+  alert_severity: high
+  kill_chain_stage: exploitation
+  playbook_id: 550e8400-e29b-41d4-a716-446655440002
+  priority: 80
+
+- policy_outcome: deny
+  alert_severity: high
+  kill_chain_stage: command_and_control
+  playbook_id: 550e8400-e29b-41d4-a716-446655440001
+  priority: 90
+

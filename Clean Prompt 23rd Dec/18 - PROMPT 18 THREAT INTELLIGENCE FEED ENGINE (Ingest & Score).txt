@@ -1,0 +1,143 @@
+PROMPT 18: THREAT INTELLIGENCE FEED ENGINE (Ingest & Score)
+Role: Senior Rust Data Engineer & Threat Intelligence Architect Target Path: /home/ransomeye/rebuild/core/threat_feed/ Goal: Build the ransomeye-threat-feed crate. Context: Raw feeds are noisy. We cannot dump millions of low-confidence hashes into the Graph. This engine filters signal from noise using high-performance Rust pipelines. It consumes feeds (e.g., MalwareBazaar, CISA KEV), normalizes the data (e.g., defanging URLs), and assigns a confidence score so the Engine knows which threats are confirmed vs. speculative.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/threat_feed/
+
+Workspace: You must add "core/threat_feed" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+reqwest: For fetching remote feeds (HTTP/HTTPS).
+
+tokio: For async ingestion tasks.
+
+serde, serde_json: For parsing JSON feeds.
+
+csv: For streaming CSV parsing (critical for large dumps).
+
+sha2: For fingerprinting/deduplication.
+
+core/intel: To push clean IOCs to the Graph.
+
+core/kernel: For configuration (API keys, Proxy settings).
+
+Security/Performance:
+
+Streaming Parsers: Use csv's iterator or serde_json's stream features. NEVER load a multi-gigabyte feed entirely into RAM.
+
+Resilience: If one feed fails (e.g., 404 or Timeout), the engine MUST log the error and continue processing other feeds. It must not panic.
+
+Normalization: All Domains/URLs must be lowercase and stripped of protocols (e.g., https:// removed) before storage.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/threat_feed/:
+
+Plaintext
+
+core/threat_feed/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports IngestionEngine
+    ├── models.rs               # CanonicalIOC Structs
+    ├── pipeline.rs             # Orchestrator (Fetch -> Normalize -> Score -> Push)
+    ├── ingestors/
+    │   ├── mod.rs
+    │   ├── traits.rs           # FeedIngestor Trait
+    │   ├── malware_bazaar.rs   # CSV Parser
+    │   ├── cisa_kev.rs         # JSON Parser
+    │   └── ransomware_live.rs  # JSON Parser
+    ├── processing/
+    │   ├── normalization.rs    # IPv4/Domain canonicalization
+    │   ├── dedupe.rs           # Bloom Filter / Hash checking
+    │   └── trust_scorer.rs     # Confidence Logic
+    └── storage/
+        └── graph_pusher.rs     # Interface to core/intel
+3.⚙️ IMPLEMENTATION DETAILS
+A. Canonical Models (src/models.rs)
+Structs:
+
+Rust
+
+pub enum IocType { Ip, Domain, FileHash(HashType) }
+
+pub struct CanonicalIoc {
+    pub value: String,
+    pub ioc_type: IocType,
+    pub source_id: String,      // e.g., "cisa-kev"
+    pub first_seen: i64,
+    pub trust_score: f32,       // 0.0 to 1.0
+    pub metadata: serde_json::Value,
+}
+B. Ingestors (src/ingestors/)
+Trait: async fn fetch_and_parse(&self) -> Result<Box<dyn Iterator<Item = CanonicalIoc>>, FeedError> Logic:
+
+MalwareBazaar:
+
+Use reqwest to download the daily CSV.
+
+Use csv::ReaderBuilder to stream rows.
+
+Map columns (sha256_hash, signature) to CanonicalIoc.
+
+CISA KEV:
+
+Fetch JSON.
+
+Map vulnerabilities array to IOCs (CVE IDs).
+
+C. Processing Pipeline (src/processing/)
+Normalization (normalization.rs):
+
+Lowercase domains.
+
+Remove protocols (https://, ftp://) from URLs to extract raw domains.
+
+Validate IP addresses.
+
+Deduplication (dedupe.rs):
+
+Calculate SHA256(ioc_value + source).
+
+Check lightweight state (or query core/intel) to see if this IOC was recently processed.
+
+If exists: Merge/Update timestamp.
+
+If new: Create.
+
+D. Trust Scoring (src/processing/trust_scorer.rs)
+Goal: Assign a confidence score (0.0 - 1.0). Logic:
+
+Heuristic:
+
+If Source == CISA KEV -> Score = 1.0 (Government verified).
+
+If Source == MalwareBazaar AND recent -> Score = 0.9.
+
+If Source == Ransomware.live -> Score = 0.8.
+
+Updates the trust_score field in the struct.
+
+E. Orchestrator (src/pipeline.rs)
+Logic:
+
+Spawn async tasks for each configured Feed defined in core/kernel config.
+
+Stream items through the chain: Ingest -> Normalize -> TrustScore -> Dedupe -> GraphPush.
+
+Error Handling: Catch errors per-feed. Log WARN and continue.
+
+4. ✅ ACCEPTANCE CRITERIA
+Streaming Test: The engine processes a dummy 100MB CSV file without spiking RAM usage above 50MB (verifying iterator logic).
+
+Normalization: Input Https://Evil.com/path is correctly normalized to Domain evil.com.
+
+Scoring: An IOC originating from the CISA KEV ingestor is automatically assigned a Trust Score of 1.0.
+
+Real Integration: The pipeline successfully calls graph_pusher to insert a validated IOC into the core/intel mock database.
+
+Resilience: A simulated 404 Not Found error from one feed provider does not panic the entire crate; other feeds continue to load.
+
+Build: cargo build -p ransomeye-threat-feed succeeds.

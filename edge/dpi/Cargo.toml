@@ -1,0 +1,46 @@
+[package]
+name = "dpi"
+version = "0.1.0"
+edition = "2021"
+authors = ["nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU"]
+description = "RansomEye DPI Probe - High-throughput network telemetry sensor (standalone)"
+autobins = false
+
+[features]
+default = []
+bin = []  # Feature flag to enable binary build (requires libpcap system library)
+
+[[bin]]
+name = "dpi"
+path = "probe/src/main.rs"
+required-features = ["bin"]
+
+[lib]
+name = "dpi"
+path = "probe/src/lib.rs"
+
+[dependencies]
+pcap = "1.1"
+pnet = "0.35"
+ed25519-dalek = { workspace = true }
+rand = "0.8"
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+crossbeam = "0.8"
+hostname = "0.4"
+tracing-subscriber = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+

@@ -1,0 +1,70 @@
+[package]
+name = "policy"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+path = "engine/src/lib.rs"
+
+[[bin]]
+name = "policy"
+path = "engine/src/main.rs"
+
+[[bin]]
+name = "sign_policies"
+path = "tools/sign_policies.rs"
+
+[[bin]]
+name = "extract_pubkey_simple"
+path = "tools/extract_pubkey_simple.rs"
+
+[[bin]]
+name = "extract_payload"
+path = "tools/extract_payload.rs"
+
+[[bin]]
+name = "extract_signature"
+path = "tools/extract_signature.rs"
+
+[[bin]]
+name = "ring_verify_test"
+path = "tools/ring_verify_test.rs"
+
+[[bin]]
+name = "debug_sign"
+path = "tools/debug_sign.rs"
+
+[[bin]]
+name = "verify_with_both_algs"
+path = "tools/verify_with_both_algs.rs"
+
+[[bin]]
+name = "test_ring_pss_verify"
+path = "tools/test_ring_pss_verify.rs"
+
+[[bin]]
+name = "test_sign_verify_roundtrip"
+path = "tools/test_sign_verify_roundtrip.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+ring = { workspace = true }
+base64 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }
+hex = { workspace = true }
+regex = "1.10"
+once_cell = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
+criterion = "0.5"

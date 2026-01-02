@@ -1,0 +1,147 @@
+🛡️ PROMPT 36: CRITICAL INFRASTRUCTURE HARDENING
+Role: Systems Architect & Security Engineer Target Path: /home/ransomeye/rebuild/
+
+Goal: Upgrade the platform from "Enterprise" to "Military Grade" by implementing strict Resource Isolation (to prevent self-cannibalization on single-node deployments), Split-Horizon Networking (to isolate Admin traffic), Dynamic Discovery (Beaconing), and Hardware Root of Trust (TPM).
+
+Context:
+
+The "Starvation" Risk: In "Small Env" deployments (Agent + Core + DPI on one box), the Agent's file scanning and DPI's packet capture will choke the Core Database's Disk I/O. We must enforce I/O Priorities.
+
+The "Lateral Movement" Risk: Admin interfaces must never be exposed on the same IP as Agent telemetry. We need Split-Horizon Binding.
+
+The "Field Ops" Risk: IP addresses change in tactical environments. Agents must find the Core via a UDP Beacon, not hardcoded configs.
+
+The "Physical Capture" Risk: If a server is stolen, disk-based keys are compromised. We must support TPM (Trusted Platform Module) key storage.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Naming Standard:
+
+The new discovery crate MUST be named core/ransomeye_discovery.
+
+All logic updates MUST apply to existing ransomeye_* crates.
+
+Resource Governor Logic (Strict):
+
+You MUST use libc to make syscalls for ioprio_set.
+
+Core (Postgres): Class 1 (Realtime).
+
+DPI: Class 2 (Best Effort).
+
+Agent: Class 3 (Idle).
+
+You MUST generate systemd Drop-In files (override.conf) to enforce CPUQuota.
+
+Discovery Protocol:
+
+Port: UDP 4242.
+
+Security: The Beacon Response MUST be cryptographically signed using the Core's private key to prevent spoofing.
+
+Hardware Security:
+
+Use the tss-esapi crate for TPM 2.0 interaction.
+
+Implement a "Graceful Fallback": Try TPM first; if missing/failed, warn in logs and fall back to Software Key.
+
+2. 📂 DIRECTORY & FILE PLAN
+You are modifying existing crates and creating one new crate.
+
+A. Create New Crate: core/ransomeye_discovery
+
+Cargo.toml
+
+src/lib.rs (Exports the service)
+
+src/beacon.rs (UDP Listener & Signing Logic)
+
+B. Update Crate: ops/ransomeye_tuner
+
+Cargo.toml (Add libc)
+
+src/isolation.rs (New Module for IO/CPU control)
+
+src/main.rs (Register the new apply_isolation command)
+
+C. Update Crate: core/ransomeye_kernel
+
+Cargo.toml (Add tss-esapi)
+
+src/config.rs (Add split-bind fields)
+
+src/trust.rs (Add TPM loading logic)
+
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Beacon System (core/ransomeye_discovery)
+Dependencies: tokio (full), serde, serde_json, ransomeye_kernel (for config/keys), tracing.Logic (src/beacon.rs):
+
+Socket: Bind UdpSocket to 0.0.0.0:4242.
+
+Loop: Wait for incoming data.
+
+Protocol:
+
+If payload == b"RANSOMEYE_PING":
+
+Construct BeaconResponse: { "mgmt_ip": "...", "telemetry_ip": "...", "timestamp": ... }.
+
+Sign: Calculate Ed25519 signature of the JSON string using ransomeye_kernel::trust::sign().
+
+Send: JSON + Signature back to the requester.
+
+B. The Resource Governor (ops/ransomeye_tuner)
+Dependencies: Add libc to Cargo.toml.Logic (src/isolation.rs):
+
+Function: pub fn prioritize_core_io(pid: i32)
+
+Use libc::syscall(SYS_ioprio_set, ...) to set IOPRIO_CLASS_RT (Realtime) for the Postgres PID.
+
+Function: pub fn deprioritize_agent_io(pid: i32)
+
+Set IOPRIO_CLASS_IDLE for the Agent PID.
+
+Systemd Generator:
+
+Create /etc/systemd/system/ransomeye-agent.service.d/hardening.conf:
+
+Ini, TOML
+
+[Service]
+CPUQuota=10%         # Never steal more than 10% of a core
+IOWeight=1           # Lowest IO priority allowed by CFQ/BFQ
+MemoryHigh=512M      # Throttle if exceeding 512MB
+C. Hardware Root of Trust (core/ransomeye_kernel)
+Dependencies: Add tss-esapi to Cargo.toml.Logic (src/trust.rs):
+
+Function: pub fn load_signing_key() -> KeyPair
+
+Flow:
+
+Step 1: Check AppConfig.use_tpm.
+
+Step 2 (TPM Path): Initialize TssContext. Attempt to load key from persistent handle 0x81000001. If successful, return a handle wrapper.
+
+Step 3 (Fallback): If Step 2 fails (or TPM missing), Log "WARN: TPM unavailable, using Software Key". Read private_key.pem from disk.
+
+Logic (src/config.rs):
+
+Add fields to AppConfig:
+
+Rust
+
+pub bind_addr_mgmt: String,      // e.g., "10.0.1.5"
+pub bind_addr_telemetry: String, // e.g., "192.168.1.5"
+4. ✅ ACCEPTANCE CRITERIA
+Discovery Check: A mock UDP client sending "RANSOMEYE_PING" to localhost:4242 receives a valid JSON response containing the IP and a cryptographic signature.
+
+Isolation Check:
+
+Running the Tuner generates the systemd drop-in files in /etc/systemd/system/.
+
+Verify that CPUQuota=10% is present in the Agent's config.
+
+IO Priority Check: (Mocked) The Tuner calls ioprio_set with the correct constants (1 for RT, 3 for Idle).
+
+TPM Compilation: The code compiles with tss-esapi dependency (even if a physical TPM is not present on the build machine, the crate must link).
+
+Config Check: ransomeye_kernel now compiles with the new bind_addr_mgmt fields available in the struct.

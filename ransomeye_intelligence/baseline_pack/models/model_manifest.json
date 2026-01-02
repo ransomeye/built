@@ -1,0 +1,61 @@
+{
+  "created": "2025-12-23T09:12:54.497294Z",
+  "manifest_version": "1.0.0",
+  "models": [
+    {
+      "accuracy": 0.99405,
+      "algorithm": "random_forest",
+      "classes": [
+        "benign",
+        "ransomware",
+        "suspicious"
+      ],
+      "f1_score": 0.9940336186886379,
+      "features": 256,
+      "hash": "sha256:01e394bf7b10eb8fe4a1d1d19dad9878dc0f23e55cc84fad51439edd5a3b6461",
+      "name": "ransomware_behavior.model",
+      "precision": 0.994101177566835,
+      "recall": 0.99405,
+      "shap_file": "baseline_pack/shap/ransomware_behavior_shap.json",
+      "shap_required": true,
+      "training_data_hash": "sha256:95aff5ef17d9a8095cab372bdc9aabe961ab2aa228a5504deda6c64783ed227f",
+      "type": "behavior_classifier",
+      "version": "1.0.0"
+    },
+    {
+      "algorithm": "isolation_forest",
+      "contamination": 0.01,
+      "features": 128,
+      "hash": "sha256:bff6a94eeb969050990edfa0a512dc8a59a8f56d88ad63e0d9eedf32e051f988",
+      "name": "anomaly_baseline.model",
+      "shap_file": "baseline_pack/shap/anomaly_baseline_shap.json",
+      "shap_required": true,
+      "training_data_hash": "sha256:95f715d0e94f39fec80a1f757504bc6cc3742cfd8da07ae7c24f02f33833ddbc",
+      "type": "anomaly_detector",
+      "version": "1.0.0"
+    },
+    {
+      "algorithm": "platt_scaling",
+      "features": 64,
+      "hash": "sha256:c0e957580bb739bc85c0470d2c6c2032b659511afa9f36718664bdfab7233cb1",
+      "name": "confidence_calibration.model",
+      "shap_file": "baseline_pack/shap/confidence_calibration_shap.json",
+      "shap_required": true,
+      "training_data_hash": "sha256:ebb52136c3cdba4b1e2062550e7b3573e84a16f87d1af1453d72ab852ab9b12f",
+      "type": "calibration",
+      "version": "1.0.0"
+    }
+  ],
+  "pack_hash": "sha256:ecc03b8b384504d85a6c193919629c7b3eeb49dde885194b2819b7ea43e76597",
+  "pack_name": "RansomEye Baseline Intelligence Pack",
+  "pack_version": "1.0.0",
+  "signature": {
+    "algorithm": "RSA-4096-PSS-SHA256",
+    "signature": "XJScrcmi4oGSXp816TJsHFStDVEZnCWkb6ShCUHl1qLIXiIx/4I8G8g0RWNaFQHeNcAgFHYZ2WhfhCWVE3N5bQUg+DUnJQNE1tJSOlw1E+lbNyavpgX8PAIu3MhIuRxCGh16CKYmgBOI2BWOgfW5YRwbO3nLCCOjfJZbCVnD4HGozqIlZGn9VCZU8SKIZ071BMzaVBzTyvIGl6jITRGDOt4bxlJmSe/1kx177qafYTArzpxgEQ8wAdqhjt45o9BVBDMEkW7I19OC6fQfiaTQEnUmqd57kSRilp9zGxEo+0xEyfU6y/vY1ukaczMt+EwSbF0kEcAo1OkjoAjgnK6IN5XUaIy/TwbZ/jH2ikhJctYm/U3sx/fuBpw6acMM0eNvHJIbqoStq40ek3sgy8gFYsG6WQioKef34cbx2u+F8/N1F1RzKE3gbFZrJZWFPTx2V5jxjQVL946wxqOJ228VImXDsuoLqNrfhXCCuI5TwB8B5haJ6S3jMQcSXhdrYP8wiXUe3H0oMytT5sMiCGu2H1aXmhBBcTI/xTz1AtauEv6Yo2PwwKBufB5V8CJD1cYm0p3xSBg8+6CHcd0n0iSn4sqmqeJS0fDgnj/GK8EbplNb7JU0911u/bfVgKDjwqrbZ5jIjwHNsts3y1qv2Mu9chWYfNDAgFYjG0ri2nNyGDU=",
+    "signer": "ransomeye_baseline_generator",
+    "timestamp": "2025-12-31T08:30:31.247881Z"
+  },
+  "signer": "policy",
+  "trained_on": "2025-12-23T09:12:54.497318Z",
+  "training_methodology": "synthetic_and_redteam"
+}

@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evidence Bundle Schema",
+  "description": "Schema for RansomEye evidence bundles - immutable, hash-chained, cryptographically signed",
+  "type": "object",
+  "required": [
+    "bundle_id",
+    "created_at",
+    "engine_version",
+    "policy_version",
+    "evidence_items",
+    "bundle_hash",
+    "is_sealed"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the evidence bundle"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when bundle was created (UTC)"
+    },
+    "sealed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when bundle was sealed (UTC, null if not sealed)"
+    },
+    "engine_version": {
+      "type": "string",
+      "description": "Version of the RansomEye engine that created this bundle"
+    },
+    "policy_version": {
+      "type": "string",
+      "description": "Version of the policy that was active when bundle was created"
+    },
+    "evidence_items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/EvidenceItem"
+      },
+      "description": "Array of evidence items in this bundle"
+    },
+    "bundle_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the bundle (hex encoded)"
+    },
+    "previous_bundle_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the previous bundle in the chain (null for first bundle)"
+    },
+    "signature": {
+      "type": ["string", "null"],
+      "description": "Cryptographic signature of the bundle (base64 encoded, null if not signed)"
+    },
+    "is_sealed": {
+      "type": "boolean",
+      "description": "Whether the bundle is sealed (immutable)"
+    }
+  },
+  "definitions": {
+    "EvidenceItem": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "source",
+        "source_type",
+        "timestamp",
+        "data",
+        "integrity_hash"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for this evidence item"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source system that produced this evidence"
+        },
+        "source_type": {
+          "type": "string",
+          "description": "Type of source (e.g., dpi_probe, linux_agent, correlation_engine)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when evidence was collected (UTC)"
+        },
+        "kill_chain_stage": {
+          "type": ["string", "null"],
+          "description": "MITRE ATT&CK kill chain stage (if applicable)"
+        },
+        "data": {
+          "type": "object",
+          "description": "Evidence data (structure depends on source_type)"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional metadata key-value pairs"
+        },
+        "integrity_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of this evidence item (hex encoded)"
+        }
+      }
+    }
+  }
+}
+

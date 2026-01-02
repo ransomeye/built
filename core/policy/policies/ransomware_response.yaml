@@ -1,0 +1,36 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_policy/policies/ransomware_response.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Ransomware response policy - deterministic policy for ransomware alerts
+id: ransomware_response
+version: 1.0.1
+name: Ransomware Response Policy
+description: Policy for responding to ransomware alerts
+enabled: true
+priority: 100
+match_conditions:
+- field: kill_chain_stage
+  operator: equals
+  value: actions_on_objectives
+- field: alert_severity
+  operator: in
+  value:
+  - critical
+  - high
+- field: asset_class
+  operator: matches
+  value: .*
+decision:
+  action: isolate
+  allowed_actions:
+  - isolate
+  - quarantine
+  - block
+  - escalate
+  reasoning: Ransomware detected at actions_on_objectives stage - immediate isolation required
+required_approvals:
+- security_team
+- incident_response
+signature: LuVxLmfF9tEd99etp7aPSiCCLHQsooQkPX4niM/J+DnShZDGJJvIHUoG//kJPaf0JCKLBDtGctoMO/MZPVOsP1OmfE/7H5j7Jaxxlpvd5AwcPMGafKZXyMFUSjrQOckrcMPWxdrxzmWvFEW0fzeIQuYstZHzcVMHkBE4Gq/H8DyvrliNzdoy5SiAXGsU0Lf7JnFY6AYnFijdSaHmawNa5YWwOucZ69R+P2iebZMtKZ6fEvBLW5oqK54/y7npHRtsQrXPmWiDKPs6SddC9ctBtvrmHF7wFiQYOg0QTDsl+GYeUcGqVgjBsY9RHEpUeICrX0jYAwCiqUZ7F+TniO3XMRmeFQHGR6M6NQpEef2haxYPqNTusExlVPncCKbmQGeKk35e7rABePEtyOx5mVRbJD5aZGV2bUdnZ4LCbWyMlsnOtKFXZ4CMPMDTmPNZNEhlD31sfXuvc9oODlhoey5TOTgiMcGx2vLGa5TztptHr28ZIzo36dGMJLBLr/XZjS5eoGHyVU33QR51d5xJGzBM6kDQd82TbyYQMYGvjVWm47rqJ8g4i6kf835WEIQLq/Wq3FhRyXaE/htKNbv33/JYSW0TPwdMlhaRu5xzcgzmYeLI15MaTWONnHRDYWamQ3xx5uY6qSvmvw0Fm4E7/flUz0eNVMz9ZjgidoBl6HBl+74=
+signature_hash: 13d992baaa76859a02609606f46a92ebf024ec16350828872183ee62ca587755
+signature_alg: RSA-4096-SHA256
+key_id: policy_root_v1

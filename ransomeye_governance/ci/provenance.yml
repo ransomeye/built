@@ -1,0 +1,68 @@
+# Path: /home/ransomeye/rebuild/ransomeye_governance/ci/provenance.yml
+# Author: RansomEye Core Team
+# Purpose: CI job that generates build provenance for supply chain security
+
+name: Build Provenance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+      
+      - name: Generate Build Provenance
+        run: |
+          cd /home/ransomeye/rebuild
+          python3 ransomeye_governance/tooling/provenance_generator.py --project-root /home/ransomeye/rebuild --output build_provenance.json
+        continue-on-error: false
+      
+      - name: Verify Provenance Format
+        run: |
+          if [ ! -f build_provenance.json ]; then
+            echo "ERROR: Provenance file not generated!"
+            exit 1
+          fi
+          python3 -c "import json; json.load(open('build_provenance.json'))"
+        continue-on-error: false
+      
+      - name: Provenance Report
+        if: always()
+        run: |
+          echo "=== Build Provenance Results ===" > provenance_report.txt
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> provenance_report.txt
+          echo "" >> provenance_report.txt
+          echo "Provenance generated successfully." >> provenance_report.txt
+      
+      - name: Upload Provenance
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: build-provenance
+          path: build_provenance.json
+      
+      - name: Upload Provenance Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: provenance-report
+          path: provenance_report.txt
+

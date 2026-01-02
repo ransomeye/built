@@ -1,0 +1,128 @@
+PROMPT 1: THE CORE KERNEL (Trust Root)
+Role: Senior Systems Engineer & Cryptography Architect Target Path: /home/ransomeye/rebuild/core/kernel/ Goal: Build the ransomeye-kernel library, which serves as the foundational dependency for all backend services. Context: This library standardizes how the entire platform handles Configuration (Environment Variables only), Logging (Structured JSON), and Cryptography (Ed25519 signatures). It prevents "Configuration Drift" and ensures that if the cryptographic keys are missing, the application refuses to start (Fail-Closed).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/kernel/
+
+Workspace: You must add "core/kernel" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+ring: For Ed25519 digital signatures (The Trust Root).
+
+tracing, tracing-subscriber: For structured, async-aware logging.
+
+serde, serde_json: For serializing logs and config.
+
+config: For loading environment variables.
+
+thiserror: For ergonomic error handling.
+
+dotenvy: For local development convenience (loading .env files), but production must rely on real Env Vars.
+
+Security/Performance:
+
+Zero-Trust Config: Configuration MUST be loaded from Environment Variables. Do not support local config files (like config.toml) for production secrets.
+
+Fail-Closed: If critical variables (like RE_TRUST_ROOT_KEY) are missing, the load() function must PANIC immediately. The application cannot run in an insecure state.
+
+Structured Logging: Logs must be output as JSON to stdout to allow ingestion by SIEM tools later.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/kernel/:
+
+Plaintext
+
+core/kernel/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports modules
+    ├── config.rs               # Strict Env Var Loader
+    ├── logging.rs              # JSON Tracing Initializer
+    ├── trust.rs                # Ed25519 Verify/Sign Logic
+    └── error.rs                # Unified KernelError Enum
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Unified Errors (src/error.rs)
+Struct/Trait: pub enum KernelError Logic:
+
+Use thiserror to define variants:
+
+ConfigMissing(String): When a required Env Var is not found.
+
+CryptoFailure(String): When signing/verification fails.
+
+AuthFailed: Generic authentication error.
+
+B. Zero-Trust Configuration (src/config.rs)
+Struct: pub struct AppConfig Logic:
+
+Define fields:
+
+pub trust_root_key: String (Required)
+
+pub log_level: String (Default: "info")
+
+pub database_url: String (Required)
+
+Implement AppConfig::load() -> Result<Self, KernelError>:
+
+Attempt to load from Environment.
+
+If RE_TRUST_ROOT_KEY or RE_DB_URL are missing, return Err or panic! (preferred for startup safety).
+
+Do not allow default values for secrets.
+
+C. Structured Logging (src/logging.rs)
+Function: pub fn init() -> Result<(), KernelError> Logic:
+
+Configure tracing_subscriber.
+
+Set the output format to JSON (.json()).
+
+Automatically inject fields into every log event:
+
+timestamp (ISO 8601)
+
+pid (Process ID)
+
+module (Crate name)
+
+Set the log level filter based on the RE_LOG_LEVEL env var.
+
+D. Cryptographic Root (src/trust.rs)
+Goal: Abstract ring complexities. Logic:
+
+Verification: pub fn verify_signature(data: &[u8], signature: &[u8], public_key: &[u8]) -> Result<(), KernelError>
+
+Use ring::signature::UnparsedPublicKey.
+
+Return Ok(()) if valid, Err if invalid.
+
+Signing: pub fn sign_payload(data: &[u8], private_key: &[u8]) -> Result<Vec<u8>, KernelError>
+
+Use ring::signature::KeyPair.
+
+(Note: This will be used by the Core Dispatcher later).
+
+4. ✅ ACCEPTANCE CRITERIA
+Build: cargo build -p ransomeye-kernel succeeds without warnings.
+
+Config Test:
+
+Create a test that sets RE_TRUST_ROOT_KEY and calls AppConfig::load(). It should succeed.
+
+Create a test that unsets RE_TRUST_ROOT_KEY and asserts that AppConfig::load() panics or returns an Error.
+
+Crypto Test:
+
+Generate a dummy keypair in a test.
+
+Sign a message "Hello World".
+
+Verify the signature successfully using trust::verify_signature.
+
+Flip one bit in the signature and assert verification fails.
+
+Logging Test: Verify that calling tracing::info!("test") produces a JSON string to stdout (manual check or captured via test utility).

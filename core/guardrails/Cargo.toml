@@ -1,0 +1,42 @@
+# Path and File Name : /home/ransomeye/rebuild/core/guardrails/Cargo.toml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Cargo configuration for RansomEye Guardrails Enforcement Engine - Phase 0 root-of-trust enforcement layer
+
+[package]
+name = "ransomeye_guardrails"
+version = "1.0.0"
+edition = "2021"
+authors = ["RansomEye Team"]
+license = "PROPRIETARY"
+
+[[bin]]
+name = "ransomeye-guardrails"
+path = "src/main.rs"
+
+[lib]
+name = "ransomeye_guardrails"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+ring = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+walkdir = "2.4"
+regex = "1.10"
+clap = { version = "4.4", features = ["derive"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8"
+proptest = "1.4"
+

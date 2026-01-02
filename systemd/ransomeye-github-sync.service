@@ -1,0 +1,46 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-github-sync.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for automatic GitHub synchronization
+# CRITICAL: Rootless runtime enforcement - MUST NOT run as root (UID 0)
+# RUNTIME: Uses /opt/ransomeye (not /home/ransomeye/rebuild)
+
+[Unit]
+Description=RansomEye GitHub Auto-Sync Service
+Documentation=https://github.com/ransomeye/ransomeye.v1
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/ransomeye/config/install_state.json
+# Pre-start validation: fail-closed if runtime layout invalid
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye-github-sync
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+# Pre-start validation: verify runtime layout ownership
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -r /opt/ransomeye/bin/ransomeye-github-sync || exit 1'
+ExecStart=/opt/ransomeye/bin/ransomeye-github-sync
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Runtime paths: /opt/ransomeye and state directories
+ReadWritePaths=/opt/ransomeye /var/lib/ransomeye /var/log/ransomeye
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="RANSOMEYE_ROOT=/opt/ransomeye"
+Environment="GIT_TERMINAL_PROMPT=0"
+Environment="GIT_ASKPASS="
+
+[Install]
+WantedBy=multi-user.target
+

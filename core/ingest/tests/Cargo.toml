@@ -1,0 +1,37 @@
+[package]
+name = "ransomeye_ingestion_tests"
+version = "1.0.0"
+edition = "2021"
+
+[[test]]
+name = "auth_failure_tests"
+path = "auth_failure_tests.rs"
+
+[[test]]
+name = "signature_failure_tests"
+path = "signature_failure_tests.rs"
+
+[[test]]
+name = "schema_rejection_tests"
+path = "schema_rejection_tests.rs"
+
+[[test]]
+name = "overload_tests"
+path = "overload_tests.rs"
+
+[[test]]
+name = "replay_attack_tests"
+path = "replay_attack_tests.rs"
+
+[[test]]
+name = "backpressure_tests"
+path = "backpressure_tests.rs"
+
+[[test]]
+name = "content_dedupe_tests"
+path = "content_dedupe_tests.rs"
+
+[[test]]
+name = "priority_rate_limit_tests"
+path = "priority_rate_limit_tests.rs"
+

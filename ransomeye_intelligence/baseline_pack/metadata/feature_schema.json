@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "feature_sets": {
+    "ransomware_behavior": {
+      "features": [
+        {
+          "name": "file_entropy",
+          "type": "float",
+          "range": [0.0, 8.0],
+          "description": "Shannon entropy of file content"
+        },
+        {
+          "name": "process_tree_depth",
+          "type": "integer",
+          "range": [1, 20],
+          "description": "Depth of process tree"
+        },
+        {
+          "name": "network_connections",
+          "type": "integer",
+          "range": [0, 1000],
+          "description": "Number of network connections"
+        },
+        {
+          "name": "registry_modifications",
+          "type": "integer",
+          "range": [0, 500],
+          "description": "Number of registry modifications"
+        },
+        {
+          "name": "file_encryption",
+          "type": "boolean",
+          "range": [0, 1],
+          "description": "File encryption detected"
+        }
+      ],
+      "total_features": 5
+    },
+    "anomaly_baseline": {
+      "features": [
+        {
+          "name": "cpu_usage",
+          "type": "float",
+          "range": [0.0, 100.0],
+          "description": "CPU usage percentage"
+        },
+        {
+          "name": "memory_usage",
+          "type": "float",
+          "range": [0.0, 100.0],
+          "description": "Memory usage percentage"
+        },
+        {
+          "name": "disk_io",
+          "type": "float",
+          "range": [0.0, 1000.0],
+          "description": "Disk I/O operations per second"
+        },
+        {
+          "name": "network_io",
+          "type": "float",
+          "range": [0.0, 10000.0],
+          "description": "Network I/O bytes per second"
+        },
+        {
+          "name": "process_count",
+          "type": "integer",
+          "range": [0, 10000],
+          "description": "Number of running processes"
+        }
+      ],
+      "total_features": 5
+    }
+  },
+  "validation_rules": {
+    "feature_count_match": "Feature count must match model expectations",
+    "feature_type_match": "Feature types must match schema",
+    "feature_range_validation": "Feature values must be within specified ranges",
+    "required_features": "All required features must be present"
+  }
+}
+

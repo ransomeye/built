@@ -1,0 +1,101 @@
+PROMPT 28: FINAL RELEASE ENGINEERING (Packaging)
+Role: Release Manager & DevOps Engineer Target Path: /home/ransomeye/rebuild/release/
+
+Goal: Build the Final Release Pipeline.Context: We must ship 4 distinct products from this single monorepo: The Core Server, The Linux Agent, The Windows Agent, and The DPI Probe. This module orchestrates the packaging process, ensuring that every artifact is strictly isolated (no cross-contamination) and cryptographically signed before it leaves the build server.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/release/
+
+Workspace: Add "release" (if applicable as a member, otherwise it's a script directory) to the root Cargo.toml.
+
+Separation of Concerns:
+
+Core Bundle: Contains core/*, ops/*, ui/*. MUST NOT contain edge/ source or binaries.
+
+Agent Bundle: Contains edge/agent/*.
+
+DPI Bundle: Contains edge/dpi/*.
+
+Gate Enforcement:
+
+The builder MUST run governance/gates/check_gates.py (from Phase 27) before packaging.
+
+If the Gates fail (e.g., Resource Limit violation), the Build MUST FAIL immediately. No artifacts shall be created.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/release/:
+
+Plaintext
+
+release/
+├── builder/
+│   ├── build.py                    # Main Orchestrator
+│   ├── packager_core.py            # Tarball logic for Server
+│   ├── packager_agent.py           # Tarball/Zip logic for Endpoints
+│   └── signer.py                   # GPG/Ed25519 Signing logic
+├── artifacts/                      # Output Directory (Gitignored)
+│   └── .gitkeep
+└── manifests/
+    └── generate_hash_list.py       # SHA256SUMS generator
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Build Orchestrator (builder/build.py)
+Logic:
+
+Step 1: Execute python3 governance/gates/check_gates.py.
+
+If Exit Code != 0: Print "⛔ RELEASE ABORTED: GATES FAILED" and exit.
+
+Step 2: Run cargo build --release (for the whole workspace).
+
+Step 3: Call packager_core.py.
+
+Step 4: Call packager_agent.py.
+
+Step 5: Call signer.py to sign all generated files in artifacts/.
+
+Step 6: Call generate_hash_list.py to create SHA256SUMS.
+
+B. Core Packager (builder/packager_core.py)
+Logic:
+
+Create temp dir.
+
+Copy Binaries: target/release/ransomeye-core, ransomeye-ops, ransomeye-tuner.
+
+Copy Assets: ui/dist/ (if separated), governance/policies.
+
+Exclude: Explicitly ensure edge/ directory is NOT included.
+
+Compress: Create artifacts/ransomeye-core-{ver}.tar.gz.
+
+C. Agent Packager (builder/packager_agent.py)
+Logic:
+
+Linux:
+
+Bundle target/release/ransomeye-agent, ransomeye-loader, ransomeye-sentinel.
+
+Output: artifacts/ransomeye-agent-linux-{ver}.tar.gz.
+
+Windows:
+
+Bundle target/release/ransomeye-agent.exe, ransomeye-sentinel.exe.
+
+Output: artifacts/ransomeye-agent-windows-{ver}.zip.
+
+DPI:
+
+Bundle target/release/ransomeye-dpi.
+
+Output: artifacts/ransomeye-dpi-{ver}.tar.gz.
+
+4. ✅ ACCEPTANCE CRITERIA
+Artifact Generation: Running python3 release/builder/build.py produces 4 distinct, signed archives in the artifacts/ folder.
+
+Isolation Test: Extracting the ransomeye-core.tar.gz reveals NO edge directory or agent binaries.
+
+Safety Test: If check_gates.py is forced to fail (e.g., via a mock), the build script exits immediately and the artifacts/ folder remains empty.
+
+Manifest: A SHA256SUMS file is generated containing hashes for all artifacts.

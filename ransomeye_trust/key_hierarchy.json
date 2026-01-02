@@ -1,0 +1,34 @@
+{
+  "root_ca": {
+    "key": "keys/root_ca.key",
+    "cert": "certs/root_ca.crt"
+  },
+  "domains": {
+    "artifacts": {
+      "key": "keys/artifacts_signing.key",
+      "cert": "certs/artifacts_signing.crt",
+      "description": "Signing key for ML models, reports, and other artifacts"
+    },
+    "agents": {
+      "key": "keys/agents_signing.key",
+      "cert": "certs/agents_signing.crt",
+      "description": "Signing key for agent binaries and updates"
+    },
+    "updates": {
+      "key": "keys/updates_signing.key",
+      "cert": "certs/updates_signing.crt",
+      "description": "Signing key for system updates and patches"
+    },
+    "config": {
+      "key": "keys/config_signing.key",
+      "cert": "certs/config_signing.crt",
+      "description": "Signing key for configuration files"
+    },
+    "reports": {
+      "key": "keys/reports_signing.key",
+      "cert": "certs/reports_signing.crt",
+      "description": "Signing key for forensic reports and summaries"
+    }
+  }
+}
+

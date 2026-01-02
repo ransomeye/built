@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RansomEye Install State Schema",
+  "description": "Cryptographically-signed installation state for fail-closed security enforcement with explicit DB mode",
+  "type": "object",
+  "required": [
+    "state_version",
+    "install_timestamp",
+    "db",
+    "enabled_modules",
+    "manifest_hash",
+    "installer_identity_hash",
+    "signer_fingerprint"
+  ],
+  "properties": {
+    "state_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Install state schema version"
+    },
+    "install_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp in ISO8601 format"
+    },
+    "db": {
+      "type": "object",
+      "description": "Database configuration section (MANDATORY for Core)",
+      "required": [
+        "enabled",
+        "mode",
+        "host",
+        "port",
+        "name",
+        "schema_applied",
+        "schema_signature_verified"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "const": true,
+          "description": "Database is MANDATORY for RansomEye Core (must always be true)"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["standalone", "ha"],
+          "description": "Database mode: standalone (single instance) or ha (high availability)"
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database host (REQUIRED - DB is mandatory)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Database port (REQUIRED - DB is mandatory)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Database name (REQUIRED - DB is mandatory)"
+        },
+        "schema_applied": {
+          "type": "boolean",
+          "const": true,
+          "description": "Database schema must be applied (REQUIRED)"
+        },
+        "schema_signature_verified": {
+          "type": "boolean",
+          "const": true,
+          "description": "Schema signature must be verified (REQUIRED)"
+        }
+      }
+    },
+    "enabled_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of enabled RansomEye modules"
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA256 hash of install_manifest.json"
+    },
+    "installer_identity_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA256 hash of installer identity"
+    },
+    "signer_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Ed25519 public key fingerprint"
+    }
+  }
+}

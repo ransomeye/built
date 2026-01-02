@@ -1,0 +1,25 @@
+[package]
+name = "bus"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "bus"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = "0.24"
+serde = { workspace = true }
+serde_json = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
+ed25519-dalek = { workspace = true }
+base64 = "0.22"
+sha2 = { workspace = true }
+parking_lot = { workspace = true }
+uuid = { workspace = true }

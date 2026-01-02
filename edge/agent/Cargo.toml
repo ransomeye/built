@@ -1,0 +1,19 @@
+[package]
+name = "agent"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "agent"
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+agent-linux = { path = "linux" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows_agent = { path = "windows" }
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+

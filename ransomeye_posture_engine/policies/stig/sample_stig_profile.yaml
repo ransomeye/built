@@ -1,0 +1,34 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_posture_engine/policies/stig/sample_stig_profile.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Sample STIG profile requirement definitions
+
+# Sample STIG requirements
+# Replace with actual STIG requirements as needed
+
+requirements:
+  - id: STIG-001
+    title: Ensure authentication failures are monitored
+    description: System must monitor and alert on authentication failures
+    severity: CAT II
+    vuln_id: V-12345
+    check_type: deterministic
+    check_logic:
+      type: threshold
+      threshold: 0.1
+      fact_types: [high_auth_failure_rate]
+      categories: [auth_hygiene]
+    remediation: "Implement authentication monitoring and alerting."
+
+  - id: STIG-002
+    title: Ensure network exposure is minimized
+    description: System must minimize exposure to external networks
+    severity: CAT I
+    vuln_id: V-12346
+    check_type: deterministic
+    check_logic:
+      type: threshold
+      threshold: 5
+      fact_types: [exposed_ports]
+      categories: [network_exposure]
+    remediation: "Close unnecessary ports and restrict network access."
+

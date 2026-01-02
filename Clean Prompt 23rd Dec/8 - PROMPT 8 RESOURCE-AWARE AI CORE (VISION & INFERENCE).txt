@@ -1,0 +1,123 @@
+PROMPT 8: RESOURCE-AWARE AI CORE (VISION & INFERENCE)
+Role: AI Engineer & Systems Optimization Specialist Target Path: /home/ransomeye/rebuild/core/ai/ Goal: Build the ransomeye-ai library, which hosts the local inference engine for Tabular data (Random Forest/XGBoost via ONNX) and Computer Vision (OCR). Context: Traditional AV signatures fail against new ransomware. This module uses ML to detect malicious behavior patterns. Crucially, it includes Computer Vision to read screenshots for "Ransom Notes" (e.g., "YOUR FILES ARE ENCRYPTED"). However, OCR is expensive; this module acts as a "Resource Governor," refusing to run heavy tasks if the system CPU or RAM is under stress.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/ai/
+
+Workspace: You must add "core/ai" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+ort: The Rust wrapper for ONNX Runtime (fastest inference).
+
+image: For image processing (grayscale/resize before OCR).
+
+sys-info: For real-time checking of RAM and Load Average.
+
+num_cpus: For calculating thread caps.
+
+rusty-tesseract (or similar lightweight binding): For OCR.
+
+tokio: Async runtime.
+
+Security/Performance:
+
+Thread Capping: The AI engine MUST NEVER use all available CPU cores. It is lower priority than packet capture.
+
+Lazy Loading: Do not load large models (e.g., >500MB) if AvailableRAM < 2GB.
+
+Load Shedding (Vision): Before running OCR, check sys_info::loadavg(). If Load > (Cores * 0.8), ABORT processing immediately to prevent system lockup.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/ai/:
+
+Plaintext
+
+core/ai/
+├── Cargo.toml                  # Dependencies
+├── models/                     # Directory for .onnx files
+│   └── .gitkeep
+└── src/
+    ├── lib.rs                  # Exports
+    ├── tuning.rs               # Dynamic Resource Limits
+    ├── inference/
+    │   ├── mod.rs
+    │   └── tabular.rs          # Random Forest / XGBoost (ONNX)
+    ├── vision/
+    │   ├── mod.rs
+    │   └── ocr.rs              # Text Extraction (Throttled)
+    └── feedback/
+        ├── mod.rs
+        └── collector.rs        # For future "Human-in-the-loop"
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Dynamic Resource Tuning (src/tuning.rs)
+Logic:
+
+Thread Cap:
+
+Cores = num_cpus::get().
+
+Rule: AI_Threads = max(1, Cores / 4). (Leave 75% of CPU for Core/DPI).
+
+Memory Check:
+
+pub fn can_load_model(size_mb: u64) -> bool.
+
+Get sys_info::mem_info().
+
+Return false if AvailableRAM < (size_mb * 2).
+
+Load Check:
+
+pub fn should_run_heavy_task() -> bool.
+
+Return false if LoadAvg > (Cores * 0.8).
+
+B. Resource-Aware Inference (src/inference/tabular.rs)
+Struct: pub struct InferenceEngine Logic:
+
+Initialization:
+
+Configure ort::SessionBuilder.
+
+CRITICAL: Set with_intra_threads(tuning::get_thread_cap()). This forces ONNX to respect our CPU limits.
+
+Check RAM before loading the model file. If insufficient, log Warning and enter "Fallback Mode" (heuristic only).
+
+Execution: predict(features: &[f32]) -> Result<f32, AiError>.
+
+C. Throttled Computer Vision (src/vision/ocr.rs)
+Function: pub fn scan_image_for_ransom_note(image_data: &[u8]) -> VisionResult Logic:
+
+Guardrail: Call tuning::should_run_heavy_task().
+
+If false: Return VisionResult::Skipped("System Load High").
+
+Why: Reading a screenshot is not worth crashing the server.
+
+Pre-processing: Use image crate to Grayscale and increase Contrast (makes OCR faster/accurate).
+
+OCR: Run Tesseract on the buffer.
+
+Keyword Search: Scan text for regex patterns: (encrypted|bitcoin|tor browser|restore files|onion).
+
+Output: Return Detected if keywords found, else Clean.
+
+4. ✅ ACCEPTANCE CRITERIA
+Single Box Test: On a mock 4-core machine, verify that the ONNX Runtime initializes with exactly 1 thread (4 / 4 = 1).
+
+OOM Protection: Attempting to load a dummy 4GB model on a low-RAM test environment triggers a warning log and graceful fallback, not a panic/crash.
+
+Vision Throttling:
+
+Mock sys_info to report high CPU load.
+
+Call scan_image_for_ransom_note.
+
+Assert it returns VisionResult::Skipped.
+
+Detection Test: A sample image containing the text "YOUR FILES ARE ENCRYPTED" returns VisionResult::Detected.
+
+Build: cargo build -p ransomeye-ai succeeds.

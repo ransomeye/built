@@ -1,0 +1,140 @@
+PROMPT 4: SCALABLE INGESTION, DEDUPLICATION & NORMALIZATION
+Role: High-Performance Rust Engineer Target Path: /home/ransomeye/rebuild/core/ingest/ Goal: Build the ransomeye-ingest library, which processes raw telemetry, removes duplicate events (noise), and converts them into a standardized format. Context: This module receives raw events from the Message Bus. Before passing data to the Engine or Database, it must Deduplicate (prevent alert fatigue from repeating events), Normalize (convert Windows/Linux logs to a common schema), and handle Backpressure (drop low-priority logs if the system is overloaded).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/ingest/
+
+Workspace: You must add "core/ingest" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+lru: For high-speed in-memory deduplication caching.
+
+sha2: For creating event fingerprints (hashes).
+
+tokio: For async event loop handling.
+
+serde, serde_json: For parsing raw logs.
+
+sys-info: For detecting available RAM to size the cache.
+
+quick-xml: For fast parsing of Windows XML events.
+
+tracing: For logging.
+
+core/bus, core/kernel: For configuration and types.
+
+Security/Performance:
+
+Dynamic Cache Sizing: The Deduplication LRU Cache size must scale with available RAM. (Don't waste RAM on small boxes, don't thrash on big ones).
+
+Adaptive Backpressure: If the Core is overloaded (queue > 80%), the Ingest layer must DROP low-priority logs (Info/Debug) to preserve high-priority alerts (Critical).
+
+Fail-Closed: Malformed logs should be dropped and logged as errors, but must NEVER crash the pipeline.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/ingest/:
+
+Plaintext
+
+core/ingest/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── pipeline.rs             # Main Async Event Loop
+    ├── tuning.rs               # Dynamic Cache Sizing Logic
+    ├── dedupe.rs               # LRU Cache Noise Filter
+    ├── normalization.rs        # Schema Mappers (Windows/Linux -> Standard)
+    └── rate_limit.rs           # Backpressure & Load Shedding
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Dynamic Tuning (src/tuning.rs)
+Function: pub fn get_cache_capacity() -> usize Logic:
+
+Get TotalRAM via sys_info.
+
+Calculate Dedupe Capacity:
+
+Small Profile (<8GB RAM): Cap at 50,000 items. (Keep memory footprint tiny).
+
+Massive Profile (>64GB RAM): Cap at 2,000,000 items. (Absorb massive event storms from 50k agents).
+
+B. The Pipeline (src/pipeline.rs)
+Logic:
+
+Subscribe to telemetry.* and logs.* on the Bus.
+
+Step 1: Rate Limit: Pass through rate_limit::check(). If it returns Drop, discard immediately.
+
+Step 2: Dedupe: Pass through dedupe::should_process(). If false, discard.
+
+Step 3: Normalize: Pass through normalization::normalize().
+
+Step 4: Publish: Send the result to the core.normalized_events topic (for the Engine to pick up).
+
+C. The Deduplication Engine (src/dedupe.rs)
+Goal: Stop "Flapping" alerts (e.g., a service restarting 100 times/min). Structure: Use lru::LruCache wrapped in a RwLock. Logic:
+
+Initialization: LruCache::new(tuning::get_cache_capacity()).
+
+Algorithm (Exact Dedupe):
+
+Extract key fields: (source_ip, event_type, target_process).
+
+Compute Hash = SHA256(concat(fields)).
+
+Check Cache:
+
+If Hash exists AND last_seen < 60s: DROP and increment a suppressed_count metric.
+
+If new or expired: UPDATE cache with now and PASS.
+
+D. Adaptive Rate Limiting (src/rate_limit.rs)
+Goal: Protect the DB/Core from 50k agents sending logs simultaneously. Logic:
+
+Monitor ChannelCapacity (Queue depth to Core).
+
+Normal Mode: Pass all events.
+
+Panic Mode (Queue > 80% full):
+
+DROP all Info and Debug logs immediately.
+
+PASS only Warning and Critical alerts.
+
+Log a LoadSheddingActive meta-event once per minute.
+
+E. Normalization (src/normalization.rs)
+Goal: Convert disparate logs into a single schema. Struct:
+
+Rust
+
+pub struct StandardEvent {
+    pub timestamp: i64,
+    pub host_id: String,
+    pub event_type: EventType, // Enum: ProcessStart, NetConnect, FileWrite
+    pub subject: String,       // e.g., "powershell.exe"
+    pub object: String,        // e.g., "C:\Users\Admin\passwords.txt"
+    pub raw_source: String,    // Original log for evidence
+}
+Mappers:
+
+from_windows_xml(): Parse EventID 4688 (Process Creation) -> ProcessStart.
+
+from_linux_audit(): Parse type=EXECVE -> ProcessStart.
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Scaling Test: On a 196GB RAM mock, the LRU Cache initializes with capacity > 1 Million items.
+
+
+Dedupe Test: Sending 100 identical events results in exactly 1 event passed to normalization.
+
+
+Load Shedding Test: When the output channel is flooded (mocked to 80%), "Info" logs are dropped, but "Ransomware Detected" alerts still pass through.
+
+
+Normalization Test: A raw Windows XML log for cmd.exe is correctly converted into a StandardEvent with event_type: ProcessStart.
+
+Build: cargo build -p ransomeye-ingest succeeds.

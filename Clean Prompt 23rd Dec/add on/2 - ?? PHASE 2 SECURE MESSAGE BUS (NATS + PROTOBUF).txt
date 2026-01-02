@@ -1,0 +1,125 @@
+📡 PHASE 2: SECURE MESSAGE BUS (NATS + PROTOBUF)
+
+Role: Distributed Systems Architect
+Target Path: /home/ransomeye/rebuild/core/ransomeye_bus/
+Goal: Build the internal communication library using NATS (messaging) and Protobuf (serialization) with mandatory mTLS.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+Naming Convention: Crate name MUST be ransomeye_bus.
+
+Schema Enforcement: No loose JSON on the bus. All messages MUST use Protobuf definitions.
+
+mTLS Enforcement: The client MUST panic at initialization if valid mTLS certificates (signed by the Trust Root) are not provided.
+
+ACL Safety: Enforce publisher rules: Agents CANNOT publish CommandRequest (prevents lateral movement from a compromised agent).
+
+2. 📂 DIRECTORY STRUCTURE
+
+core/ransomeye_bus/
+├── Cargo.toml
+├── build.rs                    # Protobuf compiler
+├── proto/
+│   └── ransomeye.v1.proto      # The Schema
+└── src/
+    ├── lib.rs                  # Exports
+    ├── client.rs               # NATS wrapper
+    ├── mtls.rs                 # TLS Configuration logic
+    ├── acl.rs                  # Role-based access control
+    └── protocol.rs             # Generated code integration
+
+3. ⚙️ COMPONENT SPECIFICATIONS
+A. The Schema (proto/ransomeye.v1.proto)
+Envelope: Contains message_id (UUID), source_id, timestamp.
+
+Payloads: oneof containing Telemetry, Alert, Command, Heartbeat.
+
+Command: Specifically includes action (Kill, Isolate) and target_pid.
+
+B. mTLS Logic (src/mtls.rs)
+Loads RE_TLS_CLIENT_CERT, RE_TLS_CLIENT_KEY, and RE_TRUST_ROOT_CA from the environment via ransomeye_kernel.
+
+Returns a rustls::ClientConfig configured for mutual authentication.
+
+C. ACL Logic (src/acl.rs)
+pub fn can_publish(role: &str, payload_type: PayloadType) -> bool
+
+Rule: If role == "agent" and payload == CommandRequest, return false.
+
+4. 🛠️ IMPLEMENTATION CODE
+Bus Cargo
+
+[package]
+name = "ransomeye_bus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-nats = "0.37"
+prost = "0.13"
+tokio = { version = "1.0", features = ["full"] }
+tokio-rustls = "0.26"
+rustls = { version = "0.23", features = ["ring"] }
+ransomeye_kernel = { path = "../ransomeye_kernel" }
+thiserror = "1.0"
+tracing = "0.1"
+
+[build-dependencies]
+prost-build = "0.13"
+
+
+Build Script
+
+// Copyright (c) RansomEye. Proprietary & Confidential.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    prost_build::compile_protos(&["proto/ransomeye.v1.proto"], &["proto/"])?;
+    Ok(())
+}
+
+Protobuf Schema
+
+syntax = "proto3";
+package ransomeye.v1;
+
+message Envelope {
+    string message_id = 1;
+    string source_id = 2;
+    int64 timestamp = 3;
+    oneof payload {
+        Heartbeat heartbeat = 10;
+        Alert alert = 11;
+        Command command = 12;
+    }
+}
+
+message Heartbeat {
+    string version = 1;
+    double cpu_usage = 2;
+}
+
+message Alert {
+    string severity = 1;
+    string title = 2;
+    string description = 3;
+}
+
+message Command {
+    string action = 1; // e.g., "KILL", "ISOLATE"
+    int32 target_pid = 2;
+}
+```
+
+### 5. ✅ ACCEPTANCE CRITERIA FOR CURSOR
+1.  `cargo build -p ransomeye_bus` succeeds and generates Rust structs in `OUT_DIR`.
+2.  Tests verify that an `agent` role is blocked from publishing `Command` messages.
+3.  Serialization/Deserialization tests confirm no data loss between the Rust structs and Protobuf bytes.
+
+
+This setup ensures that all components communicate over a strictly typed and encrypted channel.
+
+Next Steps:
+
+Initialize the proto/ directory and create the .proto file.
+
+Update the root Cargo.toml to include core/ransomeye_bus.
+

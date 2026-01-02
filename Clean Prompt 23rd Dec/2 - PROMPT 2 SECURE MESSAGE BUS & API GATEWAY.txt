@@ -1,0 +1,148 @@
+PROMPT 2: SECURE MESSAGE BUS & API GATEWAY
+Role: Distributed Systems Architect Target Path: /home/ransomeye/rebuild/core/bus/ Goal: Build the secure, internal communication library using NATS (messaging) and Protobuf (serialization). Context: This library abstracts the network layer. It enforces Zero Trust (mTLS authentication is mandatory for every connection) and Type Safety (structured data via Protobuf). It prevents unauthorized components (e.g., a compromised agent) from sending administrative commands.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/bus/
+
+Workspace: You must add "core/bus" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+async-nats: High-performance NATS client (Pure Rust).
+
+prost: Protocol Buffers runtime.
+
+prost-build: For compiling .proto files in build.rs.
+
+rustls, tokio-rustls: For mTLS. Note: usage of rustls-native-certs is BANNED; we must use our specific local CA.
+
+tokio: Async runtime.
+
+core/kernel: For loading configuration/certs.
+
+Security/Performance:
+
+Schema First: All messages must be defined in .proto files. No loose JSON strings allowed on the bus.
+
+mTLS Enforcement: The Client must PANIC if it cannot load valid Client Certificates signed by the Trust Root defined in Prompt 1.
+
+ACL Enforcement: Access Control checks must happen before publishing a message.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/bus/:
+
+Plaintext
+
+core/bus/
+├── Cargo.toml                  # Dependencies
+├── build.rs                    # Compiles .proto files at build time
+├── proto/
+│   └── ransomeye.v1.proto      # The Schema Definition
+└── src/
+    ├── lib.rs                  # Exports
+    ├── client.rs               # NATS Client Wrapper
+    ├── mtls.rs                 # Certificate Loading & TLS Config
+    ├── acl.rs                  # Access Control Logic
+    └── protocol.rs             # Re-exports generated Protobuf structs
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Protocol Definition (proto/ransomeye.v1.proto)
+Goal: Define the wire format. Logic:
+
+Syntax: proto3. Package: ransomeye.v1.
+
+Message Envelope: The outer wrapper.
+
+string message_id = 1; (UUID)
+
+string source_component = 2; (e.g., "agent-linux-01")
+
+int64 timestamp_utc = 3;
+
+Oneof Payload:
+
+TelemetryEvent telemetry = 10;
+
+AlertEvent alert = 11;
+
+CommandRequest command = 12;
+
+Heartbeat heartbeat = 13;
+
+Sub-messages:
+
+TelemetryEvent: cpu_usage, ram_usage.
+
+AlertEvent: threat_type, severity, description.
+
+CommandRequest: command_type (Kill, Isolate), target_pid.
+
+Heartbeat: uptime, version.
+
+B. Build Script (build.rs)
+Logic:
+
+Use prost_build::Config to compile proto/ransomeye.v1.proto.
+
+Output the Rust code to the OUT_DIR.
+
+C. mTLS Enforcement (src/mtls.rs)
+Function: pub fn create_tls_config() -> rustls::ClientConfig Logic:
+
+Load file paths from Env via core/kernel (or passed in config):
+
+RE_TLS_CLIENT_CERT
+
+RE_TLS_CLIENT_KEY
+
+RE_TRUST_ROOT_CA
+
+Parse PEM files.
+
+Construct a rustls::ClientConfig.
+
+Fail-Closed: If any file is missing or invalid, panic!("Security Fatal: Invalid mTLS Configuration").
+
+D. Access Control List (src/acl.rs)
+Function: pub fn can_publish(role: &str, message_type: &str) -> bool Logic:
+
+Rule 1: role="agent" CAN publish Telemetry, Alert, Heartbeat.
+
+Rule 2: role="agent" CANNOT publish CommandRequest. (Prevents compromised agents from controlling the fleet).
+
+Rule 3: role="core" CAN publish CommandRequest.
+
+Return false by default (Deny All).
+
+E. The Client Wrapper (src/client.rs)
+Struct: pub struct BusClient Logic:
+
+Connect: async-nats::connect_with_options using the TLS config from mtls.rs.
+
+Publish: pub async fn publish(&self, envelope: Envelope)
+
+Check acl::can_publish. If false, log security warning and drop.
+
+Serialize Envelope using prost::Message::encode.
+
+Send to subject ransomeye.events.
+
+4. ✅ ACCEPTANCE CRITERIA
+Build: cargo build -p ransomeye-bus succeeds. The .proto files are correctly compiled into Rust structs.
+
+Serialization Test:
+
+Create an Envelope with a Heartbeat.
+
+Serialize to bytes, then deserialize back.
+
+Assert fields match.
+
+ACL Test:
+
+Assert acl::can_publish("agent", "CommandRequest") returns false.
+
+Assert acl::can_publish("core", "CommandRequest") returns true.
+
+Security Integration: Attempting to initialize the BusClient without valid dummy cert paths (in tests) results in a panic/error.

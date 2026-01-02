@@ -1,0 +1,123 @@
+Here is Phase 6 of 11: The Detection Engine.
+
+Copy and paste the prompt below into your IDE or AI coding assistant to continue the build.
+
+Role: Senior Backend Developer & Security Engineer
+
+Target Path: /home/ransomeye/rebuild/core/ransomeye_engine/
+
+
+Goal: Build the real-time detection logic using a Sharded Actor Model to process telemetry and identify ransomware behavior without database contention.
+
+
+Context: This engine evaluates rules against normalized incoming events from the Message Bus. To handle high-scale environments (up to 50,000 agents), it uses Sharding: all events for a specific Host ID are routed to the same worker thread. This eliminates mutex contention and allows the engine to hold host state in memory efficiently.
+
+
+
+
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+
+Root: /home/ransomeye/rebuild/core/ransomeye_engine/.
+
+
+Workspace: Add core/ransomeye_engine to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+
+tokio: For async I/O and DB persistence.
+
+
+
+rayon: For CPU-bound rule evaluation and JSON parsing.
+
+
+
+dashmap: For high-performance concurrent state caching.
+
+
+ransomeye_bus, ransomeye_db, ransomeye_kernel: Internal dependencies for communication and storage.
+
+Sharding Logic:
+
+Events for a specific HostID MUST always be processed by the same worker thread.
+
+Use a consistent hashing algorithm: Worker_ID = Hash(HostID) % Worker_Count.
+
+Performance:
+
+
+Hybrid Threading: Use rayon for heavy compute (rules) and tokio for I/O (DB writes).
+
+
+Dynamic Tuning: Calculate worker thread counts based on available CPU cores (num_cpus).
+
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/ransomeye_engine/: 
+
+Plaintext
+
+core/ransomeye_engine/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── tuning.rs               # Dynamic Worker Sizing
+    ├── sharding.rs             # HostID -> Worker Router
+    ├── runner.rs               # Main Event Loop
+    └── correlation/            # Real-Time Threat Detection
+        ├── mod.rs
+        ├── state_machine.rs    # Host State (Clean -> Infected)
+        ├── rules.rs            # Detection Logic (Lateral Movement, Encryption)
+        └── cache.rs            # In-Memory State (DashMap)
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Sharded Event Router (src/sharding.rs)
+
+Goal: Eliminate database locks by ensuring thread-local state.
+
+
+Logic:
+
+Create N channels (where N is the tuned worker count).
+
+Route events to the specific channel based on the hash of the HostID.
+
+Each worker thread consumes from its assigned channel and maintains its own local cache of host states.
+
+B. Correlation Engine (src/correlation/)
+State Machine (state_machine.rs):
+
+Track transitions: Clean -> Suspicious (1 event) -> Probable (3+ events) -> Confirmed (Ransomware).
+
+Optimization: Only write state changes to ransomeye_db. Incremental updates are kept in memory.
+
+Rules (rules.rs):
+
+
+Encryption Detection: Trigger if FileWrite > 50/sec AND file entropy > 7.5.
+
+
+Lateral Movement: Trigger if LogonType == 3 (Network) AND user is not a known admin.
+
+C. Dynamic Tuning (src/tuning.rs)
+
+Worker Sizing: Determine the number of workers using num_cpus::get().
+
+
+Load Shedding: If process CPU usage exceeds 90%, prioritize active threat detection by skipping low-priority compliance tasks.
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Build Check: cargo build -p ransomeye_engine succeeds without warnings.
+
+
+Sharding Test: Send 100 events for "Host-A" and verify they are all processed by the same worker thread ID.
+
+
+Detection Test: Mock 50 rapid FileWrite events with high entropy; verify a Confirmed alert is generated in the ransomeye_db.
+
+
+State Persistence: Verify that a state transition (e.g., Suspicious) is flushed to the database within 1 second.

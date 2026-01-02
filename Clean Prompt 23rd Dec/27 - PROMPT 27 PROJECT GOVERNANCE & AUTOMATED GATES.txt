@@ -1,0 +1,81 @@
+PROMPT 27: PROJECT GOVERNANCE & AUTOMATED GATES
+Role: QA Lead & Governance Officer Target Path: /home/ransomeye/rebuild/governance/
+
+Goal: Implement the Project Governance Layer. Context: We have defined strict architectural rules (e.g., "Training must be capped at 3GB Disk Usage", "Swap must be 16GB"). This module builds the scripts that verify these rules are actually present in the code. It prevents a developer from accidentally removing safety limits.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/governance/
+
+Workspace: Add "governance" (or "governance/gates") to the [workspace.members] list in the root Cargo.toml.
+
+Gate Checks (CRITICAL):
+
+Resource Check: Verify core/trainer/src/jobs/core_job.rs (and others) contains the string "3072" (3GB limit) and agent_job.rs contains "200" (200MB limit). Note: This refers to the Disk Usage limit defined in Phase 24.
+
+Swap Check: Verify ops/tuner/src/swap.rs contains the logic for "16GB".
+
+Port Check: Verify ops/portguard/ directory exists.
+
+Security Check: Verify update scripts (apply_update.sh) exist.
+
+Port Hygiene:
+
+Scan the codebase for hardcoded ports (8080, 5432) appearing outside of configuration files.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/governance/:
+
+Plaintext
+
+governance/
+├── roadmap/
+│   ├── implementation_plan.md
+│   └── deliverable_matrix.csv
+├── gates/
+│   ├── check_gates.py              # The Enforcer Script
+│   ├── resource_audit.py           # Verifies RAM/Disk/Swap Logic
+│   └── security_audit.py           # Verifies mTLS/Signing presence
+└── policies/
+    └── release_policy.yaml         # Config for the gates
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Gatekeeper (gates/check_gates.py)
+Logic:
+
+Print "🔒 Running Governance Gates...".
+
+Execute resource_audit.py.
+
+Execute security_audit.py.
+
+Result: If any script returns Exit Code != 0, print "❌ GATE FAILED" and exit with error. Else, print "✅ GATES PASSED".
+
+B. Resource Audit (gates/resource_audit.py)
+Logic:
+
+Training Limit: Read core/trainer/src/jobs/core_job.rs.
+
+Assert it contains 3072 (The 3GB Disk Limit).
+
+Read core/trainer/src/jobs/agent_job.rs.
+
+Assert it contains 200 (The 200MB Disk Limit).
+
+Swap Limit: Read ops/tuner/src/swap.rs.
+
+Assert it contains logic or constants for 16 GB (e.g., 16 * 1024 or similar representation).
+
+C. Security Audit (gates/security_audit.py)
+Logic:
+
+ML Safety: Check that shap_gen.rs exists in edge/dpi/ml/ (Ensures Explainability).
+
+Updates: Check that core/installer/src/update/verify.rs exists (Ensures Update Signing).
+
+4. ✅ ACCEPTANCE CRITERIA
+Pass: Running python3 gates/check_gates.py on the current codebase returns Exit Code 0.
+
+Fail (Tamper): Manually changing the training limit in core_job.rs from "3072" to "4096" causes check_gates.py to FAIL immediately.
+
+Fail (Missing): Deleting ops/tuner/src/swap.rs causes the audit to FAIL.

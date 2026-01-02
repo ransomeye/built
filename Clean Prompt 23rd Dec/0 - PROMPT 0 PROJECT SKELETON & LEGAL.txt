@@ -1,0 +1,149 @@
+# 🧱 PROMPT 0: PROJECT SKELETON & LEGAL GOVERNANCE
+
+**Role:** Lead Architect & Compliance Officer
+**Target Path:** `/home/ransomeye/rebuild/`
+**Goal:** Establish the immutable directory structure, configure the Rust Workspace, and build the "Legal Governor" tools that prevent GPL contamination.
+**Context:** This is the foundation of the entire platform. We are establishing the workspace members and build tools first to ensure that no code enters this repository without passing strict legal and stylistic checks (e.g., no viral licenses, mandatory copyright headers).
+
+---
+
+### 1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+1. **Directory Standards:**
+* **Root:** `/home/ransomeye/rebuild/`
+* **Architecture:** Monorepo using Rust Workspace features.
+
+
+2. **Dependencies (Strict):**
+* `cargo_metadata`: For scanning the dependency tree in `license_check`.
+* `toml`: For parsing manifests.
+* `walkdir`: For recursively finding source files in `header_check`.
+* `colored` (or `termcolor`): For printing red/green output.
+* *No other dependencies allowed for this phase.*
+
+
+3. **Security/Governance:**
+* **Licensing Hard Ban:** You are **STRICTLY FORBIDDEN** from using any library licensed under GPL (v2/v3), AGPL, SSPL, or Commons Clause.
+* **Allowed Licenses:** MIT, Apache-2.0, BSD, ISC, MPL-2.0, CC0.
+* **Enforcement:** The build tools created here must fail with `exit(1)` if a violation is detected.
+
+
+
+---
+
+### 2. 📂 DIRECTORY STRUCTURE & FILES
+
+Create exactly this structure under `/home/ransomeye/rebuild/`:
+
+```text
+/home/ransomeye/rebuild/
+├── .gitignore                  # Standard Rust/Node gitignore
+├── Cargo.toml                  # The Workspace Root Manifest
+├── README.md                   # Architecture Overview
+├── governance/                 # Legal & Policy Enforcers
+│   ├── licenses/               # (Directory for license text files)
+│   └── tools/                  # Rust scripts for enforcement
+│       ├── Cargo.toml
+│       └── src/
+│           ├── main.rs         # Entrypoint (CLI dispatcher)
+│           └── bin/
+│               ├── license_check.rs # Dependency Auditor
+│               └── header_check.rs  # Copyright Header Enforcer
+
+```
+
+---
+
+### 3. ⚙️ IMPLEMENTATION DETAILS
+
+#### A. Workspace Manifest (`Cargo.toml`)
+
+**Goal:** Define the workspace members to include all future phases.
+**Logic:**
+
+* Define `[workspace]`.
+* **Members:** Include the following list *exactly*:
+```toml
+members = [
+    "governance/tools",
+    "core/kernel",
+    "core/bus",
+    "core/intel",
+    "core/ingest",
+    "core/engine",
+    "core/policy",
+    "core/dispatch",
+    "core/ai",
+    "core/reporting",
+    "core/forensics",  # Phase 15
+    "core/narrative",  # Phase 16
+    "core/governor",   # Phase 17
+    "core/threat_feed",# Phase 18
+    "core/trainer",    # Phase 24
+    "core/audit",      # Phase 31
+    "edge/dpi",
+    "edge/agent",
+    "edge/sentinel",   # Phase 21
+    "edge/loader",     # Phase 29
+    "ui/wasm",
+    "ops/tuner",       # Phase 23
+    "ops/portguard",   # Phase 25
+    "ops/dr",          # Phase 34
+]
+
+```
+
+
+* **Resolver:** Set `resolver = "2"`.
+* **Profile (Release):**
+* `lto = true`
+* `codegen-units = 1`
+* `panic = "abort"`
+* `strip = true`
+
+
+
+#### B. The License Governor (`governance/tools/src/bin/license_check.rs`)
+
+**Goal:** Audit dependencies against the Hard Constraints.
+**Logic:**
+
+1. Use `cargo_metadata` to fetch the dependency graph of the current workspace.
+2. Iterate through every package in the graph.
+3. **Check:** Compare `package.license` against two lists:
+* **Blocklist:** "GPL", "AGPL", "SSPL", "Commons Clause".
+* **Allowlist:** "MIT", "Apache-2.0", "BSD", "ISC", "MPL-2.0", "CC0".
+
+
+4. **Action:**
+* If a Blocked license is found: Print the package name and license in **RED**, then `std::process::exit(1)`.
+* If Clean: Print "✅ Legal Governance Passed" in Green.
+
+
+
+#### C. The Header Governor (`governance/tools/src/bin/header_check.rs`)
+
+**Goal:** Ensure every source file carries the corporate copyright.
+**Logic:**
+
+1. Define the required string: `// Copyright (c) RansomEye. Proprietary & Confidential.`
+2. Use `walkdir` to recursively scan the repository starting from root.
+3. **Filter:** Only check files ending in `.rs`, `.ts`, `.tsx`, `.py`.
+4. **Check:** Read the first line of the file.
+5. **Action:**
+* If the line is missing or mismatching: Print "❌ Header missing in [filename]" in **RED**, then `std::process::exit(1)`.
+
+
+
+---
+
+### 4. ✅ ACCEPTANCE CRITERIA
+
+1. **Directory Verification:** The full directory tree exists as specified.
+2. **Build:** Running `cargo build` inside `governance/tools/` succeeds without errors.
+3. **License Test:** Running `cargo run --bin license_check` passes on the clean repo.
+* *Negative Test:* Temporarily adding a crate with a GPL license to `Cargo.toml` causes the script to fail with exit code 1.
+
+
+4. **Header Test:** Running `cargo run --bin header_check` passes.
+* *Negative Test:* Creating a dummy `test.rs` without the header causes the script to fail.

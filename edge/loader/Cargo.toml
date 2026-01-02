@@ -1,0 +1,8 @@
+[package]
+name = "loader"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "loader"
+path = "src/lib.rs"

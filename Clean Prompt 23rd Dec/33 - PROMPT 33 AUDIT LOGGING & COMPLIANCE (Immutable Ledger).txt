@@ -1,0 +1,99 @@
+PROMPT 33: AUDIT LOGGING & COMPLIANCE (Immutable Ledger)
+Role: Backend Engineer & Cryptography Specialist Target Path: /home/ransomeye/rebuild/core/audit/
+
+Goal: Build the ransomeye-audit crate. Context: For government compliance (ISO 27001, GDPR), we need a centralized log of every action (e.g., "User X disabled Policy Y"). Standard DB logs can be deleted by a DBA. This system uses a Hash Chain: Entry N contains SHA256(Entry N-1 + Data). If a row is deleted or modified, the entire chain breaks, signaling tampering.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/audit/
+
+Workspace: Add "core/audit" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+sha2: For calculating the cryptographic link.
+
+hex: For storing hashes.
+
+sqlx: To store the structured logs in Postgres.
+
+tantivy: For high-speed Full-Text Search (FTS) of log messages (Postgres LIKE is too slow for TBs of logs).
+
+tokio: Async runtime.
+
+Security Mechanism:
+
+Chain Logic: Current_Hash = SHA256(Previous_Hash + Timestamp + Action + Actor).
+
+FTS Indexing: Every log entry must be indexed in tantivy immediately upon receipt for sub-second searching.
+
+Non-Repudiation: The Actor field (User ID) is mandatory.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/audit/:
+
+Plaintext
+
+core/audit/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports AuditLogger
+    ├── models.rs               # LogEntry Struct
+    ├── chain.rs                # Hashing & Integrity Verification
+    ├── storage.rs              # Postgres Insert Logic
+    └── search.rs               # Tantivy Indexing & Querying
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Log Model (src/models.rs)
+Struct:
+
+Rust
+
+pub struct AuditEntry {
+    pub id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub actor: String,          // e.g., "admin@ransomeye.tech"
+    pub action: String,         // e.g., "POLICY_UPDATE"
+    pub details: serde_json::Value,
+    pub prev_hash: String,      // Link to N-1
+    pub curr_hash: String,      // SHA256(prev + fields)
+}
+B. The Hash Chain (src/chain.rs)
+Logic:
+
+Fetch Tip: Query DB for the most recent entry (ORDER BY timestamp DESC LIMIT 1).
+
+Calculate:
+
+If DB empty, prev_hash = "GENESIS_HASH".
+
+Else, prev_hash = last_entry.curr_hash.
+
+digest = Sha256::digest(format!("{}{}{}{}", prev_hash, timestamp, actor, action)).
+
+Verify: verify_chain() iterates through rows to ensure Row[N].prev == Row[N-1].curr. If mismatch -> TAMPER_DETECTED.
+
+C. Search Engine (src/search.rs)
+Library: tantivy (Rust port of Lucene). Logic:
+
+Schema: Define fields timestamp (Date), actor (String), action (Text), details (Text).
+
+Writer: On log(), commit the document to the Tantivy index writer.
+
+Reader: search(query: &str) parses the query (e.g., "actor:admin AND action:DELETE") and returns matching Log IDs.
+
+D. The Facade (src/lib.rs)
+Struct: pub struct AuditLogger { pool: PgPool, index: IndexWriter } Method: pub async fn log(&self, actor: &str, action: &str, details: Value) -> Result<(), AuditError>
+
+Wraps the chain calculation, storage insertion, and search indexing in a transaction (conceptually).
+
+4. ✅ ACCEPTANCE CRITERIA
+Chain Test: Logging 3 events results in 3 DB rows where Row 2's prev_hash equals Row 1's curr_hash.
+
+Tamper Detection: Manually deleting Row 2 in the mock DB causes chain::verify() to return a specific error pointing to the break.
+
+Search Test: Searching for a keyword inside the JSON details field via tantivy returns the correct Log ID.
+
+Performance: Inserting 1,000 logs takes < 500ms (Async).
+
+Build: cargo build -p ransomeye-audit succeeds.

@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Linux Agent Telemetry Event Schema",
+  "description": "Schema for signed telemetry events emitted by RansomEye Linux Agent",
+  "type": "object",
+  "required": [
+    "message_id",
+    "timestamp",
+    "nonce",
+    "component_identity",
+    "host_id",
+    "data",
+    "signature",
+    "data_hash"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID v4)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp in ISO-8601 format (UTC)"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "64-character hex-encoded nonce for replay protection"
+    },
+    "component_identity": {
+      "type": "string",
+      "pattern": "^linux_agent_[0-9a-f]{32}$",
+      "description": "Linux Agent component identity hash"
+    },
+    "host_id": {
+      "type": "string",
+      "description": "Host identifier (hostname or unique host ID)"
+    },
+    "data": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "event_type": {"const": "process"},
+            "pid": {"type": "integer"},
+            "ppid": {"type": "integer"},
+            "process_name": {"type": "string"},
+            "command_line": {"type": "string"},
+            "user_id": {"type": "integer"},
+            "group_id": {"type": "integer"},
+            "timestamp": {"type": "string", "format": "date-time"}
+          },
+          "required": ["event_type", "pid", "process_name", "timestamp"]
+        },
+        {
+          "properties": {
+            "event_type": {"const": "file"},
+            "path": {"type": "string"},
+            "operation": {"type": "string"},
+            "user_id": {"type": "integer"},
+            "process_id": {"type": "integer"},
+            "timestamp": {"type": "string", "format": "date-time"}
+          },
+          "required": ["event_type", "path", "operation", "timestamp"]
+        },
+        {
+          "properties": {
+            "event_type": {"const": "auth"},
+            "user": {"type": "string"},
+            "source": {"type": "string"},
+            "success": {"type": "boolean"},
+            "timestamp": {"type": "string", "format": "date-time"}
+          },
+          "required": ["event_type", "user", "source", "success", "timestamp"]
+        },
+        {
+          "properties": {
+            "event_type": {"const": "network"},
+            "src_ip": {"type": "string"},
+            "dst_ip": {"type": "string"},
+            "src_port": {"type": "integer"},
+            "dst_port": {"type": "integer"},
+            "protocol": {"type": "string"},
+            "process_id": {"type": "integer"},
+            "timestamp": {"type": "string", "format": "date-time"}
+          },
+          "required": ["event_type", "src_ip", "dst_ip", "protocol", "timestamp"]
+        }
+      ]
+    },
+    "signature": {
+      "type": "string",
+      "description": "Base64-encoded RSA-4096-PSS-SHA256 signature"
+    },
+    "data_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hash of data field (hex-encoded)"
+    }
+  }
+}

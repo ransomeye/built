@@ -1,0 +1,22 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-feed-retraining.timer
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd timer for daily model retraining (Phase 6 - 24h schedule)
+
+[Unit]
+Description=RansomEye Feed-Based Model Retraining Timer (Phase 6)
+Documentation=https://ransomeye.tech
+Requires=ransomeye-feed-retraining.service
+
+[Timer]
+# Phase 6: Daily schedule (24h) - runs after feed fetcher
+OnCalendar=daily
+# Run at 3 AM UTC (1 hour after feed fetcher)
+OnCalendar=*-*-* 03:00:00
+# Run immediately if missed
+Persistent=true
+# Randomize start time by up to 5 minutes
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
+

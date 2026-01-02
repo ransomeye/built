@@ -1,0 +1,112 @@
+PROMPT 12: OPS CLI & SRE TOOLING
+Role: Site Reliability Engineer (SRE) & Systems Developer Target Path: /home/ransomeye/rebuild/ops/ Goal: Build the ransomeye-ops CLI tool. Context: System Administrators need a safe, reliable way to perform maintenance without manually touching the database or raw files. This tool handles Key Rotation (replacing compromised keys), Log Archival (compressing and encrypting old logs to cold storage), and Database Backups. It ensures these operations are atomic and secure.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/ops/
+
+Workspace: You must add "ops" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+clap: For parsing CLI arguments (subcommands, flags).
+
+ring: For cryptographic operations (generating new keys, encrypting archives).
+
+zstd: For high-ratio compression of log archives.
+
+sqlx: For database interactions (backup locks, log pruning).
+
+tokio: Async runtime.
+
+core/kernel: For configuration and crypto primitives.
+
+core/intel: For graph backup logic.
+
+Security/Performance:
+
+Permission Check: The tool must refuse to run if the user is not root or part of the ransomeye-admin group.
+
+Key Rotation Safety: When rotating trust roots, the tool must verify that the new keys are successfully generated and saved before invalidating the old ones.
+
+Secure Archival: Archives sent to cold storage must be encrypted (AES-GCM) so that a stolen hard drive doesn't leak sensitive audit data.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/ops/:
+
+Plaintext
+
+ops/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # CLI Entrypoint (Clap)
+    ├── lib.rs                  # Exports
+    ├── utils.rs                # Helper functions (permissions, file IO)
+    ├── commands/
+    │   ├── mod.rs
+    │   ├── rotate_keys.rs      # Trust Root Rollover Logic
+    │   ├── archive.rs          # Log Retention & Encryption
+    │   ├── backup.rs           # Database Dump Wrapper
+    │   └── health.rs           # Deep System Diagnostics
+3.⚙️ IMPLEMENTATION DETAILS
+A. Key Rotation (src/commands/rotate_keys.rs)
+Context: If a private key is compromised, we must rotate it without downtime. Logic:
+
+Generate: Create a New_KeyPair (Ed25519).
+
+Sign Update: Create a TrustUpdate message containing the New_PublicKey, signed by the Old_PrivateKey.
+
+Broadcast: Publish this message to the broadcast.updates topic on the Bus.
+
+Wait: Listen for ACKs from Agents (configurable timeout).
+
+Commit: If >80% of agents ACK, update the core/kernel config on disk to use the new key.
+
+B. Secure Log Archival (src/commands/archive.rs)
+Policy: Logs older than 30 days must be moved to cold storage. Logic:
+
+Query: Select old AuditLogs from the DB (WHERE timestamp < now - 30d).
+
+Stream: Write records to a JSON file stream.
+
+Compress: Pipe stream through zstd.
+
+Encrypt: Pipe compressed stream through AES-GCM (using a specific Archive Key).
+
+Save: Write to /mnt/cold_storage/logs_{date}.zst.enc.
+
+Prune: Execute DELETE on the DB (vacuum/analyze after).
+
+C. Database Backup (src/commands/backup.rs)
+Logic: Wrapper around pg_dump.
+
+Lock: Briefly lock DB writes (if necessary for consistency).
+
+Dump: Execute pg_dump -Fc.
+
+Encrypt: Pipe output to an encryption stream.
+
+Save: Write to /var/backups/ransomeye_{timestamp}.enc.
+
+D. Health Check (src/commands/health.rs)
+Logic:
+
+Check Database Connectivity.
+
+Check NATS Bus Connectivity.
+
+Check Disk Space (>10% free).
+
+Output a structured JSON health report.
+
+4. ✅ ACCEPTANCE CRITERIA
+Rotation Test: Running ops rotate-keys generates a valid TrustUpdate message signed by the old key (verified in test).
+
+Archive Test: Running ops archive --days 30 successfully removes old logs from the mock DB and creates an encrypted .zst.enc file on disk.
+
+CLI Usability: Running ops --help displays clear usage instructions for all subcommands.
+
+Security: The tool exits immediately with "Permission Denied" if run by a non-privileged user.
+
+Build: cargo build -p ransomeye-ops succeeds.

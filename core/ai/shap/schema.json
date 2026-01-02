@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SHAP Explanation Schema",
+  "type": "object",
+  "required": [
+    "feature_contributions",
+    "baseline_value",
+    "output_value",
+    "shap_version",
+    "explanation_hash"
+  ],
+  "properties": {
+    "feature_contributions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["feature_name", "contribution", "importance"],
+        "properties": {
+          "feature_name": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "number"
+          },
+          "importance": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "baseline_value": {
+      "type": "number"
+    },
+    "output_value": {
+      "type": "number"
+    },
+    "shap_version": {
+      "type": "string"
+    },
+    "explanation_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
+

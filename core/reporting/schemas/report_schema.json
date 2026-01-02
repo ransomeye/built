@@ -1,0 +1,234 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forensic Report Schema",
+  "description": "Schema for RansomEye forensic reports - reproducible, versioned, with evidence references",
+  "type": "object",
+  "required": [
+    "metadata",
+    "title",
+    "description",
+    "evidence_bundle_ids",
+    "summary",
+    "evidence_hashes",
+    "reproducible"
+  ],
+  "properties": {
+    "metadata": {
+      "$ref": "#/definitions/ReportMetadata"
+    },
+    "title": {
+      "type": "string",
+      "description": "Report title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Report description"
+    },
+    "evidence_bundle_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "description": "IDs of evidence bundles referenced in this report"
+    },
+    "timeline": {
+      "type": ["object", "null"],
+      "$ref": "#/definitions/ForensicTimeline",
+      "description": "Forensic timeline (optional)"
+    },
+    "summary": {
+      "$ref": "#/definitions/ReportSummary"
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ReportSection"
+      },
+      "description": "Report sections"
+    },
+    "evidence_hashes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "description": "SHA-256 hashes of evidence bundles (hex encoded)"
+    },
+    "reproducible": {
+      "type": "boolean",
+      "description": "Whether this report is reproducible from stored evidence"
+    }
+  },
+  "definitions": {
+    "ReportMetadata": {
+      "type": "object",
+      "required": [
+        "report_id",
+        "created_at",
+        "engine_version",
+        "policy_version",
+        "build_hash"
+      ],
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique identifier for this report"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when report was created (UTC)"
+        },
+        "engine_version": {
+          "type": "string",
+          "description": "Version of the RansomEye engine"
+        },
+        "policy_version": {
+          "type": "string",
+          "description": "Version of the active policy"
+        },
+        "build_hash": {
+          "type": "string",
+          "description": "Build hash of the RansomEye system"
+        },
+        "model_version_hash": {
+          "type": ["string", "null"],
+          "description": "Hash of model versions used (if applicable)"
+        }
+      }
+    },
+    "ReportSummary": {
+      "type": "object",
+      "required": [
+        "total_evidence_items"
+      ],
+      "properties": {
+        "total_evidence_items": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of evidence items in report"
+        },
+        "time_range_start": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Start of time range covered by report (UTC)"
+        },
+        "time_range_end": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "End of time range covered by report (UTC)"
+        },
+        "kill_chain_stages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Kill chain stages present in evidence"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sources of evidence"
+        }
+      }
+    },
+    "ReportSection": {
+      "type": "object",
+      "required": [
+        "title",
+        "content"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Section title"
+        },
+        "content": {
+          "type": "string",
+          "description": "Section content"
+        },
+        "evidence_references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "Evidence bundle IDs referenced in this section"
+        },
+        "subsections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportSection"
+          },
+          "description": "Nested subsections"
+        }
+      }
+    },
+    "ForensicTimeline": {
+      "type": "object",
+      "required": [
+        "events"
+      ],
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimelineEvent"
+          }
+        }
+      }
+    },
+    "TimelineEvent": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "source",
+        "source_type",
+        "event_type",
+        "description",
+        "evidence_id"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp (UTC)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the event"
+        },
+        "source_type": {
+          "type": "string",
+          "description": "Type of source"
+        },
+        "event_type": {
+          "type": "string",
+          "description": "Type of event"
+        },
+        "kill_chain_stage": {
+          "type": ["string", "null"],
+          "description": "MITRE ATT&CK kill chain stage"
+        },
+        "description": {
+          "type": "string",
+          "description": "Event description"
+        },
+        "evidence_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of associated evidence item"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional event metadata"
+        }
+      }
+    }
+  }
+}
+

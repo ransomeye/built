@@ -1,0 +1,189 @@
+# Path and File Name : /home/ransomeye/rebuild/core/response_playbooks/schema/playbook.schema.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: YAML schema definition for incident response playbooks
+
+$schema: http://json-schema.org/draft-07/schema#
+type: object
+required:
+  - id
+  - name
+  - version
+  - severity
+  - trigger_conditions
+  - steps
+  - rollback_steps
+  - approvals_required
+  - dry_run_supported
+  - timeout_per_step
+  - max_execution_time
+  - signature
+  - signature_hash
+properties:
+  id:
+    type: string
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    description: UUID v4 identifier for the playbook
+  name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: Human-readable playbook name
+  version:
+    type: string
+    pattern: '^\d+\.\d+\.\d+$'
+    description: Semantic version (MAJOR.MINOR.PATCH)
+  severity:
+    type: string
+    enum: [low, medium, high, critical]
+    description: Playbook severity level
+  trigger_conditions:
+    type: object
+    required:
+      - policy_outcomes
+      - alert_severity
+      - kill_chain_stage
+    properties:
+      policy_outcomes:
+        type: array
+        items:
+          type: string
+        description: List of policy decision outcomes that trigger this playbook
+      alert_severity:
+        type: array
+        items:
+          type: string
+          enum: [low, medium, high, critical]
+        description: Alert severity levels that trigger this playbook
+      kill_chain_stage:
+        type: array
+        items:
+          type: string
+          enum: [reconnaissance, weaponization, delivery, exploitation, installation, command_and_control, actions_on_objectives]
+        description: MITRE ATT&CK kill chain stages
+      custom_conditions:
+        type: object
+        description: Additional custom trigger conditions
+  steps:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required:
+        - step_id
+        - step_name
+        - action_type
+        - enforcement_action
+        - timeout_seconds
+        - retry_on_failure
+        - continue_on_failure
+      properties:
+        step_id:
+          type: string
+          pattern: '^step_[0-9a-f]{8}$'
+        step_name:
+          type: string
+          minLength: 1
+        action_type:
+          type: string
+          enum: [isolate, quarantine, block, notify, collect, analyze, escalate]
+        enforcement_action:
+          type: object
+          required:
+            - adapter
+            - parameters
+          properties:
+            adapter:
+              type: string
+              enum: [linux_agent, windows_agent, network, core]
+            parameters:
+              type: object
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        retry_on_failure:
+          type: boolean
+        continue_on_failure:
+          type: boolean
+        preconditions:
+          type: array
+          items:
+            type: string
+        postconditions:
+          type: array
+          items:
+            type: string
+  rollback_steps:
+    type: array
+    items:
+      type: object
+      required:
+        - rollback_id
+        - rollback_name
+        - reverse_action
+        - timeout_seconds
+      properties:
+        rollback_id:
+          type: string
+          pattern: '^rollback_[0-9a-f]{8}$'
+        rollback_name:
+          type: string
+        reverse_action:
+          type: object
+          required:
+            - adapter
+            - parameters
+          properties:
+            adapter:
+              type: string
+            parameters:
+              type: object
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+  approvals_required:
+    type: object
+    required:
+      - human_approval
+      - auto_approval
+    properties:
+      human_approval:
+        type: boolean
+      auto_approval:
+        type: boolean
+      approval_timeout_seconds:
+        type: integer
+        minimum: 0
+  dry_run_supported:
+    type: boolean
+  timeout_per_step:
+    type: integer
+    minimum: 1
+    maximum: 3600
+  max_execution_time:
+    type: integer
+    minimum: 1
+    maximum: 86400
+  signature:
+    type: string
+    description: Base64-encoded cryptographic signature (RSA-4096 or Ed25519)
+  signature_hash:
+    type: string
+    pattern: '^[0-9a-f]{64}$'
+    description: SHA-256 hash of the playbook content (before signature)
+  metadata:
+    type: object
+    properties:
+      created_at:
+        type: string
+        format: date-time
+      created_by:
+        type: string
+      description:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+

@@ -1,0 +1,25 @@
+{
+  "test_name": "health_gate_failure",
+  "timestamp": "2025-12-30T08:32:19Z",
+  "expected_behavior": {
+    "health_gate_fails": true,
+    "orchestrator_aborts": true,
+    "explicit_failure_logged": true,
+    "exit_code_non_zero": true
+  },
+  "observed_behavior": {
+    "service_status": "failed
+failed",
+    "exit_code": "1",
+    "restart_count": "0",
+    "failure_detection_time_seconds": ".331955866",
+    "error_visible_in_journal": true
+  },
+  "test_results": {
+    "failed_correctly": false,
+    "exit_code_correct": true,
+    "no_restart": true,
+    "error_visible": true
+  },
+  "pass": false
+}

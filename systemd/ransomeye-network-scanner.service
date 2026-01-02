@@ -1,0 +1,61 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-network-scanner.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service file for Phase 9 Network Scanner
+
+[Unit]
+Description=RansomEye Phase 9: Network Scanner (Active + Passive)
+Documentation=https://ransomeye.tech
+After=network.target postgresql.service
+Wants=postgresql.service
+ConditionPathExists=/opt/ransomeye/config/install_state.json
+# Pre-start validation: fail-closed if runtime layout invalid
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye-network-scanner
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+# Pre-start validation: verify runtime layout ownership
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -r /opt/ransomeye/bin/ransomeye-network-scanner || exit 1'
+ExecStart=/opt/ransomeye/bin/ransomeye-network-scanner
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ransomeye-network-scanner
+
+# Environment variables
+Environment="RUST_LOG=info"
+Environment="SCAN_CIDRS=192.168.1.0/24,10.0.0.0/8"
+Environment="MAX_PORTS=1000"
+Environment="MAX_RATE=10.0"
+Environment="SCAN_TIMEOUT=300"
+Environment="ACTIVE_MODE_ENABLED=true"
+Environment="PASSIVE_MODE_ENABLED=true"
+Environment="MAX_CONCURRENT_SCANS=10"
+Environment="RANSOMEYE_SCANNER_PRIVATE_KEY_PATH=/etc/ransomeye/keys/scanner_private_key.pem"
+Environment="RANSOMEYE_SCANNER_PLAYBOOK_TRIGGERS=/etc/ransomeye/config/scanner_playbook_triggers.yaml"
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Runtime paths: /opt/ransomeye and state directories
+ReadWritePaths=/opt/ransomeye /var/log/ransomeye /var/lib/ransomeye
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
+

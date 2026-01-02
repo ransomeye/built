@@ -1,0 +1,36 @@
+id: ransomware_response
+version: "1.0.0"
+name: "Ransomware Response Policy"
+description: "Policy for responding to ransomware alerts"
+enabled: true
+priority: 100
+
+match_conditions:
+  - field: "kill_chain_stage"
+    operator: "equals"
+    value: "actions_on_objectives"
+  
+  - field: "alert_severity"
+    operator: "in"
+    value: ["critical", "high"]
+  
+  - field: "asset_class"
+    operator: "matches"
+    value: ".*"
+
+decision:
+  action: "isolate"
+  allowed_actions:
+    - "isolate"
+    - "quarantine"
+    - "block"
+    - "escalate"
+  reasoning: "Ransomware detected at actions_on_objectives stage - immediate isolation required"
+
+required_approvals:
+  - "security_team"
+  - "incident_response"
+
+signature: "REPLACE_WITH_REAL_SIGNATURE"
+signature_hash: "REPLACE_WITH_REAL_HASH"
+

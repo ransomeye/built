@@ -1,0 +1,97 @@
+/* Path and File Name : /home/ransomeye/rebuild/ransomeye_reporting/src/formats/html_styles.css */
+/* Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU */
+/* Details of functionality of this file: HTML report styles - CSS styling for HTML forensic reports */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.header {
+    background-color: #1a1a1a;
+    color: white;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+.header h1 {
+    margin: 0;
+}
+
+h2 {
+    color: #1a1a1a;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 10px;
+}
+
+.metadata {
+    background-color: white;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.metadata table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.metadata table td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.metadata table td:first-child {
+    font-weight: bold;
+    width: 200px;
+}
+
+.section {
+    background-color: white;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section h3 {
+    color: #1a1a1a;
+    margin-top: 0;
+}
+
+.section ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.section ul li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+code {
+    background-color: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 2px solid #1a1a1a;
+    text-align: center;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.footer p {
+    margin: 5px 0;
+}
+

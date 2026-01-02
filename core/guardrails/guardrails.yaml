@@ -1,0 +1,449 @@
+version: 1.0.1
+spec_hash: 32fb7f6b921ef36bf1ef0d4682228df43ee30153309eae9cda38132bc911524e
+signature: yExmSWXngSCLOVorNefmXf+hqwLHG0lCFtJSYWqdOkya5eX9fxySdTgqkgCwi9vQ3eHcuffcpWDqm6wZSgkwBw==
+public_key: 302a300506032b6570032100b0c59acf686317936c681cf025bf774c6ea4224d61fe7fbf24e8a65713887c85
+metadata:
+  created: '2025-01-27T00:00:00Z'
+  last_modified: '2025-01-27T12:00:00Z'
+  signer: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+  update_reason: Phase 0.5 - Removed phantom modules, aligned with disk reality per
+    MODULE_PHASE_MAP.yaml
+allowed_phases:
+- id: 0
+  name: Guardrails Enforcement Engine
+  path: /home/ransomeye/rebuild/core/guardrails/
+  status: IMPLEMENTED
+  installable: true
+  runnable: true
+- id: 1
+  name: Core Engine & Installer
+  path: /home/ransomeye/rebuild/ransomeye_installer/
+  status: IMPLEMENTED
+  installable: true
+  runnable: true
+- id: 2
+  name: AI Core & Model Registry
+  path: /home/ransomeye/rebuild/core/ai/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/ai library, not standalone service
+- id: 3
+  name: Alert Engine & Policy Manager
+  path: /home/ransomeye/rebuild/ransomeye_intelligence/
+  status: IMPLEMENTED
+  installable: true
+  runnable: true
+  notes: Implemented as ransomeye_intelligence (includes threat intel from Phase 18)
+- id: 4
+  name: KillChain & Forensic Dump
+  path: /home/ransomeye/rebuild/core/engine/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/engine (correlation engine includes killchain)
+- id: 5
+  name: LLM Summarizer
+  path: /home/ransomeye/rebuild/core/narrative/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/narrative library
+- id: 6
+  name: Incident Response & Playbooks
+  path: /home/ransomeye/rebuild/core/response_playbooks/
+  status: IMPLEMENTED
+  installable: false
+  runnable: true
+  notes: Phase 6 - Incident Response Playbook Engine with deterministic execution, rollback, and cryptographic verification
+- id: 7
+  name: SOC Copilot
+  path: /home/ransomeye/rebuild/core/ai/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/ai (advisory functionality)
+- id: 8
+  name: Threat Correlation Engine
+  path: /home/ransomeye/rebuild/core/engine/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/engine (correlation engine)
+- id: 9
+  name: Network Scanner
+  path: /home/ransomeye/rebuild/core/network_scanner/
+  status: IMPLEMENTED
+  installable: false
+  runnable: true
+  notes: Phase 9 - Active and passive network discovery with rate limiting and signed results
+- id: 10
+  name: DB Core
+  path: /home/ransomeye/rebuild/core/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: PostgreSQL integration is library-based, no standalone service
+- id: 11
+  name: UI & Dashboards
+  path: /home/ransomeye/rebuild/ransomeye_ui/
+  status: NOT_IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Phase 11 - Not yet created per MODULE_PHASE_MAP.yaml
+- id: 12
+  name: Orchestrator (Master Flow)
+  path: /home/ransomeye/rebuild/ransomeye_installer/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Orchestration handled by installer/operations tools
+- id: 13
+  name: Forensic Engine (Advanced)
+  path: /home/ransomeye/rebuild/core/forensics/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/forensics library
+- id: 14
+  name: LLM Behavior Summarizer (Expanded)
+  path: /home/ransomeye/rebuild/core/narrative/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/narrative library
+- id: 15
+  name: SOC Copilot (Advanced)
+  path: /home/ransomeye/rebuild/core/ai/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/ai (advisory functionality)
+- id: 16
+  name: Deception Framework
+  path: /home/ransomeye/rebuild/core/deception/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Phase 16 - Deception Framework with signed assets, safe deployment, high-confidence signals, correlation and playbook integration
+- id: 17
+  name: AI Assistant (Governor Mode)
+  path: /home/ransomeye/rebuild/core/governor/
+  status: IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Implemented as core/governor library
+- id: 18
+  name: Threat Intelligence Feed Engine
+  path: /home/ransomeye/rebuild/ransomeye_intelligence/
+  status: IMPLEMENTED
+  installable: true
+  runnable: true
+  notes: Implemented as part of ransomeye_intelligence (Phase 3)
+- id: 19
+  name: HNMP Engine
+  path: /home/ransomeye/rebuild/ransomeye_posture_engine/
+  status: IMPLEMENTED
+  installable: true
+  runnable: true
+  notes: Implemented as ransomeye_posture_engine
+- id: 20
+  name: Global Validator
+  path: /home/ransomeye/rebuild/core/guardrails/
+  status: IMPLEMENTED
+  installable: false
+  runnable: true
+  notes: Implemented as part of guardrails enforcement engine
+- id: 21
+  name: Linux Agent (Standalone)
+  path: /home/ransomeye/rebuild/ransomeye_linux_agent/
+  status: NOT_IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Standalone agent - not installed by main installer, use dedicated installer
+- id: 22
+  name: Windows Agent (Standalone)
+  path: /home/ransomeye/rebuild/ransomeye_windows_agent/
+  status: NOT_IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Standalone agent - not installed by main installer, use MSI installer
+- id: 23
+  name: DPI Probe (Standalone)
+  path: /home/ransomeye/rebuild/ransomeye_dpi_probe/
+  status: NOT_IMPLEMENTED
+  installable: false
+  runnable: false
+  notes: Standalone probe - not installed by main installer, use dedicated installer
+allowed_modules:
+- ransomeye_intelligence
+- ransomeye_posture_engine
+- core
+- core/ai
+- core/audit
+- core/bus
+- core/dispatch
+- core/engine
+- core/forensics
+- core/governor
+- core/guardrails
+- core/deception
+- core/ingest
+- core/intel
+- core/kernel
+- core/narrative
+- core/policy
+- core/reporting
+- core/threat_feed
+- core/trainer
+- ransomeye_architecture
+- ransomeye_governance
+- ransomeye_guardrails
+- ransomeye_installer
+- ransomeye_retention
+- ransomeye_trust
+forbidden_modules:
+- ransomeye_ai_core
+- ransomeye_alert_engine
+- ransomeye_forensic
+- ransomeye_killchain_core
+- ransomeye_threat_correlation
+- ransomeye_threat_intel_engine
+- ransomeye_response
+- ransomeye_master_core
+- ransomeye_llm
+- ransomeye_incident_summarizer
+- ransomeye_net_scanner
+- ransomeye_db_core
+- ransomeye_ui
+- ransomeye_hnmp_engine
+- ransomeye_test
+- ransomeye_dummy
+- ransomeye_mock
+- ransomeye_placeholder
+- ransomeye_example
+- ransomeye_sample
+- ransomeye_temp
+- ransomeye_old
+- ransomeye_backup
+consistency_rules:
+- rule: Every allowed_module must exist on disk
+  enforcement: Guardrails enforcer validates module existence before allowing installation
+  fail_closed: true
+- rule: Every module on disk must belong to exactly one phase
+  enforcement: Module resolver maps modules to phases, installer validates
+  fail_closed: true
+- rule: Standalone agents are explicitly excluded from unified installer
+  enforcement: Installer detects standalone agents but does not install them
+  fail_closed: true
+- rule: NOT_IMPLEMENTED phases cannot be installed
+  enforcement: Installer rejects installation of NOT_IMPLEMENTED phases
+  fail_closed: true
+- rule: Phantom modules trigger immediate fail-closed
+  enforcement: Any reference to forbidden_modules causes build/install failure
+  fail_closed: true
+env_only_rules:
+  required_env_vars:
+  - DB_HOST
+  - DB_PORT
+  - DB_NAME
+  - DB_USER
+  - DB_PASS
+  - MODEL_DIR
+  - PDF_ENGINE_PATH
+  - OUTPUT_DIR
+  - CORE_API_PORT
+  - CHAIN_OUTPUT_PATH
+  - SUMMARY_EXPORT_PATH
+  - FRONTEND_PORT
+  - BACKEND_API_PORT
+  - RETENTION_YEARS
+  - DB_ENCRYPTION_KEY_PATH
+  - CAPTURE_IFACE
+  - COMPLIANCE_CONFIG
+  - ASSISTANT_TOPK
+  - ASSISTANT_MAX_TOKENS
+  - ASSISTANT_DATA_DIR
+  - ENABLE_EBPF
+  - ENABLE_KERNEL_DRIVER
+  - UPDATE_BUNDLE_DIR
+  threat_intel_env_vars:
+  - MISP_URL
+  - MISP_KEY
+  - OTX_URL
+  - OTX_KEY
+  - TALOS_URL
+  - TALOS_KEY
+  - THREATFOX_URL
+  - THREATFOX_KEY
+  forbidden_patterns:
+  - pattern: \b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b
+    description: Hardcoded IPv4 address
+    exceptions:
+    - 127.0.0.1
+    - localhost
+    - 0.0.0.0
+  - pattern: (?:https?|ftp|ws|wss)://(?!localhost|127\.0\.0\.1)[^\s'"`]+
+    description: Hardcoded URL
+  - pattern: (?:api[_-]?key|apikey|token|secret|password|passwd|pwd)\s*[=:]\s*["']?[A-Za-z0-9_\-]{16,}["']?
+    description: Hardcoded API key or token
+  - pattern: (?:db[_-]?(?:user|pass|password|host|port)|database[_-]?(?:user|pass|password))\s*[=:]\s*["']?[^"']+["']?
+    description: Hardcoded database credential
+crypto_requirements:
+  signing_algorithms:
+  - Ed25519
+  - RSA-4096
+  hash_algorithms:
+  - SHA-256
+  - SHA-512
+  encryption_algorithms:
+  - AES-256-GCM
+  - ChaCha20-Poly1305
+  required_signing_for:
+  - policies
+  - models
+  - playbooks
+  - enforcement_decisions
+  - guardrails_spec
+fail_closed_requirements:
+- No service starts unless guardrails pass
+- No model loads unless guardrails pass
+- No policy loads unless guardrails pass
+- No installer step proceeds unless guardrails pass
+- Any violation triggers immediate exit (non-zero)
+- Audit record must be emitted before exit
+- Phantom modules trigger immediate fail-closed
+systemd_requirements:
+  unified_directory: /home/ransomeye/rebuild/systemd/
+  required_service_properties:
+  - Restart=always
+  - WantedBy=multi-user.target
+  - StandardOutput=journal
+  - StandardError=journal
+  standalone_exceptions:
+  - path: /home/ransomeye/rebuild/ransomeye_linux_agent/
+    allowed_systemd: true
+  - path: /home/ransomeye/rebuild/ransomeye_windows_agent/
+    allowed_systemd: false
+  - path: /home/ransomeye/rebuild/ransomeye_dpi_probe/
+    allowed_systemd: true
+standalone_agent_constraints:
+  linux_agent:
+    path: /home/ransomeye/rebuild/ransomeye_linux_agent/
+    allowed_requirements_txt: true
+    allowed_systemd: true
+    must_be_rootless: true
+    installable_by_main_installer: false
+  windows_agent:
+    path: /home/ransomeye/rebuild/ransomeye_windows_agent/
+    allowed_requirements_txt: true
+    allowed_systemd: false
+    must_be_rootless: true
+    installable_by_main_installer: false
+  dpi_probe:
+    path: /home/ransomeye/rebuild/ransomeye_dpi_probe/
+    allowed_requirements_txt: true
+    allowed_systemd: true
+    must_be_rootless: true
+    installable_by_main_installer: false
+requirements_policy:
+  unified_requirements: /home/ransomeye/rebuild/requirements.txt
+  standalone_exceptions:
+  - /home/ransomeye/rebuild/ransomeye_linux_agent/requirements.txt
+  - /home/ransomeye/rebuild/ransomeye_windows_agent/requirements.txt
+  - /home/ransomeye/rebuild/ransomeye_dpi_probe/requirements.txt
+  forbidden_locations:
+  - '**/ransomeye_*/requirements.txt'
+model_requirements:
+  allowed_formats:
+  - .pkl
+  - .gguf
+  - .onnx
+  - .pt
+  - .pth
+  required_metadata:
+  - hash
+  - trained_on
+  - version
+  required_shap: true
+  reject_if_missing_shap: true
+  reject_if_missing_metadata: true
+export_requirements:
+  required_formats:
+  - PDF
+  - HTML
+  - CSV
+  optional_formats:
+  - JSON
+  - Markdown
+  required_footer: '© RansomEye.Tech | Support: Gagan@RansomEye.Tech'
+  required_fields:
+  - timestamp
+  - build_hash
+  - model_version_hash
+header_requirements:
+  required_files:
+  - .py
+  - .yaml
+  - .yml
+  - .json
+  - .sh
+  - .service
+  - .tsx
+  - .ts
+  - .rs
+  header_format: '# Path and File Name : {file_path}
+
+    # Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+
+    # Details of functionality of this file: {description}
+
+    '
+  exceptions:
+  - '**/rules.yaml'
+  - '**/retention.txt'
+  - '**/*.md'
+  - '**/key_hierarchy.json'
+  - '**/__pycache__/**'
+  - '**/.git/**'
+  - '**/node_modules/**'
+  - '**/venv/**'
+  - '**/.env.example'
+  - '**/target/**'
+  - '**/Cargo.lock'
+database_policy:
+  allowed_database: PostgreSQL
+  forbidden_databases:
+  - SQLite
+  - MySQL
+  - MongoDB
+  - JSON-based storage
+  credentials:
+    db_user: gagan
+    db_pass: gagan
+  retention_max_years: 7
+  disk_cleanup_threshold_percent: 80
+offline_requirements:
+  must_operate_offline: true
+  threat_intel_must_cache: true
+  no_internet_calls_runtime: true
+  no_cdn_dependencies: true
+  api_dependencies_only_with_cache: true
+testing_requirements:
+  required_test_structure: /tests/
+  required_test_types:
+  - unit
+  - integration
+  - systemd_service_launch
+  validation_output: logs/test_results.log
+  no_placeholders: true
+  no_mockups: true
+  no_todos: true
+ci_requirements:
+  must_detect_phantom_modules: true
+  must_detect_forbidden_directories: true
+  must_detect_hardcoded_configs: true
+  must_detect_systemd_misplacement: true
+  must_detect_unsigned_artifacts: true
+  must_fail_on_violation: true
+  must_validate_module_existence: true

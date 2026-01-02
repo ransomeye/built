@@ -1,0 +1,42 @@
+# Release Decision Report
+
+**Generated:** 2025-12-21T12:00:00Z
+
+## Decision: Allow
+
+## Justification
+
+All validation suites passed. No failures, no critical or high severity findings. All artifacts verified.
+
+## Validation Suite Results
+
+- **security:** Pass
+- **performance:** Pass
+- **stress:** Pass
+- **fault_injection:** Pass
+- **compliance:** Pass
+- **regression:** Pass
+
+## Verified Artifacts
+
+- **evidence_bundle:** /home/ransomeye/rebuild/var/lib/ransomeye/evidence/bundles/bundle_1.json
+  - Hash: abc123def456...
+  - Signature Valid: true
+
+- **posture_report:** /home/ransomeye/rebuild/ransomeye_posture_engine/output/host_host1_20251221_120000.pdf
+  - Hash: def456ghi789...
+  - Signature Valid: true
+
+## Blocking Issues
+
+None
+
+## Signature
+
+- Algorithm: Ed25519
+- Signature: <base64-encoded-signature>
+- Public Key: <base64-encoded-public-key>
+
+---
+© RansomEye.Tech | Support: Gagan@RansomEye.Tech
+

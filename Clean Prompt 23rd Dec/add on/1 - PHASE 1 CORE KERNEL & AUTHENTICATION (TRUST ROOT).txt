@@ -1,0 +1,149 @@
+🔑 PHASE 1: CORE KERNEL & AUTHENTICATION (TRUST ROOT)
+
+Role: Senior Systems Engineer & Cryptography Architect
+Target Path: /home/ransomeye/rebuild/core/ransomeye_kernel/
+Goal: Build the ransomeye_kernel library, providing the foundation for Configuration, Logging, Cryptography (Ed25519), and Authentication (JWT/Argon2).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+Naming Convention: Crate name MUST be ransomeye_kernel.
+
+Fail-Closed Configuration: If RE_TRUST_ROOT_KEY or RE_DB_URL are missing from the environment, the application MUST panic during initialization.
+
+Zero-Trust Logging: All logs must be structured JSON (via tracing-subscriber) to stdout.
+
+No unwrap(): Use thiserror for all kernel-level errors.
+
+2. 📂 DIRECTORY STRUCTURE
+
+core/ransomeye_kernel/
+├── Cargo.toml
+└── src/
+    ├── lib.rs                  # Module exports
+    ├── error.rs                # Unified KernelError enum
+    ├── config.rs               # Env-var only configuration
+    ├── logging.rs              # Structured JSON logging init
+    ├── crypto/
+    │   ├── mod.rs
+    │   ├── sign.rs             # Ed25519 logic (ring)
+    │   └── hash.rs             # Password hashing (argon2)
+    └── auth/
+        ├── mod.rs
+        └── jwt.rs              # JWT Issuance & Validation
+3. ⚙️ COMPONENT SPECIFICATIONS
+A. Unified Errors (src/error.rs)
+Define KernelError using thiserror. Variants: ConfigMissing(String), CryptoError(String), AuthError(String), InternalError.
+
+B. Zero-Trust Config (src/config.rs)
+Struct: AppConfig.
+
+Mandatory Env Vars: * RE_TRUST_ROOT_KEY: Ed25519 Private Key (Hex).
+
+RE_DB_URL: Postgres connection string.
+
+RE_JWT_SECRET: HS256 Secret for UI/API sessions.
+
+RE_API_PORT: Default 8000.
+
+Logic: Use dotenvy for development, but enforce strict environment loading for production.
+
+C. Cryptographic Trust (src/crypto/sign.rs)
+Sign: pub fn sign_payload(data: &[u8], key_hex: &str) -> Result<Vec<u8>, KernelError>.
+
+Verify: pub fn verify_signature(data: &[u8], sig: &[u8], pub_key: &[u8]) -> Result<bool, KernelError>.
+
+Library: Use ring::signature.
+
+D. Authentication & JWT (src/auth/jwt.rs)
+Hasher: Use argon2 for password hashing.
+
+Claims: sub (UserID), role (Admin/Analyst), exp (Expiry).
+
+Logic: Implement create_token and validate_token.
+
+4. 🛠️ IMPLEMENTATION CODE
+Kernel Cargo
+
+[package]
+name = "ransomeye_kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ring = "0.17"
+jsonwebtoken = "9.3"
+argon2 = "0.5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+thiserror = "1.0"
+dotenvy = "0.15"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+
+Kernel Error
+
+// Copyright (c) RansomEye. Proprietary & Confidential.
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum KernelError {
+    #[error("Configuration missing: {0}")]
+    ConfigMissing(String),
+    #[error("Cryptographic failure: {0}")]
+    CryptoError(String),
+    #[error("Authentication failure: {0}")]
+    AuthError(String),
+    #[error("Internal kernel error")]
+    Internal,
+}
+
+
+Kernel Config
+// Copyright (c) RansomEye. Proprietary & Confidential.
+use crate::error::KernelError;
+use std::env;
+
+pub struct AppConfig {
+    pub trust_root_key: String,
+    pub database_url: String,
+    pub jwt_secret: String,
+    pub api_port: u16,
+}
+
+impl AppConfig {
+    pub fn load() -> Result<Self, KernelError> {
+        let _ = dotenvy::dotenv();
+
+        Ok(AppConfig {
+            trust_root_key: env::var("RE_TRUST_ROOT_KEY")
+                .map_err(|_| KernelError::ConfigMissing("RE_TRUST_ROOT_KEY".into()))?,
+            database_url: env::var("RE_DB_URL")
+                .map_err(|_| KernelError::ConfigMissing("RE_DB_URL".into()))?,
+            jwt_secret: env::var("RE_JWT_SECRET")
+                .map_err(|_| KernelError::ConfigMissing("RE_JWT_SECRET".into()))?,
+            api_port: env::var("RE_API_PORT")
+                .unwrap_or_else(|_| "8000".to_string())
+                .parse()
+                .map_err(|_| KernelError::ConfigMissing("Invalid RE_API_PORT".into()))?,
+        })
+    }
+}
+```
+
+### 5. ✅ ACCEPTANCE CRITERIA FOR CURSOR
+1.  `cargo build -p ransomeye_kernel` succeeds.
+2.  Tests verify that `sign_payload` and `verify_signature` work correctly with valid Ed25519 keys.
+3.  The JWT module correctly rejects expired or tampered tokens.
+4.  Logs are emitted in valid JSON format.
+
+I have provided the specification and the initial core files for the ransomeye_kernel. These files implement the required zero-trust configuration and cryptographic foundations.
+
+Next Steps:
+
+Apply this code to your workspace.
+
+Run cargo test -p ransomeye_kernel to verify the crypto and JWT logic.
+
+Ready to move to Phase 2: Secure Message Bus (NATS + Protobuf)?

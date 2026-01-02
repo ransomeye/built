@@ -1,0 +1,207 @@
+# 🧹 PROMPT 35: ARCHITECTURE STANDARDIZATION & FINAL ASSEMBLY
+
+**Role:** Chief Architect & Release Engineer
+**Target Path:** `/home/ransomeye/rebuild/`
+
+**Goal:** Perform the final "Gold Master" refactoring. You must enforce the `ransomeye_*` naming convention across the entire monorepo, generate the two critical missing crates (`ransomeye_db` and `ransomeye_api`), consolidate the conflicting frontend projects, and fix the "Hardcoded Localhost" and "Port 8080" vulnerabilities.
+
+**Context:**
+
+1. **Naming:** To prevent namespace collisions and ensure enterprise uniformity, every internal crate MUST use the `ransomeye_` prefix.
+2. **Missing Infrastructure:** The `core/server` (Prompt 34) relies on `core_db` and `core_api`, but these were never defined in Prompts 0-33. You must create them now.
+3. **Frontend Split:** Prompts 13 and 22 created two separate frontends (`ui/` and `web/`). We must merge them into `ui/ransomeye_console` and delete `web/`.
+4. **Configuration Conflicts:**
+* **Ports:** API and Agent both claim port 8080. We will move API to **8000**.
+* **Phantom Member:** Prompt 0 referenced `ops/dr`, but it does not exist. It must be removed from the Workspace.
+
+
+
+---
+
+### 1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+1. **Directory & Crate Naming:**
+* **Rule:** Directory names MUST be `ransomeye_<name>` (e.g., `ransomeye_kernel`).
+* **Rule:** The `name` field in every `Cargo.toml` MUST match the directory name.
+* **Rule:** All Rust `use` imports in source code MUST be updated to the new crate names (e.g., `use core_bus` -> `use ransomeye_bus`).
+
+
+2. **Infrastructure Generation:**
+* **`core/ransomeye_db`:** Must be created. It MUST include the `init.sql` schema to support Tables referenced in Prompts 3, 5, 10, and 33.
+* **`core/ransomeye_api`:** Must be created using `axum`. It MUST bind to `0.0.0.0:8000`.
+
+
+3. **Frontend Consolidation:**
+* **Merge Strategy:** Code from `web/dashboard` (Prompt 22) MUST be moved into `ui/ransomeye_console` (Prompt 13).
+* **Hardcoding Ban:** You MUST replace `ws://localhost:8080` with dynamic host detection (`window.location.host`) in the WebSocket client.
+* **Cleanup:** The `web/` directory must be deleted after the merge.
+
+
+4. **Workspace Hygiene:**
+* Remove `ops/dr` from the root `Cargo.toml`.
+
+
+
+---
+
+### 2. 📂 FINAL DIRECTORY MAP (EXECUTION PLAN)
+
+You must execute the following moves. This supersedes all previous prompt structures.
+
+**A. Core Backend (Rename & Create):**
+
+* `core/kernel`  `core/ransomeye_kernel`
+* `core/bus`  `core/ransomeye_bus`
+* `core/intel`  `core/ransomeye_intel`
+* `core/ingest`  `core/ransomeye_ingest`
+* `core/engine`  `core/ransomeye_engine`
+* `core/policy`  `core/ransomeye_policy`
+* `core/dispatch`  `core/ransomeye_dispatch`
+* `core/ai`  `core/ransomeye_ai`
+* `core/forensics`  `core/ransomeye_forensics`
+* `core/narrative`  `core/ransomeye_narrative`
+* `core/governor`  `core/ransomeye_governor`
+* `core/threat_feed`  `core/ransomeye_threat_feed`
+* `core/trainer`  `core/ransomeye_trainer`
+* `core/audit`  `core/ransomeye_audit`
+* `core/licensing`  `core/ransomeye_licensing`
+* `core/reporting`  `core/ransomeye_reporting`
+* `core/server`  `core/ransomeye_server`
+* **CREATE:** `core/ransomeye_api`
+* **CREATE:** `core/ransomeye_db`
+
+**B. Edge & Ops (Rename):**
+
+* `edge/agent`  `edge/ransomeye_agent`
+* `edge/dpi`  `edge/ransomeye_dpi`
+* `edge/sentinel`  `edge/ransomeye_sentinel`
+* `edge/loader`  `edge/ransomeye_loader`
+* `ops/tuner`  `ops/ransomeye_tuner`
+* `ops/portguard`  `ops/ransomeye_portguard`
+* `ops/` (The CLI)  `ops/ransomeye_ops_cli`
+
+**C. UI (Consolidate):**
+
+* `ui/wasm`  `ui/ransomeye_wasm`
+* `ui/` (React Root)  `ui/ransomeye_console`
+* `web/`  **DELETE** (After merging contents to `ransomeye_console`)
+
+---
+
+### 3. ⚙️ IMPLEMENTATION DETAILS
+
+#### A. Generate `core/ransomeye_db` (The Database Layer)
+
+**Path:** `/home/ransomeye/rebuild/core/ransomeye_db/`
+**Files:**
+
+1. **`Cargo.toml`:**
+```toml
+[package]
+name = "ransomeye_db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
+tracing = "0.1"
+async-trait = "0.1"
+thiserror = "1.0"
+# Import kernel for config
+ransomeye_kernel = { path = "../ransomeye_kernel" }
+
+```
+
+
+2. **`src/lib.rs`:**
+* `pub async fn connect(config: &AppConfig) -> Result<PgPool, DbError>`: Creates a pool using `PgPoolOptions` and `config.database_url`.
+* `pub async fn migrate(pool: &PgPool) -> Result<(), DbError>`: Runs `sqlx::migrate!("./migrations").run(pool).await`.
+
+
+3. **`migrations/202512230000_init_schema.sql`:**
+* **Hosts Table:** `CREATE TABLE hosts (id UUID PRIMARY KEY, hostname TEXT, ip TEXT, first_seen TIMESTAMPTZ, last_seen TIMESTAMPTZ, risk_score FLOAT);`
+* **Events Table:** `CREATE TABLE events (id UUID PRIMARY KEY, host_id UUID, type TEXT, raw_data JSONB, timestamp TIMESTAMPTZ);`
+* **Alerts Table:** `CREATE TABLE alerts (id UUID PRIMARY KEY, host_id UUID, severity TEXT, description TEXT, status TEXT, timestamp TIMESTAMPTZ);`
+* **Audit Logs (Prompt 33):** `CREATE TABLE audit_logs (id UUID PRIMARY KEY, timestamp TIMESTAMPTZ, actor TEXT, action TEXT, details JSONB, prev_hash TEXT, curr_hash TEXT);`
+* **Graph Edges (Prompt 3):** `CREATE TABLE telemetry_edges (source TEXT, target TEXT, relation TEXT, timestamp TIMESTAMPTZ);` (Partitioning logic optional here).
+
+
+
+#### B. Generate `core/ransomeye_api` (The Gateway)
+
+**Path:** `/home/ransomeye/rebuild/core/ransomeye_api/`
+**Files:**
+
+1. **`Cargo.toml`:** Dependencies: `axum`, `serde`, `serde_json`, `tokio`, `tower-http` (cors, trace), `utoipa` (OpenAPI), `ransomeye_bus`, `ransomeye_db`, `ransomeye_kernel`.
+2. **`src/lib.rs`:**
+* `pub async fn serve(config: AppConfig, bus: BusClient, db: PgPool) -> Result<(), ApiError>`
+* **Logic:**
+* Init `axum::Router`.
+* Add Routes: `/health`, `/api/v1/alerts`, `/api/v1/hosts`, `/api/v1/agents/command`.
+* **Bind:** `TcpListener::bind(format!("0.0.0.0:{}", config.api_port))`.
+
+
+
+
+3. **`src/routes/health.rs`:** Simple 200 OK handler.
+
+#### C. Frontend Consolidation & Fixes
+
+**Target:** `ui/ransomeye_console/`
+**Action:**
+
+1. **Move Components:**
+* Copy `web/dashboard/src/components/graph/AttackMap.tsx`  `ui/ransomeye_console/src/components/graph/`.
+* Copy `web/dashboard/src/components/sentinel/HealthGrid.tsx`  `ui/ransomeye_console/src/components/sentinel/`.
+* Copy `web/dashboard/src/components/narrative/ReportCard.tsx`  `ui/ransomeye_console/src/components/narrative/`.
+
+
+2. **Fix `socket.ts` (The Localhost Bug):**
+* **File:** `ui/ransomeye_console/src/api/socket.ts`
+* **Change:**
+```typescript
+// OLD (Bad): const url = "ws://localhost:8080/ws";
+// NEW (Good):
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const host = window.location.host; // Handles remote IPs automatically
+const url = `${protocol}//${host}/ws`;
+
+```
+
+
+
+
+3. **Delete:** Remove the `/home/ransomeye/rebuild/web/` directory.
+
+#### D. Global Workspace & Config Refactor
+
+1. **Root `Cargo.toml`:**
+* **Update Members:** Replace all old paths with `core/ransomeye_kernel`, `core/ransomeye_engine`, etc.
+* **Remove Ops/DR:** Delete `"ops/dr"` from the list.
+
+
+2. **Sub-crate `Cargo.toml` Files:**
+* Iterate through EVERY crate. Change `name = "old_name"` to `name = "ransomeye_newname"`.
+* Update dependency paths: `core_kernel = { path = "../kernel" }` becomes `ransomeye_kernel = { path = "../ransomeye_kernel" }`.
+
+
+3. **Source Code Imports:**
+* You must grep/sed existing `.rs` files to rename imports: `use core_bus::`  `use ransomeye_bus::`.
+
+
+4. **Port 8000 Config:**
+* File: `core/ransomeye_kernel/src/config.rs`
+* Update: `pub const DEFAULT_API_PORT: u16 = 8000;`
+
+
+
+---
+
+### 4. ✅ ACCEPTANCE CRITERIA
+
+1. **Structure Check:** `ls -R core/` shows **only** `ransomeye_*` directories. No orphan `engine/` or `kernel/` folders exist.
+2. **Compile Check:** `cargo check --workspace` passes without "package not found" errors (proving dependency paths are fixed).
+3. **Schema Check:** `core/ransomeye_db/migrations/` contains the `init_schema.sql` file with the `audit_logs` and `events` tables.
+4. **Frontend Check:** `web/` is gone. `ui/ransomeye_console/src/api/socket.ts` contains `window.location.host`.
+5. **Port Check:** `grep "8000" core/ransomeye_kernel/src/config.rs` returns a match.
+6. **Ops/DR Check:** `grep "ops/dr" Cargo.toml` returns NO matches.

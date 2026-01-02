@@ -1,0 +1,68 @@
+Phase 7B: The Standalone Windows Agent
+Role: Windows Internals Specialist & Security Engineer
+
+Target Path: /home/ransomeye/rebuild/edge/ransomeye_agent/
+
+
+Goal: Build the self-contained Windows Agent binary using native Windows APIs for monitoring and self-defense.
+
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+
+Windows Specifics: Use the windows crate for DACL/SACL manipulation and Protected Process Light (PPL) checks.
+
+
+Self-Defense: Implement logic to deny PROCESS_TERMINATE rights to all users, preventing Task Manager from killing the agent.
+
+
+
+
+Monitoring: Utilize Windows Event Logs (e.g., EventID 4688) for process creation monitoring.
+
+
+Isolation: Use netsh advfirewall for network isolation commands.
+
+2. 📂 DIRECTORY STRUCTURE
+Plaintext
+
+edge/ransomeye_agent/
+├── src/
+│   ├── main.rs                 # Windows Service Entrypoint
+│   ├── telemetry/
+│   │   ├── process_windows.rs  # WMI / Event Log polling
+│   │   └── registry_mon.rs     # Registry Hive watching
+│   ├── deception/
+│   │   └── honeyport_win.rs    # Winsock listener
+│   ├── hardening/
+│   │   └── dacl_protect.rs     # Anti-termination logic
+│   └── command_exec_win.rs     # netsh firewall logic
+├── installer/
+│   ├── install_win.ps1         # PowerShell Installer
+│   └── setup_service.bat       # Service registration
+└── resources/
+    └── agent.manifest          # RequestedExecutionLevel: requireAdministrator
+3. ⚙️ IMPLEMENTATION DETAILS
+
+Anti-Tamper: The dacl_protect.rs module modifies the process Discretionary Access Control List (DACL) to DENY PROCESS_TERMINATE and PROCESS_VM_WRITE to the "Everyone" group.
+
+
+
+Telemetry: process_windows.rs monitors for new processes. If powershell.exe is launched with encoded commands, it triggers a Suspicious state transition.
+
+
+
+Deception: honeyport_win.rs opens port 8080. It specifically looks for connections targeting common Windows vulnerabilities (e.g., SMB probes).
+
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Build: cargo build -p ransomeye_agent succeeds for both x86_64-unknown-linux-gnu and x86_64-pc-windows-msvc targets.
+
+
+Deception Test: Manually connecting to port 8080 on either OS results in a DeceptionAlert on the NATS Bus.
+
+
+Security Test: Attempting to kill the Windows agent via Task Manager results in "Access Denied".
+
+
+Isolation Test: Executing the isolation command via the Core UI successfully blocks all non-RansomEye traffic on the target host.

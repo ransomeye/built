@@ -1,0 +1,102 @@
+Here is Phase 4 of 11: The Intel Graph.
+
+Copy and paste the prompt below into your IDE or AI coding assistant to continue the build.
+
+Role: Database Architect & Threat Intelligence Analyst Target Path: /home/ransomeye/rebuild/core/ransomeye_intel/ Goal: Build the Threat Graph engine that manages relationships between entities (Files, IPs, Processes) and ingests external threat feeds.
+
+Context: This module is the "Brain" of the platform's memory. It stores who talked to whom. To handle scale, it manages Time-Series Partitioning (splitting massive edge tables by day) and uses Recursive CTEs (Common Table Expressions) to trace attack lineages (e.g., finding "Patient Zero").
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/ransomeye_intel/
+
+Workspace: This crate must be reachable as ransomeye_intel.
+
+Dependencies (Strict):
+
+sqlx: For executing queries against the shared pool.
+
+serde, serde_json: For parsing STIX/MISP feeds.
+
+chrono: For time handling and partition naming.
+
+uuid: For identifiers.
+
+ransomeye_db: CRITICAL. You must use the PgPool struct definition and Schema types from Phase 2. Do NOT create a new connection pool; accept the shared one.
+
+Performance/Scalability:
+
+Partitioning: The telemetry_edges table must be partitioned by day. The code must automatically create future partitions.
+
+
+Streaming: Large data ingestions (like STIX feeds) must be streamed token-by-token, not loaded entirely into RAM.
+
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/ransomeye_intel/:
+
+Plaintext
+
+/home/ransomeye/rebuild/core/ransomeye_intel/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── models.rs               # IOC and Graph Node Structs
+    ├── ingestion/              # Parsers for External Feeds
+    │   ├── mod.rs
+    │   ├── stix.rs             # STIX 2.1 Streaming Parser
+    │   └── misp.rs             # MISP JSON Parser
+    └── graph/                  # Graph Database Logic
+        ├── mod.rs
+        ├── schema.rs           # Partition Management Logic
+        └── ops.rs              # Recursive CTEs & Insert Logic
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Partition Management (src/graph/schema.rs)
+Goal: Prevent the telemetry_edges table from becoming too slow. Function: pub async fn ensure_partitions_exist(pool: &PgPool) -> Result<(), IntelError> Logic:
+
+Calculate the dates for "Tomorrow" through "Tomorrow + 7 days".
+
+Loop through dates.
+
+Execute SQL: CREATE TABLE IF NOT EXISTS telemetry_edges_YYYY_MM_DD PARTITION OF telemetry_edges FOR VALUES FROM ('YYYY-MM-DD') TO ('YYYY-MM-DD + 1 day').
+
+Log "✅ Partition verified: telemetry_edges_YYYY_MM_DD".
+
+B. Graph Operations (src/graph/ops.rs)
+Goal: Efficiently query relationships. Function: pub async fn find_patient_zero(pool: &PgPool, target_host_id: Uuid) -> Result<Vec<GraphNode>, IntelError> Logic:
+
+Use a Recursive CTE (Common Table Expression) to walk backwards up the graph.
+
+Base Case: Select edges where target = target_host_id.
+
+Recursive Step: Join telemetry_edges on target = previous.source.
+
+Return the chain of nodes.
+
+Function: pub async fn insert_edge(pool: &PgPool, source: &str, target: &str, relation: &str)
+
+Simple INSERT INTO telemetry_edges ... execution.
+
+C. Streaming Ingestion (src/ingestion/stix.rs)
+Goal: Parse massive threat feeds without OOM (Out of Memory). Logic:
+
+Accept a Reader (File or HTTP Stream).
+
+Use serde_json::Deserializer::from_reader(reader).into_iter().
+
+Iterate through the JSON objects one by one.
+
+
+Validation: If a record is malformed, log a WARN and drop ONLY that record.
+
+Convert valid STIX objects into internal GraphNode structs.
+
+4. ✅ ACCEPTANCE CRITERIA
+Build Check: cargo build -p ransomeye_intel succeeds.
+
+Partition Test: Running ensure_partitions_exist against the DB creates table telemetry_edges_2025_12_24 (or current date).
+
+Graph Query: Inserting A->B->C and running the recursive query on C correctly returns the path A->B->C.
+
+Memory Safety: Parsing a large dummy STIX file (mocked stream) processes records without loading the whole file string into memory.

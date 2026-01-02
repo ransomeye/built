@@ -1,0 +1,22 @@
+[package]
+name = "governor"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "governor"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0"
+tracing = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+parking_lot = { workspace = true }
+chrono = { workspace = true }
+sysinfo = "0.30"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3.8"

@@ -1,0 +1,25 @@
+[package]
+name = "tools"
+version = "1.0.0"
+edition = "2021"
+authors = ["nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU"]
+
+[[bin]]
+name = "license_check"
+path = "src/license_check_main.rs"
+
+[[bin]]
+name = "header_check"
+path = "src/header_check_main.rs"
+
+[[bin]]
+name = "generate_notices"
+path = "src/generate_notices_main.rs"
+
+[lib]
+name = "tools"
+path = "src/lib.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+walkdir = "2"

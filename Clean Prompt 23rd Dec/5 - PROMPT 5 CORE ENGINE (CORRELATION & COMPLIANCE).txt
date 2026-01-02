@@ -1,0 +1,124 @@
+PROMPT 5: CORE ENGINE (CORRELATION & COMPLIANCE)
+Role: Backend Architect & Systems Engineer Target Path: /home/ransomeye/rebuild/core/engine/ Goal: Build the ransomeye-engine library, which runs real-time detection logic using a Sharded Actor Model. Context: This engine evaluates rules against incoming events. To handle 50k agents without locking the database, it uses Sharding: all events for a specific Host ID are routed to the same worker thread. This eliminates mutex contention and maximizes CPU cache efficiency. It handles both Real-Time Detection (Ransomware) and Compliance (CIS Benchmarks).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/engine/
+
+Workspace: You must add "core/engine" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+tokio: For async I/O (Database writes).
+
+rayon: For CPU-bound tasks (Rule evaluation, JSON parsing).
+
+dashmap: For high-performance concurrent state caching.
+
+num_cpus: For dynamic thread sizing.
+
+sys-info: For RAM detection.
+
+sqlx: For persisting state changes.
+
+serde, serde_json: For event handling.
+
+core/bus, core/intel, core/ingest: For types and communication.
+
+Security/Performance:
+
+Sharded Logic: Events for a specific HostID MUST always be processed by the same Worker Thread. This allows us to hold state in memory without locks.
+
+Hybrid Threading: Use rayon for the heavy compute (Rule Engine) and tokio for the I/O (DB Persistence).
+
+Dynamic Tuning: Do not hardcode thread counts. Calculate them based on available_ram and num_cpus.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/engine/:
+
+Plaintext
+
+core/engine/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── tuning.rs               # Dynamic Worker Sizing
+    ├── sharding.rs             # HostID -> Worker Router
+    ├── runner.rs               # Main Event Loop
+    ├── correlation/            # Real-Time Threat Detection
+    │   ├── mod.rs
+    │   ├── state_machine.rs    # Host State (Clean -> Infected)
+    │   ├── rules.rs            # Detection Logic (Lateral Movement, etc.)
+    │   └── cache.rs            # In-Memory State (LRU/DashMap)
+    └── compliance/             # Posture Assessment
+        ├── mod.rs
+        ├── benchmarks.rs       # CIS/NIST Rules
+        └── scoring.rs          # Health Score Calculator
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Dynamic Tuning (src/tuning.rs)
+Function: pub fn get_worker_count() -> usize Logic:
+
+Get Cores = num_cpus::get().
+
+Get RamGB = sys_info::mem_info().
+
+Determine Profile:
+
+Small (Single Box): Worker Threads = 2. Cache Size = 10,000 Hosts.
+
+Massive (48-Core): Worker Threads = Cores - 4 (Leave room for DB/OS). Cache Size = 1,000,000 Hosts.
+
+Threading Model:
+
+Detection: Run inside the Sharded Worker (CPU-bound).
+
+Compliance: Run on a separate tokio::spawn task (Low priority I/O-bound) so it never blocks an active attack alert.
+
+B. Sharded Event Router (src/sharding.rs)
+Goal: Eliminate DB locks. Logic:
+
+Create N Channels (where N = Tuned Worker Count).
+
+Router Logic: Target_Worker = Hash(HostID) % Worker_Count.
+
+Send the event to that specific channel.
+
+Benefit: Events for "Laptop-A" always hit Thread #5. Thread #5 owns the State Cache for "Laptop-A". Zero locks required.
+
+C. Correlation Engine (src/correlation/)
+State Machine (state_machine.rs):
+
+Transitions: Clean -> Suspicious (1 event) -> Probable (3 events) -> Confirmed (Ransomware).
+
+Optimization: Only write to the DB if the State changes. Otherwise, update the in-memory DashMap.
+
+Rules (rules.rs):
+
+Lateral Movement: if LogonType == 3 (Network) AND User != Admin.
+
+Encryption: if FileWrite > 50/sec AND Entropy > 7.5.
+
+D. Compliance & Posture (src/compliance/)
+Logic:
+
+Receive HostInventory snapshot.
+
+Evaluate: Compare installed packages/config against benchmarks.rs (Embedded CIS Rules).
+
+Score: Calculate % compliance.
+
+Output: Emit ComplianceReport to the Bus.
+
+Load Shedding: If Process CPU > 90%, skip Compliance checks (drop the event) to prioritize active threat detection.
+
+4. ✅ ACCEPTANCE CRITERIA
+Sharding Test: Send 100 events for "Host-A". Verify via logs/counters that ALL 100 events were processed by the exact same Worker Thread ID.
+
+Scalability Test (Large): On a mock 48-Core system, the engine spawns ~44 workers and processes 100k events/sec without DB lock errors.
+
+Stability Test (Small): On a 2-Core system, the engine spawns 2 workers and drops "Compliance" tasks when CPU hits 95%.
+
+State Persistence: A transition to "Suspicious" state in memory is flushed to the DB within 1 second or on shutdown.
+
+Build: cargo build -p ransomeye-engine succeeds.

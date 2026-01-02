@@ -1,0 +1,94 @@
+# Path and File Name : /home/ransomeye/rebuild/Cargo.toml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Workspace-level Cargo.toml enforcing Rust Edition 2021 across all RansomEye Rust modules. Prevents usage of unstable edition2024 features for enterprise-grade deterministic builds.
+
+[workspace]
+members = [
+    "governance/tools",
+    "core/kernel",
+    "core/bus",
+    "core/intel",
+    "core/ingest",
+    "core/engine",
+    "core/policy",
+    "core/dispatch",
+    "core/ai",
+    "core/reporting",
+    "core/forensics",
+    "core/narrative",
+    "core/governor",
+    "core/threat_feed",
+    "core/trainer",
+    "core/audit",
+    "core/guardrails",
+    "core/deception",
+    "edge/dpi",
+    "edge/agent",
+    "edge/sentinel",
+    "edge/loader",
+    "ui/wasm",
+    "ops/tuner",
+    "ops/portguard",
+    "ops/dr",
+    "qa/auditor",
+    "qa/lifecycle",
+]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+authors = ["RansomEye Team"]
+license = "PROPRIETARY"
+
+[workspace.dependencies]
+# Core async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Time and UUID
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "v7", "serde"] }
+
+# Cryptography and hashing
+sha2 = "0.10"
+ring = "0.17"
+base64 = "0.21"
+ed25519-dalek = "2.1"
+x509-parser = "0.16"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Concurrency primitives
+parking_lot = "0.12"
+once_cell = "1.19"
+dashmap = "5.0"
+crossbeam-channel = "0.5"
+
+# TLS
+rustls = "0.21"
+rustls-pemfile = "1.0"
+
+# Utilities
+hex = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+

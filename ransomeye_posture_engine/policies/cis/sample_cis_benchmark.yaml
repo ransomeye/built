@@ -1,0 +1,31 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_posture_engine/policies/cis/sample_cis_benchmark.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Sample CIS Benchmark control definitions
+
+# Sample CIS Benchmark controls
+# Replace with actual CIS Benchmark controls as needed
+
+controls:
+  - id: CIS-1.1.1
+    title: Ensure privileged execution is minimized
+    description: Detects excessive use of root/administrator privileges
+    severity: critical
+    check_type: deterministic
+    check_logic:
+      type: threshold
+      threshold: 10
+      fact_types: [privileged_execution]
+      categories: [host_hardening]
+    remediation: "Review and reduce privileged execution. Use sudo with least privilege."
+
+  - id: CIS-1.2.1
+    title: Ensure critical file modifications are monitored
+    description: Detects unauthorized modifications to critical system files
+    severity: high
+    check_type: deterministic
+    check_logic:
+      type: absence
+      fact_types: [critical_file_modification]
+      categories: [host_hardening]
+    remediation: "Implement file integrity monitoring for critical system files."
+

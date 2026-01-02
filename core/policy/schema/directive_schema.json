@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RansomEye Enforcement Directive Schema",
+  "type": "object",
+  "required": [
+    "directive_id",
+    "created_at",
+    "decision_id",
+    "target_scope",
+    "action_type",
+    "ttl_seconds",
+    "signature",
+    "nonce"
+  ],
+  "properties": {
+    "directive_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "target_scope": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "type": "string"
+        },
+        "host_id": {
+          "type": "string"
+        },
+        "network_id": {
+          "type": "string"
+        },
+        "time_window": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    },
+    "action_type": {
+      "type": "string"
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rollback_instructions": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}
+

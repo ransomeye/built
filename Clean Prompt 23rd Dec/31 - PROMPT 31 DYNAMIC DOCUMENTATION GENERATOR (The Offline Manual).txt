@@ -1,0 +1,96 @@
+PROMPT 31: DYNAMIC DOCUMENTATION GENERATOR (The Offline Manual)
+Role: Technical Writer & CI/CD Specialist Target Path: /home/ransomeye/rebuild/docs/
+
+Goal: Build the ransomeye-docs pipeline. Context: We need to deliver a "World Class" product. That implies world-class documentation. This pipeline aggregates technical API specs (OpenAPI), code documentation (cargo doc), and written Admin Guides into a single, searchable, offline-capable static site (and PDF) using mdBook.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/docs/
+
+Tooling: mdbook (standard Rust doc tool), mdbook-pdf (for printable manuals), utoipa (for extracting OpenAPI from Core).
+
+Offline Mandate:
+
+The generated HTML must NOT link to external CDNs (Google Fonts, FontAwesome, etc.). All assets (CSS, JS, Fonts) must be embedded locally.
+
+Content Aggregation:
+
+Developer Ref: Must embed the output of cargo doc (Rust API docs).
+
+API Ref: Must embed the Swagger UI (generated from core/api).
+
+Admin Guide: Manually written Markdown chapters (Installation, Troubleshooting).
+
+Output Formats:
+
+book/ (Static HTML site for the web server).
+
+RansomEye_Manual.pdf (For printing/compliance filing).
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/docs/:
+
+Plaintext
+
+docs/
+├── book.toml                   # mdBook Configuration
+├── theme/                      # Custom CSS (Dark Mode, Local Fonts)
+│   ├── index.hbs
+│   ├── css/
+│   └── fonts/
+├── src/
+│   ├── SUMMARY.md              # Table of Contents
+│   ├── introduction.md
+│   ├── admin_guide/
+│   │   ├── installation.md
+│   │   └── troubleshooting.md
+│   ├── architecture/
+│   │   ├── system_design.md
+│   │   └── security_model.md
+│   └── api_reference.md        # Placeholder for Swagger
+└── scripts/
+    ├── generate_docs.sh        # The Build Orchestrator
+    └── extract_openapi.rs      # Helper to dump JSON from Core
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Build Orchestrator (scripts/generate_docs.sh)
+Logic:
+
+Code Docs: Run cargo doc --workspace --no-deps --document-private-items. Move target/doc to docs/src/code_ref.
+
+OpenAPI: Compile and run extract_openapi.rs to generate openapi.json. Use a tool (like redoc-cli or swagger-ui-dist) to render this JSON to a static HTML file at docs/src/api_reference.html.
+
+Build Book: Run mdbook build.
+
+Build PDF: Run mdbook build -d pdf (configured for PDF output).
+
+Bundle: Zip the book/ directory for the Release Pipeline (Phase 28).
+
+B. OpenAPI Extractor (scripts/extract_openapi.rs)
+Logic:
+
+Import ransomeye_core::api::ApiDoc.
+
+Serialize the OpenApi struct to pretty JSON.
+
+Write to docs/src/openapi.json.
+
+C. Offline Theme (theme/)
+Logic:
+
+Download "Roboto" or "Inter" fonts and place them in fonts/.
+
+In css/general.css, replace all @import url('https://...') with local @font-face definitions.
+
+Ensure the "Print" button in the UI uses the PDF generated in Step A.
+
+4. ✅ ACCEPTANCE CRITERIA
+Offline Test: Disconnect the internet. Open docs/book/index.html. Verify that fonts load correctly and the layout is not broken.
+
+Content Check: Navigating to "API Reference" shows the generated Swagger/Redoc UI with valid endpoints.
+
+Link Check: Clicking "Internal Code Docs" successfully jumps to the cargo doc generated pages.
+
+PDF Generation: The script produces a RansomEye_Manual.pdf that is readable and contains all chapters.
+
+Build: Running ./scripts/generate_docs.sh completes without error.

@@ -1,0 +1,18 @@
+[
+  {
+    "document": "documents/forensics_guides.md",
+    "chunk": "# Forensics Guides **Path and File Name:** `/home/ransomeye/rebuild/ransomeye_intelligence/llm_knowledge/documents/forensics_guides.md` **Author:** nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU **Details:** Forensic investigation guides for SOC analysts --- ## Overview This document provides forensic investigation guides for SOC analysts. --- ## Forensic Procedures 1. Evidence collection 2. Timeline reconstruction 3. Malware analysis 4. Network analysis 5. Report generation --- ## Last Updated Phase 3 Implementation"
+  },
+  {
+    "document": "documents/policy_explanations.md",
+    "chunk": "# Policy Explanations **Path and File Name:** `/home/ransomeye/rebuild/ransomeye_intelligence/llm_knowledge/documents/policy_explanations.md` **Author:** nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU **Details:** Policy explanations for SOC analysts --- ## Overview This document explains RansomEye security policies and their rationale. --- ## Policy Categories ### Detection Policies - Threshold-based detection - Pattern-based detection - Anomaly-based detection ### Response Policies - Automated response actions - Manual response procedures - Escalation procedures --- ## Last Updated Phase 3 Implementation"
+  },
+  {
+    "document": "documents/kill_chain_reference.md",
+    "chunk": "# MITRE ATT&CK Kill Chain Reference **Path and File Name:** `/home/ransomeye/rebuild/ransomeye_intelligence/llm_knowledge/documents/kill_chain_reference.md` **Author:** nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU **Details:** MITRE ATT&CK kill chain reference for threat analysis --- ## Overview This document provides MITRE ATT&CK kill chain reference for threat analysis. --- ## Kill Chain Stages 1. **Reconnaissance** - Information gathering 2. **Weaponization** - Malware creation 3. **Delivery** - Attack delivery 4. **Exploitation** - Vulnerability exploitation 5. **Installation** - Malware installation 6. **Command & Control** - C2 communication 7. **Actions on Objectives** - Data exfiltration/encryption --- ## Ransomware Kill Chain 1. Initial access (phishing, RDP) 2. Execution (malware execution) 3. Persistence (registry, scheduled tasks) 4. Defense evasion (anti-VM, encryption) 5. Credential access (credential dumping) 6. Discovery (network scanning) 7. Lateral movement (RDP, SMB) 8. Impact (data encryption) --- ## Last Updated Phase 3 Implementation"
+  },
+  {
+    "document": "documents/ransomware_playbooks.md",
+    "chunk": "# Ransomware Playbooks **Path and File Name:** `/home/ransomeye/rebuild/ransomeye_intelligence/llm_knowledge/documents/ransomware_playbooks.md` **Author:** nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU **Details:** Ransomware attack playbooks and response procedures --- ## Overview This document contains ransomware attack playbooks and response procedures for SOC analysts. --- ## Common Ransomware Families ### LockBit - Encryption pattern: AES-256 + RSA-2048 - Ransom note: LockBit_readme.txt - Common indicators: Registry modifications, network connections ### Conti - Encryption pattern: ChaCha20 + RSA-4096 - Ransom note: CONTI_README.txt - Common indicators: Process injection, file encryption ### REvil - Encryption pattern: Salsa20 + RSA-4096 - Ransom note: RECOVERY_KEY.txt - Common indicators: Shadow copy deletion, network scanning --- ## Response Procedures 1. Isolate affected systems 2. Preserve evidence 3. Identify encryption algorithm 4. Check for decryption tools 5. Report incident --- ## Last Updated Phase 3 Implementation"
+  }
+]

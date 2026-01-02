@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "registry_root": "/home/ransomeye/rebuild/ransomeye_intelligence/model_registry/",
+  "description": "Canonical AI/ML Model Registry - Only explicitly registered models are governed",
+  "last_updated": "2025-12-28T00:00:00Z",
+  "models": []
+}
+

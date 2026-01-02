@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RansomEye Event Schema v1",
+  "type": "object",
+  "required": [
+    "producer_id",
+    "component_type",
+    "schema_version",
+    "timestamp",
+    "sequence_number",
+    "signature",
+    "integrity_hash",
+    "nonce",
+    "event_data"
+  ],
+  "properties": {
+    "producer_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique producer identifier"
+    },
+    "component_type": {
+      "type": "string",
+      "enum": ["dpi_probe", "linux_agent", "windows_agent"],
+      "description": "Component type"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event timestamp (ISO 8601)"
+    },
+    "sequence_number": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sequence number (monotonically increasing per producer)"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Cryptographic signature (RSA-4096-PSS-SHA256, base64 encoded)"
+    },
+    "integrity_hash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Integrity hash (SHA-256 of event data, hex encoded)"
+    },
+    "nonce": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nonce (unique per event, for replay protection)"
+    },
+    "event_data": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Event data (JSON string)"
+    }
+  }
+}
+

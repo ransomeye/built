@@ -1,0 +1,59 @@
+# Path and File Name: /home/ransomeye/rebuild/ransomeye_dpi_probe/systemd/ransomeye-dpi-probe.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details: Systemd service unit for RansomEye DPI Probe
+
+[Unit]
+Description=RansomEye DPI Probe - High-throughput network packet inspection
+After=network.target
+Requires=network.target
+ConditionPathExists=/opt/ransomeye/dpi_probe/bin/ransomeye_dpi_probe
+ConditionPathExists=/opt/ransomeye/dpi_probe/.install_receipt.json
+
+[Service]
+Type=simple
+# Rootless runtime enforcement - run as ransomeye user
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye/dpi_probe
+RuntimeDirectory=ransomeye/dpi_probe
+StateDirectory=ransomeye/dpi_probe
+ExecStart=/opt/ransomeye/dpi_probe/bin/ransomeye_dpi_probe
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits (appropriate for high-throughput packet capture)
+LimitNOFILE=1048576
+LimitNPROC=32768
+
+# Security hardening - Rootless runtime enforcement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ransomeye/dpi_probe /var/lib/ransomeye/dpi_probe /run/ransomeye/dpi_probe
+
+# Capability-based privileges (no root required for packet capture)
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+PrivateUsers=false
+
+# Memory locking (may be needed for zero-copy packet capture)
+LimitMEMLOCK=infinity
+
+# CPU and NUMA affinity (uncomment and configure as needed)
+# CPUAffinity=0-7
+# ExecStartPre=/usr/bin/numactl --membind=0
+
+# Environment variables
+EnvironmentFile=-/opt/ransomeye/dpi_probe/config/environment.conf
+
+# Kill settings
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+

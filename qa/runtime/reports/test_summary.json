@@ -1,0 +1,57 @@
+{
+  "test_suite": "runtime_validation",
+  "timestamp": "2025-12-30T08:32:35Z",
+  "summary": {
+    "total_tests": 6,
+    "total_passed": 0,
+    "total_failed": 6,
+    "failure_injection": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4
+    },
+    "runtime_validation": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    }
+  },
+  "test_results": {
+    "test_health_gate_failure": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "3.779845708"
+    }
+,
+    "test_missing_trust_material": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "2.825859328"
+    }
+,
+    "test_clean_shutdown_integrity": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "3.496567274"
+    }
+,
+    "test_missing_policy_directory": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "3.743533188"
+    }
+,
+    "test_dry_run_validation": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "5.735820790"
+    }
+,
+    "test_invalid_policy_signature": {
+      "result": "FAIL",
+      "exit_code": 1,
+      "duration_seconds": "3.811103141"
+    }
+  },
+  "overall_pass": false
+}

@@ -1,0 +1,40 @@
+{
+  "index_version": "1.0.0",
+  "index_type": "tfidf",
+  "index_file": "index.bin",
+  "created": "2025-12-22T08:11:28.604760Z",
+  "document_count": 4,
+  "chunk_count": 4,
+  "embedding_dimension": 168,
+  "embedding_model": "tfidf",
+  "vocabulary_size": 168,
+  "index_hash": "sha256:3f759ba903ff7a1394d3736c766028e93cf305419fb2e3e46272e490934b8173",
+  "documents": [
+    {
+      "path": "documents/forensics_guides.md",
+      "chunks": 1,
+      "hash": "9f179fd90e116f295fabc40fe216ca40182c42cd0acb94697a9631e861be97ff"
+    },
+    {
+      "path": "documents/policy_explanations.md",
+      "chunks": 1,
+      "hash": "41111f1a454f5f85c7dc956ace1e5efded7853f5570366a530d8a1792f54d3b5"
+    },
+    {
+      "path": "documents/kill_chain_reference.md",
+      "chunks": 1,
+      "hash": "4be96f0f7212337f4ab67c15e73ee62a578efb915b7d64e670921b0faf449b20"
+    },
+    {
+      "path": "documents/ransomware_playbooks.md",
+      "chunks": 1,
+      "hash": "7dd133846a27da79aedaba2db0096eabd29c86dd05f471a61e1456dd4ca51dc5"
+    }
+  ],
+  "signature": {
+    "algorithm": "RSA-4096-PSS-SHA256",
+    "signer": "ransomeye_rag_indexer",
+    "signature": "placeholder",
+    "timestamp": "2025-12-22T08:11:28.605175Z"
+  }
+}

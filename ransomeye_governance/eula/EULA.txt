@@ -1,0 +1,163 @@
+You are now BUILDING RansomEye Phase 1 from scratch.
+
+This is NOT an audit.
+This is a FULL IMPLEMENTATION task.
+
+Phase:
+- Phase 1 — Program Governance, Military-Grade Foundations & Global Constraints
+
+Authoritative reference:
+- Master 21-Dec-2025 specification
+- Phase 1 prompt ONLY
+- No other phase may be referenced as a dependency
+
+Environment root:
+- /home/ransomeye/rebuild/
+- Phase path MUST be:
+  /home/ransomeye/rebuild/ransomeye_governance/
+
+ABSOLUTE RULES (NON-NEGOTIABLE):
+
+- No assumptions
+- No placeholders
+- No TODOs
+- No “future phase will handle this”
+- No reuse of existing code unless it EXACTLY matches Phase 1 spec
+- Everything must FAIL-CLOSED
+- Everything must be enforceable by code, not documentation
+
+━━━━━━━━━━━━━━━━━━━━━━
+TASKS (ALL REQUIRED)
+━━━━━━━━━━━━━━━━━━━━━━
+
+1. CREATE DIRECTORY STRUCTURE (EXACT)
+
+Create the complete Phase 1 directory structure exactly as defined in the spec, including:
+- governance/
+- eula/
+- ci/
+- tooling/
+- env/
+- docs/
+- tests/
+
+Paths must match EXACTLY.
+
+2. GOVERNANCE DOCUMENTS (MANDATORY)
+
+Create ALL required governance documents, including but not limited to:
+- LICENSE_POLICY.md
+- THIRD_PARTY_POLICY.md
+- SECURITY_POLICY.md
+- AI_DAY1_READINESS.md
+- SUPPLY_CHAIN_SECURITY.md
+- CONTRIBUTION_RULES.md
+
+These are NOT placeholders.
+They must contain enforceable rules referenced by tooling and CI.
+
+3. EULA ENFORCEMENT (CRITICAL)
+
+- Create EULA.txt at:
+  /home/ransomeye/rebuild/ransomeye_governance/eula/EULA.txt
+- File MUST exist even if empty
+- Implement enforcement logic so that:
+  - Installation or startup FAILS if EULA acceptance is missing
+  - Acceptance is logged and auditable
+
+4. CI ENFORCEMENT (HARD BLOCKERS)
+
+Create ALL required CI jobs in:
+- ransomeye_governance/ci/
+
+Including:
+- license_scan.yml
+- header_enforcement.yml
+- secret_scan.yml
+- provenance.yml
+- artifact_signing.yml
+
+Each CI job MUST:
+- Fail the pipeline on violation
+- Explicitly block GPL / AGPL / SSPL
+- Enforce header presence
+- Enforce secret absence
+
+5. TOOLING (EXECUTABLE, NOT DUMMY)
+
+Implement ALL required validators in:
+- ransomeye_governance/tooling/
+
+Including:
+- license_validator.py
+- header_validator.py
+- secret_validator.py
+- provenance_generator.py
+- artifact_signer.py
+
+Each tool MUST:
+- Be runnable
+- Be referenced by CI
+- Fail loudly and deterministically
+
+6. ENV-ONLY CONFIGURATION ENFORCEMENT
+
+- Remove ALL hardcoded secrets and defaults
+- Implement runtime ENV validation
+- Missing required ENV variable MUST:
+  - Abort startup
+  - Emit explicit error
+- Unknown ENV variable MUST:
+  - Abort startup
+
+7. AI DAY-1 READINESS ENFORCEMENT (PHASE-1 LEVEL)
+
+Implement Phase-1 enforcement that:
+- FAILS if baseline AI artifacts are missing
+- FAILS if AI attempts to start without signed baseline
+- Includes tests that prove this behavior
+
+Note:
+This phase DOES NOT train AI.
+It ENFORCES that AI CANNOT START EMPTY.
+
+8. TESTS (MANDATORY)
+
+Create ALL Phase-1 tests in:
+- ransomeye_governance/tests/
+
+Including:
+- license_violation_tests
+- header_violation_tests
+- secret_violation_tests
+- ai_baseline_presence_tests
+
+Tests must be runnable and must FAIL on violation.
+
+9. FILE HEADERS (ABSOLUTE)
+
+Every file created MUST start with the mandatory header:
+- Path
+- Author
+- Purpose
+
+No exceptions.
+
+━━━━━━━━━━━━━━━━━━━━━━
+DELIVERABLES
+━━━━━━━━━━━━━━━━━━━━━━
+
+After implementation, you MUST:
+
+- Run all Phase-1 tests
+- Run all validators
+- Show CI config file paths
+- Show directory tree
+- Provide command outputs
+
+Finally, provide a clear verdict:
+- “Phase 1 implementation complete and ready for audit”
+
+Do NOT proceed to any other phase.
+Do NOT touch Phase 2+.
+Focus ONLY on Phase 1.

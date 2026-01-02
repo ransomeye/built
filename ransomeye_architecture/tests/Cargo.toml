@@ -1,0 +1,25 @@
+[package]
+name = "ransomeye_architecture_tests"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+ransomeye_architecture_enforcement = { path = "../enforcement" }
+tempfile = "3.8"
+
+[[test]]
+name = "forbidden_flow_tests"
+path = "forbidden_flow_tests.rs"
+
+[[test]]
+name = "identity_violation_tests"
+path = "identity_violation_tests.rs"
+
+[[test]]
+name = "ai_authority_violation_tests"
+path = "ai_authority_violation_tests.rs"
+
+[[test]]
+name = "plane_isolation_tests"
+path = "plane_isolation_tests.rs"
+

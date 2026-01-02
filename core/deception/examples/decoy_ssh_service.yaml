@@ -1,0 +1,42 @@
+# Path and File Name : /home/ransomeye/rebuild/core/deception/examples/decoy_ssh_service.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Example signed deception asset - decoy SSH service
+
+# Example deception asset (requires signing before use)
+# This is a template - actual asset must be signed with Ed25519 private key
+
+asset_id: "550e8400-e29b-41d4-a716-446655440000"
+asset_type: "decoy_service"
+deployment_scope: "network"
+visibility_level: "low"
+trigger_conditions:
+  interaction_types:
+    - "ssh_connection"
+    - "ssh_login_attempt"
+  min_confidence: 0.9
+telemetry_fields:
+  source_ip: "0.0.0.0"  # Will be populated on interaction
+  destination_ip: "192.168.1.250"  # Decoy IP (not production)
+  timestamp: "2025-01-27T00:00:00Z"  # Will be updated on interaction
+  interaction_type: "ssh_connection"
+  additional_metadata: {}
+teardown_procedure:
+  steps:
+    - action: "stop_service"
+      parameters:
+        service_name: "decoy_ssh"
+    - action: "remove_listener"
+      parameters:
+        port: 2222  # Decoy port (not production port 22)
+max_lifetime: 86400  # 24 hours
+signature: ""  # Must be signed with Ed25519 private key
+signature_hash: ""  # SHA-256 hash of asset (before signature)
+metadata:
+  created_at: "2025-01-27T00:00:00Z"
+  created_by: "ransomeye_deception"
+  description: "Decoy SSH service on non-production port 2222"
+  tags:
+    - "port:2222"
+    - "service:ssh"
+    - "decoy"
+

@@ -1,0 +1,117 @@
+PROMPT 6: POLICY ENFORCEMENT & SIMULATION
+Role: Security Engineer & Systems Architect Target Path: /home/ransomeye/rebuild/core/policy/ Goal: Build the ransomeye-policy library, which enforces automated responses (Playbooks) or simulates them for testing. Context: This module consumes alerts. It supports two distinct modes: Enforcement Mode (Real automated defense, e.g., "Isolate Host") and Simulation Mode (Log "Would have isolated host," but take no action). This allows security teams to test new blocking rules safely ("Fire Drills") before enabling them in production.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/policy/
+
+Workspace: You must add "core/policy" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+serde, serde_json: For serializing policy definitions and logs.
+
+async-trait: For defining flexible action traits.
+
+thiserror: For error handling.
+
+tokio: For async execution.
+
+core/bus: For publishing CommandRequest (Enforcement) or SimulationResult (Simulation).
+
+core/engine: For consuming AlertEvent types.
+
+Security/Performance:
+
+Simulation Safety (CRITICAL): If the policy mode is set to Simulate, the code path MUST NOT be physically capable of emitting a CommandRequest to the bus. This prevents accidental disruption during tests.
+
+Signed Config: Policy definitions should ideally be loaded from a signed source (future-proofing), but for now, they must be strictly typed structs.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/policy/:
+
+Plaintext
+
+core/policy/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── definition.rs           # Policy Structs (YAML/JSON Schema)
+    ├── enforcement.rs          # Real Execution Logic
+    ├── simulation.rs           # "Dry Run" Logic
+    └── playbook_runner.rs      # Action Orchestrator (The Main Loop)
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Policy Definitions (src/definition.rs)
+Structs:
+
+Rust
+
+pub enum PolicyMode {
+    Enforce,
+    Simulate,
+    Disabled,
+}
+
+pub struct Policy {
+    pub id: String,
+    pub condition: String,      // e.g., "severity == CRITICAL"
+    pub actions: Vec<Action>,   // [Isolate, Snapshot, AlertAdmin]
+    pub mode: PolicyMode,
+}
+Logic:
+
+Implement load_policies() to read definitions from a config file or database.
+
+B. Simulation Mode (src/simulation.rs)
+Logic:
+
+Receive an AlertEvent.
+
+Match against active Policies.
+
+If policy.mode == Simulate:
+
+Generate a SimulationResult struct containing: { original_alert_id, proposed_action, timestamp }.
+
+Log the result: "Would have executed [Action] on [Host] due to [Reason]."
+
+CRITICAL: Do NOT generate or publish a CommandRequest.
+
+C. Playbook Runner (src/playbook_runner.rs)
+Logic:
+
+Receive AlertEvent.
+
+Iterate through Policies.
+
+If policy.mode == Enforce:
+
+Convert the Action definition into a CommandRequest (defined in core/bus).
+
+Sign the command (using the core/kernel Trust Root).
+
+Publish the command to the command.dispatch topic on the Bus.
+
+4. ✅ ACCEPTANCE CRITERIA
+Simulation Test:
+
+Configure a policy with mode: Simulate.
+
+Trigger a "Critical Ransomware Alert" (mocked).
+
+Assert that Zero CommandRequest messages are sent to the Bus.
+
+Assert that a SimulationResult is logged/published.
+
+Enforcement Test:
+
+Configure the same policy with mode: Enforce.
+
+Trigger the alert.
+
+Assert that a valid CommandRequest (e.g., "Isolate Host") is published to the Bus.
+
+Safety Check: Verify via code review or test that the simulation.rs module does not import or use the bus.publish(CommandRequest) method.
+
+Build: cargo build -p ransomeye-policy succeeds.

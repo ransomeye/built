@@ -1,0 +1,8 @@
+{
+  "hash": "0cd3460493fcdd61e89dc5d45e9d2e8d708b6a0144e5aa98bd5f8fbf87343ab9",
+  "timestamp": "2025-12-29T10:50:55.545987",
+  "version": "1.0.0",
+  "signer": "config",
+  "artifact": "install_state.json",
+  "type": "install_state"
+}

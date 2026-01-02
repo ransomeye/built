@@ -1,0 +1,25 @@
+[package]
+name = "ransomeye_intelligence_tests"
+version = "1.0.0"
+edition = "2021"
+
+[[test]]
+name = "baseline_presence_tests"
+path = "baseline_presence_tests.rs"
+
+[[test]]
+name = "shap_completeness_tests"
+path = "shap_completeness_tests.rs"
+
+[[test]]
+name = "intel_poisoning_tests"
+path = "intel_poisoning_tests.rs"
+
+[[test]]
+name = "signature_failure_tests"
+path = "signature_failure_tests.rs"
+
+[[test]]
+name = "llm_index_integrity_tests"
+path = "llm_index_integrity_tests.rs"
+

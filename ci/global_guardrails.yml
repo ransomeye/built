@@ -1,0 +1,81 @@
+# Path and File Name : /home/ransomeye/rebuild/ci/global_guardrails.yml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: CI/CD pipeline configuration for global guardrails enforcement
+
+name: RansomEye Global Guardrails
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  guardrails-enforcement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Validate python3 Runtime
+        run: |
+          python3 --version || exit 1
+          python3 -c "import sys; assert sys.version_info >= (3, 10), 'Python 3.10+ required'; print(f'✓ Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro} meets requirements')"
+        continue-on-error: false
+      
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyyaml cryptography psycopg2-binary
+        continue-on-error: false
+      
+      - name: Validate rules.yaml Schema
+        run: |
+          cd /home/ransomeye/rebuild
+          python3 -m ransomeye_guardrails.rules_schema --rules ransomeye_guardrails/rules.yaml
+        continue-on-error: false
+      
+      - name: Run All Guardrails Checks
+        run: |
+          cd /home/ransomeye/rebuild
+          python3 -m ransomeye_guardrails
+        continue-on-error: false
+      
+      - name: Initialize Trust Hierarchy
+        run: |
+          cd /home/ransomeye/rebuild
+          python3 -m ransomeye_trust.root_ca_generator --trust-dir ransomeye_trust --init
+        continue-on-error: false
+      
+      - name: Validate Trust Infrastructure
+        run: |
+          cd /home/ransomeye/rebuild
+          test -f ransomeye_trust/key_hierarchy.json || exit 1
+          test -f ransomeye_trust/keys/root_ca.key || exit 1
+          test -f ransomeye_trust/certs/root_ca.crt || exit 1
+        continue-on-error: false
+      
+      - name: Generate Guardrails Report
+        run: |
+          cd /home/ransomeye/rebuild
+          echo "=== RansomEye Guardrails Validation ===" > guardrails_report.txt
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> guardrails_report.txt
+          echo "" >> guardrails_report.txt
+          echo "All guardrails checks passed successfully." >> guardrails_report.txt
+        continue-on-error: false
+      
+      - name: Upload Guardrails Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: guardrails-report
+          path: guardrails_report.txt
+

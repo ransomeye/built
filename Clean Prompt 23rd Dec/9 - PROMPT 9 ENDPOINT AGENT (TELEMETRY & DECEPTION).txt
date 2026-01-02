@@ -1,0 +1,107 @@
+PROMPT 9: ENDPOINT AGENT (TELEMETRY & DECEPTION)
+Role: Systems Programmer & Malware Researcher Target Path: /home/ransomeye/rebuild/edge/agent/ Goal: Build the ransomeye-agent binary. Context: This unified agent runs on Linux and Windows. It has three critical jobs: Monitor system activity (Process/File), Execute defensive commands (Kill/Isolate) received from the Core, and Deceive attackers by placing "Honeyfiles" and "Honeyports" that trigger instant alarms when touched.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/edge/agent/
+
+Workspace: You must add "edge/agent" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+sysinfo: For cross-platform process and system monitoring.
+
+notify: For watching file system events (detecting when honeyfiles are touched).
+
+whoami: For identifying the current user context.
+
+tokio: Async runtime.
+
+socket2: For low-level networking (Honeyports).
+
+core/bus: For communication types.
+
+core/kernel: For config and crypto verification.
+
+Security/Performance:
+
+Signed Execution: The agent MUST verify the Ed25519 signature of every CommandRequest against the Core's Public Key. Unsigned commands are ignored.
+
+Anti-Replay: Commands with a timestamp older than 30 seconds must be rejected.
+
+Safety: The deception module must allow configuring where traps are placed (via Policy) to avoid breaking legitimate apps.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/edge/agent/:
+
+Plaintext
+
+edge/agent/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # Agent Entrypoint & Event Loop
+    ├── config.rs               # Agent-specific Config
+    ├── telemetry/
+    │   ├── mod.rs
+    │   ├── process.rs          # Monitor new process creation
+    │   └── file_mon.rs         # Monitor critical file paths
+    ├── deception/
+    │   ├── mod.rs
+    │   ├── honeyfile.rs        # Create & Watch fake files
+    │   └── honeyport.rs        # Fake service listener
+    └── command_exec.rs         # Handle "Kill/Isolate" actions
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Telemetry Monitoring (src/telemetry/)
+Logic:
+
+Process Monitor (process.rs): Use sysinfo to poll for new processes every X milliseconds (fallback) or use OS-specific hooks if available.
+
+Emit TelemetryEvent when a new PID appears.
+
+File Monitor (file_mon.rs): Use notify to watch sensitive paths (e.g., /etc/passwd, C:\Users\*\Documents).
+
+Emit event on Write, Create, or Delete.
+
+B. The Deception Module (src/deception/)
+Goal: Detect Lateral Movement instantly. Logic:
+
+Honeyfile (honeyfile.rs):
+
+Action: Create a file (e.g., /root/passwords.txt or C:\Finance\salary_list.xlsx) filled with random junk data.
+
+Trigger: Watch this file using notify. If any process (except the Agent itself) reads, writes, or opens it -> IMMEDIATE CRITICAL ALERT.
+
+Honeyport (honeyport.rs):
+
+Action: Open a TCP Listener on a high port (e.g., 8080, 2222) using socket2.
+
+Trigger: If any IP connects to it -> IMMEDIATE ALERT (Port Scan Detected).
+
+C. Secure Command Execution (src/command_exec.rs)
+Input: CommandRequest from the Bus. Logic:
+
+Security Check:
+
+Verify Signature: Must match RE_CORE_PUBLIC_KEY.
+
+Verify Target: target_agent_id must match MY_AGENT_ID.
+
+Verify Replay: abs(now - command_timestamp) < 30s.
+
+Actions:
+
+KillProcess(pid): Terminate the specific process.
+
+IsolateNetwork(): Use iptables (Linux) or netsh (Windows) to block all traffic except the connection to the RansomEye Bus.
+
+4. ✅ ACCEPTANCE CRITERIA
+Deception Test: Manually "touching" or cating the generated honeyfile triggers a DeceptionAlert sent to the Bus.
+
+Security Test: Sending a manually constructed CommandRequest without a valid signature results in a logged "Security Violation" and ZERO action taken.
+
+Isolation Test: The IsolateNetwork command successfully applies a firewall rule (mocked in unit tests) that blocks outbound traffic.
+
+Resilience: The agent automatically attempts to reconnect to the Bus if the network drops.
+
+Build: cargo build -p ransomeye-agent succeeds.

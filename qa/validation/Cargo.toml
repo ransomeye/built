@@ -1,0 +1,31 @@
+[package]
+name = "ransomeye_validation"
+version = "1.0.0"
+edition = "2021"
+authors = ["nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+ring = "0.17"
+base64 = "0.22"
+uuid = { version = "1.0", features = ["v7"] }
+reqwest = { version = "0.11", features = ["json"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Module dependencies for integration testing
+# Note: These would need to be available as libraries or we'd use IPC/API
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[[bin]]
+name = "validation_validator"
+path = "src/main.rs"
+

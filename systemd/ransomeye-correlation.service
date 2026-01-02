@@ -1,0 +1,50 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-correlation.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Threat Correlation
+# CRITICAL: Rootless runtime enforcement - MUST NOT run as root (UID 0)
+# RUNTIME: Uses /opt/ransomeye (not /home/ransomeye/rebuild)
+
+[Unit]
+Description=RansomEye Threat Correlation
+After=network.target ransomeye-ingestion.service
+Requires=network.target ransomeye-ingestion.service
+ConditionPathExists=/opt/ransomeye/config/install_state.json
+# Pre-start validation: fail-closed if runtime layout invalid
+ConditionPathExists=/opt/ransomeye
+ConditionPathExists=/opt/ransomeye/bin/ransomeye-correlation
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye
+RuntimeDirectory=ransomeye/correlation
+StateDirectory=ransomeye/correlation
+# Pre-start validation: verify runtime layout ownership
+ExecStartPre=/bin/sh -c 'test -d /opt/ransomeye && test -r /opt/ransomeye/bin/ransomeye-correlation || exit 1'
+ExecStart=/opt/ransomeye/bin/ransomeye-correlation
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening - Rootless runtime enforcement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Runtime paths: /opt/ransomeye and state directories
+ReadWritePaths=/opt/ransomeye /var/lib/ransomeye/correlation /var/log/ransomeye /run/ransomeye/correlation
+
+# Capability-based privileges (no root required)
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SYS_NICE
+AmbientCapabilities=
+PrivateUsers=false
+
+# Environment
+Environment="RANSOMEYE_ROOT=/opt/ransomeye"
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
+

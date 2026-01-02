@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DirectiveEnvelope",
+  "type": "object",
+  "required": [
+    "directive_id",
+    "policy_id",
+    "policy_version",
+    "signature",
+    "signature_hash",
+    "issued_at",
+    "ttl_seconds",
+    "nonce",
+    "target_scope",
+    "action",
+    "preconditions_hash",
+    "audit_receipt",
+    "allowed_actions",
+    "required_approvals",
+    "evidence_reference",
+    "kill_chain_stage",
+    "severity",
+    "reasoning"
+  ],
+  "properties": {
+    "directive_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "policy_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "signature_hash": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "target_scope": {
+      "type": "object",
+      "properties": {
+        "agent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "host_addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["linux", "windows", "network"]
+        },
+        "asset_class": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      }
+    },
+    "action": {
+      "type": "string"
+    },
+    "preconditions_hash": {
+      "type": "string"
+    },
+    "audit_receipt": {
+      "type": "object",
+      "required": ["receipt_id", "receipt_signature", "receipt_hash", "receipt_timestamp"],
+      "properties": {
+        "receipt_id": {
+          "type": "string"
+        },
+        "receipt_signature": {
+          "type": "string"
+        },
+        "receipt_hash": {
+          "type": "string"
+        },
+        "receipt_timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "allowed_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_approvals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_reference": {
+      "type": "string"
+    },
+    "kill_chain_stage": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string"
+    },
+    "reasoning": {
+      "type": "string"
+    }
+  }
+}
+

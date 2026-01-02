@@ -1,0 +1,98 @@
+PROMPT 19: RED TEAM SIMULATOR (Adversary Emulation)
+Role: Red Team Operator & Rust Developer Target Path: /home/ransomeye/rebuild/core/simulation/Goal: Build the ransomeye-simulation crate.Context: We cannot wait for a real attack to know if our detection rules work. This module injects synthetic TelemetryEvents into the Bus that mimic specific threat actors (e.g., LockBit, WannaCry). It verifies that the core/engine correctly correlates these signals into an Alert.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/simulation/
+
+Workspace: You must add "core/simulation" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+tokio: For async event loops.
+
+rand: For varying the timing and jitter of attacks.
+
+serde, serde_json: For loading attack profiles.
+
+core/bus: To inject events and listen for alerts.
+
+core/kernel: For configuration.
+
+Safety (CRITICAL):
+
+Production Guard: This module MUST NOT run in Production unless explicitly enabled by an Admin with a specific flag (RANSOMEYE_RED_TEAM_ENABLE=true).
+
+Synthetic Flag: All injected events must carry metadata {"simulated": true} so they can be filtered out of permanent compliance logs if necessary.
+
+Verification:
+
+The simulator must listen to the alert.* topic. If it runs a "WannaCry" simulation and does not see a corresponding Alert within 30 seconds, it reports a TEST FAILURE.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/simulation/:
+
+Plaintext
+
+core/simulation/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── engine.rs               # Main Loop (Select Attack -> Run)
+    ├── injector.rs             # Bus Publisher (The "Attacker")
+    ├── listener.rs             # Bus Subscriber (The "Scorekeeper")
+    └── profiles/
+        ├── mod.rs
+        ├── wannacry.rs         # Hardcoded pattern: SMB Spread -> File Encrypt
+        └── lockbit.rs          # Hardcoded pattern: VSS Delete -> Exfiltration
+        └── noise.rs            # Background benign traffic
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Attack Profiles (src/profiles/)
+Trait: pub trait AttackProfile { fn generate_sequence(&self) -> Vec<Envelope>; }Logic (e.g., lockbit.rs):
+
+Step 1: Emit ProcessStart event (cmd: vssadmin.exe delete shadows /all /quiet).
+
+Step 2 (Wait 2s): Emit NetConnect event (dest: 193.x.x.x on port 443).
+
+Step 3 (Wait 1s): Emit 50x FileWrite events (path: *.lockbit, entropy: 8.0).
+
+Output: Return the vector of envelopes with appropriate timestamps.
+
+B. The Injector (src/injector.rs)
+Logic:
+
+Iterate through the Vec<Envelope> from the profile.
+
+Jitter: Sleep for random(step.delay +/- 10%) to mimic human/network variance.
+
+Publish: Send to telemetry.simulated (or telemetry.raw if testing full pipeline).
+
+C. The Scorekeeper (src/listener.rs)
+Goal: Closed-loop verification.Logic:
+
+Subscribe to alert.critical.
+
+Assert: When the "LockBit" profile runs, look for an Alert with threat_family: "LockBit" or category: "Ransomware".
+
+Timeout: If no alert received after sequence finishes + 10s buffer, log [FAIL] Detection Engine missed LockBit simulation.
+
+Success: If alert received, log [PASS] LockBit detected in 4.2s.
+
+D. The Main Engine (src/engine.rs)
+Logic:
+
+Check config::is_red_team_enabled(). If false, exit/sleep.
+
+Expose an API (or Bus subscription) to trigger specific scenarios: simulation.start { profile: "wannacry" }.
+
+Run Injector and Listener concurrently.
+
+4. ✅ ACCEPTANCE CRITERIA
+Safety Test: Running the simulator without the Env Var RANSOMEYE_RED_TEAM_ENABLE results in an immediate shutdown/noop.
+
+Detection Test: Running the wannacry profile results in a [PASS] log from the Scorekeeper (confirming the Core Engine logic from Phase 5 works).
+
+Bus Integration: Events emitted by the simulator are visible on the NATS bus (verified via a test subscriber).
+
+Build: cargo build -p ransomeye-simulation succeeds.

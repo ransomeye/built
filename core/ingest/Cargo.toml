@@ -1,0 +1,50 @@
+[package]
+name = "ingest"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+ring = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+x509-parser = { workspace = true }
+base64 = { workspace = true }
+asn1-rs = "0.6"
+hex = { workspace = true }
+jsonschema = "0.17"
+url = "2.4"
+axum = "0.7"
+tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+hostname = "0.4"
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3.8"
+tokio-test = "0.4"
+
+[lib]
+name = "ingest"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ingest"
+path = "src/main.rs"
+
+[[bin]]
+name = "ingest-http"
+path = "src/http_main.rs"
+

@@ -1,0 +1,32 @@
+{
+  "baseline_pack_license": "RANSOMEYE_PROPRIETARY",
+  "data_sources": {
+    "redteam_data": {
+      "license": "RANSOMEYE_PROPRIETARY",
+      "rights": "full",
+      "source": "ransomeye_redteam"
+    },
+    "synthetic_data": {
+      "generator": "ransomeye_synthetic_generator",
+      "license": "RANSOMEYE_PROPRIETARY",
+      "rights": "full"
+    }
+  },
+  "export_compliance": {
+    "classification": "UNRESTRICTED",
+    "encryption_regulations": "COMPLIANT",
+    "export_control": "NONE"
+  },
+  "license_manifest_version": "1.0.0",
+  "models_license": "RANSOMEYE_PROPRIETARY",
+  "no_customer_data": true,
+  "no_third_party_data": true,
+  "signature": {
+    "algorithm": "RSA-4096-PSS-SHA256",
+    "signature": "BhRC4Yl48oH9uGuZxzf+xCjORyFLgKhxBUSNur9zsVsz0790DNViIkQGbWHRu7yelCE2UQpeZ+SiqFwbD/pXj0mgu1qxdvSw4J6qUepGABKXbXGl8UCoPylpFrxBejevyZW8rU6dBPFwhz34KRe9ljZTVH8GQ/+eRRSofH5QEGc172sJ3DwE03vkoGrlPG7pVjcAutUQZ9s5GdW3MrPsrAmaaaQO/ukO6ClEpn8VF6HpAKgkZdytKX3EeyAzzoSXCe6b139AblL1nO9UGtIh9Yc7hddYzdJA7uiVAt+uB2QylcYStYaSBEmdypJ7EZyDMaR/gyv462alJVh5Tv/KNIx4lYQ4eFD6UkC/o7VVkOOKdG5ruWvs+ao1O3HIDU2vQhQIf9VI/gmGjSnHZjuGsI3fnQj4jdK55ozR7zOC/xnOBVo6npIRc7vh3AeM5P0WtrNf5TxRgXssJ101s7oUDL6p5kTW2O6vNvjdJ5gxDYxNT64Oo9H1InGE1M2Woz1VTaRuu+8Fsk/2wcrrFp90CVS4XZCvAZa1A41tF9ICYVYK6TB8zlYFHX3UgAyArAXPnV+dOhqvMTkNKfAsTJl2GAYdWUBtv5C5kmFLqsXzw5l+j/WC9+KhGRP9Wvq44XjQyEh7UzicLDEJqyQ1af/6IRVv+ivklOPhoHNCxdwu+yg=",
+    "signer": "ransomeye_legal",
+    "timestamp": "2025-12-31T08:30:31.351443Z"
+  },
+  "signer": "policy",
+  "training_data_license": "RANSOMEYE_PROPRIETARY"
+}

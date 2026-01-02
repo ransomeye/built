@@ -1,0 +1,28 @@
+{
+  "test_name": "dry_run_validation",
+  "timestamp": "2025-12-30T08:32:27Z",
+  "expected_behavior": {
+    "full_startup_sequence_executes": true,
+    "ready_reached": true,
+    "no_running_state": true,
+    "clean_exit_code_0": true
+  },
+  "observed_behavior": {
+    "service_status": "failed
+inactive",
+    "exit_code": "1",
+    "startup_time_seconds": "5.332800112",
+    "dry_run_detected": false,
+    "ready_state_detected": false,
+    "running_state_detected": false,
+    "clean_exit_detected": false
+  },
+  "test_results": {
+    "exit_code_correct": false,
+    "dry_run_detected": false,
+    "ready_reached": false,
+    "no_running_state": true,
+    "clean_exit": false
+  },
+  "pass": false
+}

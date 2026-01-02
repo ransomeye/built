@@ -1,0 +1,120 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_guardrails/rules.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Forbidden patterns and rules for static code scanning
+
+# RansomEye Guardrails - Forbidden Patterns
+# All patterns are regex-based and will trigger fail-closed violations
+
+hardcoded_patterns:
+  - name: "Hardcoded IPv4 address"
+    regex: "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b"
+    description: "Hardcoded IPv4 address detected"
+    exception: "127\\.0\\.0\\.1|localhost|0\\.0\\.0\\.0"
+    rule_name: "NO_HARDCODED_IPV4"
+    severity: "CRITICAL"
+  
+  - name: "Hardcoded IPv6 address"
+    regex: "\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b"
+    description: "Hardcoded IPv6 address detected"
+    exception: "::1|::ffff:127\\.0\\.0\\.1"
+    rule_name: "NO_HARDCODED_IPV6"
+    severity: "CRITICAL"
+  
+  - name: "Hardcoded URL"
+    regex: "(?:https?|ftp|ws|wss)://(?!localhost|127\\.0\\.0\\.1)[^\\s'\"`]+"
+    description: "Hardcoded URL detected (must use ENV variable)"
+    rule_name: "NO_HARDCODED_URL"
+    severity: "CRITICAL"
+  
+  - name: "Hardcoded API key or token"
+    regex: "(?:api[_-]?key|apikey|token|secret|password|passwd|pwd)\\s*[=:]\\s*[\"']?[A-Za-z0-9_\\-]{16,}[\"']?"
+    description: "Hardcoded API key or token detected"
+    rule_name: "NO_HARDCODED_SECRETS"
+    severity: "CRITICAL"
+  
+  - name: "Hardcoded database credential"
+    regex: "(?:db[_-]?(?:user|pass|password|host|port)|database[_-]?(?:user|pass|password))\\s*[=:]\\s*[\"']?[^\"']+[\"']?"
+    description: "Hardcoded database credential detected"
+    rule_name: "NO_HARDCODED_DB_CREDS"
+    severity: "CRITICAL"
+  
+  - name: "Cloud provider API key"
+    regex: "(?:AKIA|AIza|ya29\\.)[A-Za-z0-9_\\-]+"
+    description: "Cloud provider API key detected"
+    rule_name: "NO_CLOUD_API_KEYS"
+    severity: "CRITICAL"
+
+path_patterns:
+  - name: "Path outside project root"
+    regex: "(?:/usr|/var|/etc|/opt|/tmp|/home/[^/]+(?!ransomeye/rebuild))[^\\s'\"`]*"
+    description: "Path outside /home/ransomeye/rebuild/ detected"
+    rule_name: "NO_EXTERNAL_PATHS"
+    exception: "/home/ransomeye/rebuild/"
+    severity: "HIGH"
+
+ml_patterns:
+  - name: "Model loading without training script"
+    regex: "(?:load|pickle|joblib|torch\\.load|tf\\.keras\\.models\\.load_model)\\([\"'][^\"']*\\.(?:pkl|h5|pb|onnx|pt|pth|ckpt)[\"']"
+    description: "Model loading without corresponding training script"
+    rule_name: "NO_PRETRAINED_MODELS"
+    severity: "CRITICAL"
+  
+  - name: "ML inference without SHAP"
+    regex: "(?:predict|inference|forward)\\([^)]+\\)(?!.*shap|.*explain)"
+    description: "ML inference without SHAP explainability"
+    rule_name: "SHAP_REQUIRED"
+    severity: "CRITICAL"
+
+crypto_patterns:
+  - name: "Unsigned artifact"
+    regex: "(?:manifest\\.json|manifest\\.sig)"
+    description: "Artifact without manifest.json or manifest.sig"
+    rule_name: "CRYPTO_SIGNATURE_REQUIRED"
+    severity: "CRITICAL"
+
+header_patterns:
+  - name: "Missing mandatory header"
+    regex: "^(?!\\s*#\\s*Path and File Name)"
+    description: "File missing mandatory header"
+    rule_name: "MANDATORY_HEADER_MISSING"
+    multiline: false
+    check_first_lines: 3
+    severity: "HIGH"
+
+allowed_exceptions:
+  - file_patterns:
+      - "**/rules.yaml"
+      - "**/retention.txt"
+      - "**/*.md"
+      - "**/key_hierarchy.json"
+      - "**/__pycache__/**"
+      - "**/.git/**"
+      - "**/node_modules/**"
+      - "**/venv/**"
+      - "**/.env.example"
+    rules:
+      - "MANDATORY_HEADER_MISSING"
+
+scan_config:
+  file_extensions:
+    - ".py"
+    - ".yaml"
+    - ".yml"
+    - ".json"
+    - ".sh"
+    - ".service"
+    - ".tsx"
+    - ".ts"
+    - ".js"
+    - ".jsx"
+  
+  exclude_dirs:
+    - "__pycache__"
+    - ".git"
+    - "node_modules"
+    - "venv"
+    - ".venv"
+    - "dist"
+    - "build"
+    - ".pytest_cache"
+    - ".mypy_cache"

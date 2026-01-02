@@ -1,0 +1,129 @@
+💿 PROMPT 30: THE "DAY 0" UNIFIED INSTALLER (Distro-Agnostic)
+Role: DevOps Architect & Linux Systems Engineer Target Path: /home/ransomeye/rebuild/deploy/
+
+Goal: Build the install_unified.sh script. Context: This script takes the artifacts from Phase 28 (Release) and deploys a fully functional, tuned, and conflict-free system. It orchestrates the entire "Day 0" sequence: Hardware Tuning -> Core Install -> Port Conflict Fix -> Edge Install -> Training Init. Crucially, it must support Ubuntu 22+ and RHEL 7+ (and derivatives) by dynamically detecting the underlying OS capabilities.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/deploy/
+
+Artifacts Source: Expects signed tarballs in ./artifacts/ (from Phase 28).
+
+OS Compatibility:
+
+Distro-Agnostic: Do NOT hardcode apt-get or yum. Detect the package manager (detect_os_variant) and use the appropriate commands for dependencies.
+
+Init System: Assume systemd is present (RHEL 7+ / Ubuntu 16+ standard). Fail if not found.
+
+Execution Order (CRITICAL):
+
+
+Hardware Prep: Run ops/tuner (Enforce 16GB Swap, CPU Pinning).
+
+
+Core Install: Deploy ransomeye-core service.
+
+
+Conflict Check: Run ops/portguard (Fix Agent Port 8080 collision).
+
+
+Edge Install: Deploy ransomeye-agent and ransomeye-dpi.
+
+
+Training Init: Start ransomeye-trainer service (Day 1 Model Seeding).
+
+Idempotency:
+
+Running the script twice must not break the system, duplicate swap files, or overwrite custom configs.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/deploy/:
+
+Plaintext
+
+deploy/
+├── install_unified.sh          # The Master Script
+├── assets/
+│   ├── systemd/                # .service templates
+│   └── defaults/               # default config.toml
+└── scripts/
+    ├── setup_postgres.sh       # DB Init (Distro-aware)
+    ├── verify_install.sh       # Post-install Health Check
+    └── os_detect.sh            # Distro abstraction logic
+3. ⚙️ IMPLEMENTATION DETAILS
+A. OS Detection (scripts/os_detect.sh)
+Logic:
+
+Read /etc/os-release.
+
+Exports:
+
+PKG_MGR: "apt" or "dnf" (or "yum").
+
+SERVICE_MGR: "systemctl".
+
+Validation: If systemd is not detected, exit with "Unsupported Init System".
+
+B. The Master Script (install_unified.sh)
+Bash Logic:
+
+Source: source ./scripts/os_detect.sh.
+
+Pre-reqs: Install postgres, ethtool, tar using $PKG_MGR.
+
+Step 1 (Tuner):
+
+Execute ./artifacts/core/ransomeye-tuner --apply.
+
+Step 2 (Core):
+
+Copy binary to /opt/ransomeye/bin/.
+
+Copy assets/systemd/ransomeye-core.service to /etc/systemd/system/.
+
+
+systemctl enable --now ransomeye-core.
+
+Step 3 (PortGuard):
+
+Execute ./artifacts/core/ransomeye-portguard --fix.
+
+Step 4 (Edge):
+
+Install Agent & DPI binaries.
+
+
+Loader: Run /opt/ransomeye/bin/ransomeye-loader --load /opt/ransomeye/ebpf/probes.o to safely load eBPF.
+
+Step 5 (Training):
+
+
+systemctl enable --now ransomeye-trainer.
+
+C. Verification (scripts/verify_install.sh)
+Logic:
+
+
+Swap: swapon -s | grep 16G (approx).
+
+
+Ports: Ensure Agent is NOT listening on 8080 if Core is running.
+
+Services: systemctl is-active ransomeye-core ransomeye-agent must return "active".
+
+OS Check: Log "Installed successfully on [PRETTY_NAME]".
+
+4. ✅ ACCEPTANCE CRITERIA
+Distro Test (Debian): Script runs on Ubuntu 22.04, uses apt, and installs successfully.
+
+Distro Test (RHEL): Script runs on Red Hat 8 (or CentOS stream), uses dnf, and installs successfully.
+
+
+Swap: After install, system reports correct swap size (created by Tuner).
+
+
+Ports: Agent config correctly points to 8081 (or similar) if 8080 was taken by Core.
+
+
+Flow: The script runs from start to finish on a clean VM without errors.

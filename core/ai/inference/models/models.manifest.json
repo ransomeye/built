@@ -1,0 +1,10 @@
+{
+  "model_name": "ransomware_behavior",
+  "model_version": "1.0.0",
+  "model_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "model_size_bytes": 1024,
+  "signature": "dummy_signature_base64_placeholder",
+  "trained_on": "2024-01-01",
+  "model_type": "advisory_only",
+  "features": ["feature_0", "feature_1", "feature_2", "feature_3", "feature_4"]
+}

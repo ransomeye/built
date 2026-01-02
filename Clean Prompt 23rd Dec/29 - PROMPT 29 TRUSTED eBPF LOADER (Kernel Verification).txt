@@ -1,0 +1,90 @@
+PROMPT 29: TRUSTED eBPF LOADER (Kernel Verification)
+Role: Kernel Security Engineer & Rust Systems Programmer Target Path: /home/ransomeye/rebuild/edge/loader/
+
+Goal: Build the ransomeye-loader crate. Context: This hardened binary is the only component in the entire system allowed to make bpf() syscalls. It enforces "Code Signing for the Kernel" by verifying that every eBPF probe (.o or .wasm file) is accompanied by a valid Ed25519 signature. If a probe file is modified on disk by an attacker, the Loader must refuse to load it.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/edge/loader/
+
+
+Workspace: You must add "edge/loader" to the [workspace.members] list in the root Cargo.toml.
+
+Security Logic (CRITICAL):
+
+Signature Check: Before calling Bpf::load_file(), the loader must read the target probe.o and its corresponding probe.o.sig. It must verify the Ed25519 signature against the embedded Release Public Key.
+
+Fail-Closed: If the signature is invalid or missing, the process MUST exit with a non-zero status immediately.
+
+
+Lockdown: Once loaded, use bpf_prog_attach and then pin the maps to /sys/fs/bpf/ransomeye so other processes can read them without owning the probe.
+
+
+Anti-Downgrade: Verify the version number in the probe metadata is greater than or equal to the currently running version.
+
+Capabilities:
+
+The process must explicitly check for CAP_BPF (or CAP_SYS_ADMIN on older kernels) at startup. If missing, Panic.
+
+It must drop all other capabilities immediately after loading the probes.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/edge/loader/:
+
+Plaintext
+
+edge/loader/
+├── Cargo.toml                  # Dependencies (aya, ring, clap, etc.)
+└── src/
+    ├── main.rs                 # CLI Entrypoint (ransomeye-load <file>)
+    ├── verifier.rs             # Ed25519 Signature Check Logic
+    ├── kernel.rs               # Aya / Libbpf Wrapper
+    └── pinning.rs              # /sys/fs/bpf Management
+
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Verifier (src/verifier.rs)
+Logic:
+
+Input: Accepts path_to_probe (e.g., /opt/ransomeye/ebpf/probes.o).
+
+Signature Discovery: Look for ${path_to_probe}.sig.
+
+
+Key Loading: Load the Release Public Key (embedded in the binary via include_bytes! at compile time to prevent tampering).
+
+Verification: Use ring::signature::UnparsedPublicKey::verify to check if the .o file content matches the signature.
+
+Result: Return Ok(()) only if valid. Otherwise, Exit(1).
+
+B. The Kernel Loader (src/kernel.rs)
+Library: aya.Logic:
+
+Call verifier::verify() first.
+
+Load: Call Ebpf::load(data).
+
+
+Attach: Iterate through the programs (XDP, Kprobe, Tracepoint) defined in the object file and attach them to the appropriate interfaces or kernel symbols.
+
+C. Pinning Manager (src/pinning.rs)
+Goal: specific resource sharing.Logic:
+
+Mount: Check if /sys/fs/bpf is mounted. If not, mount it.
+
+Pin: Pin the eBPF Maps to /sys/fs/bpf/ransomeye/maps/.
+
+
+Why: This allows the Agent (Phase 9) and DPI Probe (Phase 26) to read telemetry data from these maps without needing to be the parent process of the probes.
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Security Test: Manually modifying 1 byte in a valid .o file causes the loader to reject it with "Signature Mismatch".
+
+
+Pinning Test: After running the loader, executing ls /sys/fs/bpf/ransomeye shows the pinned maps exist.
+
+
+Capability Check: Running the binary as a non-root user fails immediately with a permission error.
+
+Build: cargo build -p ransomeye-loader succeeds.

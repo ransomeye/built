@@ -1,0 +1,111 @@
+PROMPT 13: MANAGEMENT CONSOLE (REACT + WASM)
+Role: Full Stack Engineer & Frontend Specialist Target Path: /home/ransomeye/rebuild/ui/ Goal: Build the ransomeye-ui project. Context: This is the "Single Pane of Glass" for the platform. It is a strict View Layer; all business logic remains in the Core Backend. It connects to the Core API via JWT-authenticated REST and WebSockets. Crucially, it uses Rust compiled to WebAssembly (WASM) to render the complex Threat Graph (10,000+ nodes) at 60fps, which would be too slow in pure JavaScript.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/ui/
+
+Tech Stack: React 19, TypeScript, Vite, TanStack Query.
+
+WASM Root: /home/ransomeye/rebuild/ui/wasm/ (Rust crate).
+
+Workspace: You must add "ui/wasm" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+JS: react, react-dom, vite, recharts (for simple charts), d3 (controlled via WASM).
+
+Rust (WASM): wasm-bindgen, web-sys (for DOM manipulation), js-sys.
+
+Security/Performance:
+
+WASM Rendering: The visual graph of nodes/edges MUST be computed in Rust and drawn to an HTML5 Canvas. JS only handles the click events.
+
+
+Authentication: The UI must automatically redirect to /login if any API request returns 401 Unauthorized.
+
+
+RBAC: UI elements (like "Settings") must be hidden if the user's JWT role is "Analyst" (Read-Only) vs "Admin".
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/ui/:
+
+Plaintext
+
+ui/
+├── package.json                # NPM Dependencies
+├── vite.config.ts              # Build Config (WASM plugin included)
+├── index.html                  # Entrypoint
+├── src/
+│   ├── main.tsx                # React Root
+│   ├── App.tsx                 # Router & Layout
+│   ├── api/                    # Generated OpenAPI Clients
+│   ├── components/
+│   │   ├── Dashboard.tsx       # Fleet Health Widgets
+│   │   ├── Alerts.tsx          # Incident Queue
+│   │   ├── GraphView.tsx       # The WASM Canvas Wrapper
+│   │   └── Policies.tsx        # Policy Editor & Simulation Trigger
+│   └── hooks/                  # Auth & Data Fetching
+└── wasm/                       # Rust Visualization Engine
+    ├── Cargo.toml              # crate-type = ["cdylib"]
+    └── src/
+        ├── lib.rs
+        └── graph_renderer.rs   # Force-Directed Layout Logic
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Dashboard (src/components/Dashboard.tsx)
+Goal: High-level overview.Metrics to Display:
+
+Active Threats: (Red Counter) - Count of Critical alerts.
+
+
+Fleet Compliance: (Percentage) - Aggregated from Phase 5 Compliance reports.
+
+Online Status: Ratio of Online/Offline agents.Logic: Poll GET /api/v1/metrics every 5 seconds using useQuery.
+
+B. The Threat Graph WASM (wasm/src/lib.rs)
+Problem: Rendering 10,000 nodes in DOM is slow.Solution:
+
+
+Rust Function: #[wasm_bindgen] pub fn render_graph(canvas_id: &str, data: &JsValue).
+
+Logic:
+
+Deserialize data (JSON Graph) into Rust structs.
+
+Run a "Force-Directed Layout" algorithm (simulation steps) in Rust.
+
+Use web-sys to get the CanvasRenderingContext2d.
+
+Draw lines (edges) and circles (nodes) directly to the canvas.
+
+React Integration: GraphView.tsx imports the WASM module and passes the JSON data fetched from core/intel.
+
+C. Simulation Console (src/components/Policies.tsx)
+Goal: Interface for the "Fire Drill" logic from Phase 6.Controls:
+
+
+Toggle Switch: "Enforcement Mode" vs "Simulation Mode".
+
+Button: "Run Dry Run Attack".
+
+Feedback: When clicked, call POST /api/v1/policy/simulate. Display the returned SimulationResult log in a distinct "Console Output" box.
+
+D. Security Integration
+Auth: Check for a valid Session Cookie or LocalStorage Token on app load. If missing, render <Login />.
+
+
+Redirect: Setup an Axios/Fetch interceptor to catch 401 errors and force a logout/redirect.
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Build Test: npm run build produces a static dist/ folder containing minified JS and the compiled .wasm binary.
+
+
+WASM Test: The Graph View renders 1,000 mock nodes in < 1 second (60fps smoothness).
+
+
+Integration Test: Clicking "Isolate Host" in the UI sends a valid CommandRequest payload to the Core API (verified via Network Tab).
+
+
+Security: Navigating to /dashboard without a token redirects immediately to /login.

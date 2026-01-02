@@ -1,0 +1,144 @@
+🧠 PROMPT 3: SCALABLE THREAT GRAPH & INTEL
+Role: Database Architect Target Path: /home/ransomeye/rebuild/core/intel/ Goal: Build the ransomeye-intel library, which manages the Threat Graph and Time-Series storage engine. Context: This module is responsible for storing and querying the relationships between entities (Files, IPs, Processes). It must handle massive scale (50,000 agents) by using Dynamic Connection Pooling (sizing the DB pool based on available RAM) and Time-Series Partitioning (splitting massive edge tables by day).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/intel/
+
+
+Workspace: You must add "core/intel" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+
+sqlx: Asynchronous Postgres driver (must enable runtime-tokio-rustls, postgres, chrono, uuid features).
+
+
+sys-info: For detecting available system RAM.
+
+
+num_cpus: For detecting available CPU cores.
+
+
+serde, serde_json: For serializing graph nodes.
+
+
+tokio: Async runtime.
+
+
+chrono: For time handling.
+
+
+uuid: For unique IDs.
+
+
+core/kernel: For loading database configuration.
+
+Security/Performance:
+
+Dynamic Tuning: Do not hardcode connection pool sizes. Calculate them at runtime: Pool Size = (Cores * 2) + Spindle_Factor, but cap based on RAM.
+
+
+Partitioning: The telemetry_edges table must be partitioned by day to prevent performance degradation over time.
+
+
+
+Streaming: Large data ingestions (like STIX feeds) must be streamed, not loaded entirely into RAM.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/intel/:
+
+Plaintext
+
+core/intel/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── tuning.rs               # Dynamic DB Pool Sizing Logic
+    ├── models.rs               # IOC and Graph Node Structs
+    ├── ingestion/              # Parsers for External Feeds
+    │   ├── mod.rs
+    │   ├── stix.rs             # STIX 2.1 Streaming Parser
+    │   ├── misp.rs             # MISP JSON Parser
+    │   └── feed_manager.rs     # Parallel Loader Orchestrator
+    └── graph/                  # Graph Database Logic
+        ├── mod.rs
+        ├── schema.rs           # SQL Schema & Partitioning Logic
+        ├── ops.rs              # Insert/Query Logic (Recursive CTEs)
+        └── query_optimizer.rs  # Query Builders
+
+
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Dynamic DB Tuning (src/tuning.rs)
+Function: pub fn configure_pool() -> sqlx::postgres::PgPoolOptions Logic:
+
+Detect Cores using num_cpus::get().
+
+Detect Total RAM using sys_info::mem_info().
+
+Formula:
+
+Base_Pool = Cores * 2.
+
+
+Constraint (Small Env): If RAM < 16GB, cap pool at 50 connections to save RAM for the graph itself.
+
+
+Constraint (Large Env): If RAM > 100GB, allow up to 400 connections.
+
+Return a configured PgPoolOptions struct.
+
+B. Partitioned Graph Schema (src/graph/schema.rs)
+Goal: Prevent the telemetry_edges table from becoming too slow. Logic:
+
+
+Global Tables: nodes (Static entities like Malware Families, CVEs) - No partition needed.
+
+
+Partitioned Tables: telemetry_edges (Who talked to whom) - Partition by Day.
+
+Example partitions: telemetry_edges_2025_12_23, telemetry_edges_2025_12_24.
+
+Migration Logic: Implement a function ensure_partitions_exist(pool: &PgPool) that runs on startup. It should check for and create partitions for the next 7 days.
+
+C. Graph Operations (src/graph/ops.rs)
+Goal: Efficiently query relationships. Logic:
+
+Batching: When inserting nodes, use batching logic.
+
+Large Env: Batch size = 5,000.
+
+Small Env: Batch size = 500.
+
+Recursive Lookup: Implement find_related(node_id) using Postgres Recursive CTEs (Common Table Expressions).
+
+This enables finding "Grand-parent" relations (e.g., File -> Hash -> Malware -> APT Group) in a single query.
+
+D. Streaming Ingestion (src/ingestion/stix.rs)
+Goal: Parse massive threat feeds without OOM. Logic:
+
+Use serde_json::StreamDeserializer to read input token-by-token.
+
+Parallelism:
+
+If Cores > 16: Spawn 4 worker threads to parse chunks in parallel.
+
+If Cores <= 4: Use single-threaded parsing to be polite to the CPU.
+
+Validation: If a record is malformed, log a WARN and drop ONLY that record. Do NOT abort the entire feed.
+
+4. ✅ ACCEPTANCE CRITERIA
+
+Scaling Test (Large): Mocking a 48-core/196GB system results in a DB Pool size of ~100-400 connections.
+
+
+Scaling Test (Small): Mocking a 2-core/4GB system results in a Pool size of < 50.
+
+
+Partitioning: Inserting a record with today's timestamp successfully lands in the correct telemetry_edges_YYYY_MM_DD table (verified via SQL check).
+
+
+Memory Safety: Parsing a large dummy STIX file (e.g., 2GB) does not cause RAM usage to spike massively (proving streaming works).
+
+Build: cargo build -p ransomeye-intel succeeds.

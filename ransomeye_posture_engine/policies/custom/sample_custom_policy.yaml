@@ -1,0 +1,33 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_posture_engine/policies/custom/sample_custom_policy.yaml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Sample custom policy definitions
+
+# Sample custom policies
+# Add your organization-specific policies here
+
+policies:
+  - policy_id: CUSTOM-001
+    name: High-risk process execution
+    description: Alert on high-risk process execution patterns
+    severity: high
+    enabled: true
+    check_logic:
+      type: pattern
+      pattern:
+        risk_level: high
+      fact_types: [privileged_execution]
+      categories: [host_hardening]
+    remediation: "Review and restrict high-risk process execution."
+
+  - policy_id: CUSTOM-002
+    name: Configuration drift threshold
+    description: Alert on excessive configuration changes
+    severity: medium
+    enabled: true
+    check_logic:
+      type: threshold
+      threshold: 3
+      fact_types: [configuration_drift]
+      categories: [drift_detection]
+    remediation: "Investigate configuration drift and establish change control."
+

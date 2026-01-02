@@ -1,0 +1,137 @@
+PROMPT 14: RELEASE GATE & GOLD MASTER VERIFICATION
+Role: QA Lead & Governance Officer Target Path: /home/ransomeye/rebuild/qa/ Goal: Build the ransomeye-auditor binary. Context: This is the final automated barrier before deployment. It runs a comprehensive suite of checks: Static Analysis (Clippy), Security Scans (Cargo Audit), License Verification (Phase 0), and a "Fire Drill" Integration Test. It enforces a "Zero Warning" policy. If the audit passes, it mints a cryptographically signed "Gold Master" manifest.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/qa/
+
+Workspace: You must add "qa/auditor" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+
+cargo_metadata: To scan the workspace structure.
+
+
+reqwest: To check external links/CVE databases.
+
+
+ring: To sign the final release manifest.
+
+
+serde, serde_json: To generate the manifest.
+
+
+tokio: Async runtime.
+
+Security/Performance:
+
+Strict Mode: The pipeline must run with cargo clippy -- -D warnings. Any warning is a fatal error.
+
+
+License Check: It must call the license_check tool built in Phase 0.
+
+Performance Check: It must check the binary size of core and agent. If core > 50MB, warn about bloat.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/qa/:
+
+Plaintext
+
+qa/
+├── Cargo.toml                  # Workspace entry for QA tools
+└── auditor/
+    ├── Cargo.toml
+    └── src/
+        ├── main.rs             # CLI Entrypoint
+        ├── checks/
+        │   ├── mod.rs
+        │   ├── static_analysis.rs  # Clippy, Fmt, Header Check
+        │   ├── security.rs         # Cargo Audit, License Check, Secret Scan
+        │   ├── performance.rs      # Binary Size, WASM optimization check
+        │   └── integration.rs      # "Fire Drill" (Dockerized E2E test)
+        └── report.rs           # Generates signed release_manifest.json
+3.⚙️ IMPLEMENTATION DETAILS
+A. Static Analysis & Hygiene (src/checks/static_analysis.rs)
+Logic:
+
+Format: Run cargo fmt -- --check. Fail if output is not empty.
+
+Clippy: Run cargo clippy -- -D warnings. Fail if exit code != 0.
+
+
+Headers: Execute the governance/tools/header_check binary from Phase 0. Fail if it returns error.
+
+B. Security Audit (src/checks/security.rs)
+Logic:
+
+License: Execute governance/tools/license_check. Fail on error.
+
+Vulnerabilities: Run cargo audit (requires cargo-audit installed or use library). Fail if CVEs found.
+
+Secrets: Simple regex scan of source code for high-entropy strings or keys (e.g., BEGIN PRIVATE KEY, AWS_ACCESS_KEY). Exclude tests/ folder.
+
+C. Build & Performance (src/checks/performance.rs)
+Logic:
+
+Build: Run cargo build --release.
+
+Size Check: Inspect target/release/ransomeye-core.
+
+If size > 50MB, print "⚠️ WARNING: Binary Bloat Detected".
+
+WASM Check: Inspect ui/dist/assets/*.wasm. Check if size > 5MB (implies debug info wasn't stripped).
+
+D. The "Fire Drill" (src/checks/integration.rs)
+Goal: Prove the system actually works. Logic:
+
+
+Setup: Spin up a temporary core process and a mock agent.
+
+
+Trigger: Inject a mock "Ransomware Detected" alert into the Bus.
+
+Verify:
+
+Did Core receive it?
+
+Did Policy Engine trigger?
+
+Did DB record the alert? 
+
+
+Teardown: Kill processes.
+
+E. The Golden Manifest (src/report.rs)
+Goal: Mint the Release. Logic:
+
+Collect Git Hash, Timestamp, and SHA256 hashes of all compiled binaries.
+
+Create JSON:
+
+JSON
+
+{
+  "version": "1.0.0",
+  "timestamp": "2025-12-23T10:00:00Z",
+  "auditor_verdict": "PASS",
+  "git_hash": "...",
+  "binaries": { ... }
+}
+
+Sign: Sign this JSON string using a Release_Private_Key.
+
+
+Output: Write release_manifest.json and release_manifest.json.sig.
+
+4. ✅ ACCEPTANCE CRITERIA
+Fail-Closed: Introduce a single unwrap() or unused variable in core. Run auditor. Assert it FAILS (due to Clippy).
+
+Security: Add a dependency with a known CVE. Run auditor. Assert it FAILS.
+
+
+Success: On a clean repo, auditor runs to completion, passes all checks, and generates a valid, signed release_manifest.json.
+
+
+Integration: The Fire Drill correctly identifies if the Core is broken (e.g., cannot connect to DB) and fails the release.

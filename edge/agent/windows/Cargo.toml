@@ -1,0 +1,54 @@
+# Path and File Name : /home/ransomeye/rebuild/ransomeye_windows_agent/Cargo.toml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Cargo manifest for Windows Agent - standalone telemetry sensor
+
+[package]
+name = "windows_agent"
+version = "0.1.0"
+edition = "2021"
+authors = ["nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU"]
+description = "RansomEye Windows Agent - Standalone host-based telemetry sensor (Phase 9C)"
+autobins = false
+autolib = false
+
+[[bin]]
+name = "agent-windows"
+path = "agent/src/main.rs"
+
+[lib]
+name = "agent_windows"
+path = "agent/src/lib.rs"
+
+[dependencies]
+# Core dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Cryptography - Ed25519 signing
+ed25519-dalek = { workspace = true }
+rand = "0.8"
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+# Concurrency
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+tokio = { workspace = true }
+
+# Windows-specific
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "processthreadsapi", "securitybaseapi", "winnls", "winreg", "winuser", "tlhelp32", "fileapi", "handleapi", "iphlpapi", "ws2def", "winsock2", "winerror", "minwinbase", "winnt", "evntrace", "evntprov"] }
+windows = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Diagnostics_Etw", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Registry", "Win32_System_IO", "Win32_Networking_WinSock"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio-test = "0.4"
+mockall = "0.12"
+hostname = "0.4"
+

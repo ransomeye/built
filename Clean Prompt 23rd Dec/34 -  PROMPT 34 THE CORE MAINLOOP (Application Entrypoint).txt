@@ -1,0 +1,125 @@
+PROMPT 34: THE CORE MAINLOOP (Application Entrypoint)
+Role: Chief Systems Architect & Rust Integration Lead Target Path: /home/ransomeye/rebuild/core/server/
+
+Goal: Build the ransomeye-core binary.Context: Up to this point, we have built libraries. This module builds the application. It is responsible for the Startup Sequence (Config -> DB -> Bus -> Engine -> API), Lifecycle Management (monitoring background threads like Forensics/Training), and Graceful Shutdown (ensuring the Audit Log is flushed before the process exits).
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/server/
+
+Workspace: You must add "core/server" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (The Kitchen Sink):
+
+You must import ALL core crates: core/kernel, core/db, core/bus, core/api, core/engine, core/intel, core/audit, core/forensics, core/trainer, core/licensing, core/governor, core/threat_feed.
+
+tokio: The Async Runtime (attributes: full).
+
+tracing: For structured logging.
+
+signal-hook: To catch SIGTERM/SIGINT.
+
+Startup Logic:
+
+Fail-Fast: If the DB Connection fails or the License is invalid, the server MUST exit immediately with a clear error message. It must not start in a "zombie" state.
+
+Banner: Print an ASCII Art banner + Version + Active Profile (e.g., "Massive") at startup.
+
+Shutdown Logic:
+
+When Ctrl+C is pressed, the server must Wait for active HTTP requests to finish and Flush the Audit Log queue before exiting.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/server/:
+
+Plaintext
+
+core/server/
+├── Cargo.toml                  # Depends on ALL core/* crates
+└── src/
+    ├── main.rs                 # The Tokio Entrypoint
+    ├── banner.rs               # ASCII Art & Version Info
+    ├── setup.rs                # Config Load, Logger Init, DB Connect
+    └── lifecycle.rs            # Thread Spawning & Graceful Shutdown
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The Main Entrypoint (src/main.rs)
+Logic:
+
+Rust
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // 1. Print Banner
+    banner::print();
+
+    // 2. Load Config & Init Trust Root
+    let config = core_kernel::load_config()?;
+    
+    // 3. Verify License (Phase 32)
+    core_licensing::verify_at_startup()?;
+
+    // 4. Connect Infrastructure
+    let db = core_db::connect(&config).await?;
+    let bus = core_bus::init(&config).await?;
+    let audit = core_audit::init(&config, db.clone()).await?;
+
+    // 5. Spawn Background Workers (Engine, Forensics, Threat Feed)
+    lifecycle::spawn_workers(bus.clone(), db.clone(), audit.clone());
+
+    // 6. Start API Server (Blocks until shutdown signal)
+    core_api::serve(config, bus, db, audit).await?;
+
+    Ok(())
+}
+B. Background Worker Manager (src/lifecycle.rs)
+Logic:
+
+Use tokio::spawn to launch the non-blocking services:
+
+Detection Engine (Phase 5).
+
+Forensics DNA Worker (Phase 15).
+
+Threat Feed Ingestor (Phase 18).
+
+Training Scheduler (Phase 24).
+
+Panic Guard: Wrap spawns in a monitor loop. If the "Detection Engine" task panics/dies, log a CRITICAL error and attempt to restart it (Self-Healing).
+
+C. Graceful Shutdown (src/lifecycle.rs)
+Logic:
+
+Listen for tokio::signal::ctrl_c().
+
+On signal:
+
+Log "Shutdown Signal Received...".
+
+Call core_api::stop().
+
+Call core_audit::flush().
+
+Log "Goodbye." and std::process::exit(0).
+
+4. ✅ ACCEPTANCE CRITERIA
+Compilation: cargo build -p ransomeye-core succeeds (proving all crate dependencies are correctly linked in the Workspace).
+
+Startup Test: Running the binary prints the Banner, connects to the Mock DB, and starts the API port (8080/9080).
+
+License Gate: Running the binary without a valid license.json causes it to exit with "License Invalid".
+
+Shutdown Test: Pressing Ctrl+C results in a clean log message "Shutdown Complete" rather than a hard crash.
+
+🏁 MISSION COMPLETE.
+You now have all 34 PROMPTS required to build RansomEye from scratch.
+
+Next Steps for You:
+
+Start with Prompt 0 (The Workspace Setup).
+
+Execute the prompts sequentially.
+
+Run the Phase 14 Auditor and Phase 27 Governance Gates frequently to ensure compliance.
+
+Would you like me to create a "Master Execution Script" (Bash) that automates the directory creation for all 34 prompts at once?

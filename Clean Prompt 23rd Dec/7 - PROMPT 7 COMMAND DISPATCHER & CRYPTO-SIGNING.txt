@@ -1,0 +1,123 @@
+PROMPT 7: COMMAND DISPATCHER & CRYPTO-SIGNING
+Role: Cryptography Engineer & Backend Developer Target Path: /home/ransomeye/rebuild/core/dispatch/Goal: Build the ransomeye-dispatch library, which routes commands to agents and enforces cryptographic signing.Context: Agents are configured to trust no one. They will reject any command that does not carry a valid Ed25519 signature from the Core. This module holds the Core Private Key. It receives abstract requests from the Policy Engine (Phase 6), checks if the target agent is online, signs the payload, and publishes it to the secure bus.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/dispatch/
+
+Workspace: You must add "core/dispatch" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+ring: For Ed25519 signing operations.
+
+dashmap: For thread-safe, high-concurrency tracking of online agents.
+
+prost: For serializing commands before signing.
+
+tokio: Async runtime.
+
+core/bus: For types (CommandRequest, Envelope) and publishing.
+
+core/kernel: For loading the RE_CORE_PRIVATE_KEY securely.
+
+Security/Performance:
+
+Mandatory Signing: Every command must be signed. NO exceptions.
+
+No Dummy Keys: The system must panic at startup if the Private Key is missing or malformed.
+
+Efficiency: The Router must handle 10,000 concurrent heartbeat updates without locking issues (hence DashMap).
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/dispatch/:
+
+Plaintext
+
+core/dispatch/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports
+    ├── signer.rs               # Ed25519 Signing Logic
+    ├── router.rs               # Connection Tracking (Who is online?)
+    ├── handler.rs              # Main Message Loop
+    └── error.rs                # DispatchError Enum
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Connection Tracking (src/router.rs)
+Goal: Know exactly which Agents are online to route commands efficiently.State: DashMap<String, AgentSession> where String is the AgentID.Struct:
+
+Rust
+
+pub struct AgentSession {
+    pub ip_address: String,
+    pub last_heartbeat: i64, // Unix Timestamp
+    pub version: String,
+    pub public_key: Vec<u8>, // For future bidirectional auth
+}
+Logic:
+
+Update: Listen to heartbeat.* on the Bus. On receipt, insert/update the AgentSession in the DashMap.
+
+Query: pub fn is_online(&self, agent_id: &str) -> bool.
+
+Return true if exists AND last_heartbeat > (now - 60s).
+
+Return false otherwise.
+
+B. Cryptographic Signing (src/signer.rs)
+Goal: Prove the command came from the Core.Logic:
+
+Load Key: On init, load RE_CORE_PRIVATE_KEY from core/kernel. Panic if missing.
+
+Sign Function: pub fn sign(&self, command: &CommandRequest) -> Result<Vec<u8>, DispatchError>
+
+Serialize the CommandRequest to bytes (using prost).
+
+Use ring::signature::KeyPair::sign() to generate the signature.
+
+Return the signature bytes.
+
+C. The Dispatch Loop (src/handler.rs)
+Input: Receives CommandRequest from Phase 6 (Policy).Logic:
+
+Routing Check: Call router.is_online(target_agent_id).
+
+If Offline: Log "Agent Offline", queue for retry (optional), or drop based on priority. Return Err(AgentOffline).
+
+If Online: Proceed.
+
+Signing: Call signer.sign(command).
+
+Packaging: Create a new Envelope.
+
+Attach the raw command.
+
+Attach the signature (add a signature field to the Envelope proto if not already present in Phase 2, or wrap the command in a SignedCommand proto).
+
+Publish: Send to topic agent.<agent_id>.command.
+
+4. ✅ ACCEPTANCE CRITERIA
+Crypto Test:
+
+Create a dummy command.
+
+Run it through signer::sign().
+
+Verify the output signature is valid using the corresponding Public Key (via ring::signature::UnparsedPublicKey::verify).
+
+Routing Test:
+
+Attempt to send a command to "Agent-X".
+
+router should return AgentOffline error.
+
+Simulate a heartbeat from "Agent-X".
+
+Retry command; router should succeed.
+
+Security Integration: The module panics at startup if core/kernel reports a missing Private Key.
+
+Concurrency: The router successfully handles simulated concurrent heartbeat updates from 1000 threads without deadlocking.
+
+Build: cargo build -p ransomeye-dispatch succeeds.

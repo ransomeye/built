@@ -1,0 +1,99 @@
+RANSOMEYE END USER LICENSE AGREEMENT (EULA)
+
+Path and File Name: /home/ransomeye/rebuild/ransomeye_operations/eula/EULA.txt
+Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+Details: End User License Agreement for RansomEye platform
+
+================================================================================
+RANSOMEYE END USER LICENSE AGREEMENT
+================================================================================
+
+IMPORTANT - READ CAREFULLY: This End User License Agreement ("EULA") is a legal
+agreement between you (either an individual or a single entity) and RansomEye
+for the RansomEye software product identified above, which includes computer
+software and may include associated media, printed materials, and "online" or
+electronic documentation ("SOFTWARE PRODUCT").
+
+By installing, copying, or otherwise using the SOFTWARE PRODUCT, you agree to
+be bound by the terms of this EULA. If you do not agree to the terms of this
+EULA, do not install or use the SOFTWARE PRODUCT.
+
+================================================================================
+1. GRANT OF LICENSE
+================================================================================
+
+Subject to the terms and conditions of this EULA, RansomEye grants you a
+limited, non-exclusive, non-transferable license to install and use the
+SOFTWARE PRODUCT on a single computer or server for your internal business
+purposes.
+
+================================================================================
+2. RESTRICTIONS
+================================================================================
+
+You may NOT:
+- Reverse engineer, decompile, or disassemble the SOFTWARE PRODUCT
+- Rent, lease, or lend the SOFTWARE PRODUCT
+- Use the SOFTWARE PRODUCT for any illegal purpose
+- Remove or alter any copyright, trademark, or proprietary notices
+- Share, distribute, or sublicense the SOFTWARE PRODUCT
+
+================================================================================
+3. DATA COLLECTION AND PRIVACY
+================================================================================
+
+The SOFTWARE PRODUCT collects and processes security telemetry data for threat
+detection and response purposes. By using the SOFTWARE PRODUCT, you consent to
+the collection, processing, and storage of such data in accordance with
+RansomEye's privacy policy.
+
+================================================================================
+4. WARRANTY DISCLAIMER
+================================================================================
+
+THE SOFTWARE PRODUCT IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+================================================================================
+5. LIMITATION OF LIABILITY
+================================================================================
+
+IN NO EVENT SHALL RANSOMEYE BE LIABLE FOR ANY SPECIAL, INCIDENTAL, INDIRECT, OR
+CONSEQUENTIAL DAMAGES WHATSOEVER ARISING OUT OF OR RELATED TO YOUR USE OR
+INABILITY TO USE THE SOFTWARE PRODUCT.
+
+================================================================================
+6. TERMINATION
+================================================================================
+
+This EULA is effective until terminated. Your rights under this EULA will
+terminate automatically without notice if you fail to comply with any of its
+terms.
+
+================================================================================
+7. GOVERNING LAW
+================================================================================
+
+This EULA shall be governed by and construed in accordance with the laws of
+the jurisdiction in which RansomEye operates.
+
+================================================================================
+ACCEPTANCE
+================================================================================
+
+By installing or using the SOFTWARE PRODUCT, you acknowledge that you have read
+this EULA, understand it, and agree to be bound by its terms and conditions.
+
+If you do not agree to the terms of this EULA, do not install or use the
+SOFTWARE PRODUCT.
+
+================================================================================
+Contact: Gagan@RansomEye.Tech
+Support: Gagan@RansomEye.Tech
+Website: https://RansomEye.Tech
+
+Copyright © RansomEye.Tech. All rights reserved.
+
+================================================================================
+

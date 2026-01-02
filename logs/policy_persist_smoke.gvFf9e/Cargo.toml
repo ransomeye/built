@@ -1,0 +1,8 @@
+[package]
+name = "ransomeye_policy_persist_smoke"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+policy = { path = "/home/ransomeye/rebuild/core/policy" }
+tracing-subscriber = { workspace = true }

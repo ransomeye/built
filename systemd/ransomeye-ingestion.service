@@ -1,0 +1,29 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-ingestion.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye HTTP Ingestion Server
+
+[Unit]
+Description=RansomEye HTTP Ingestion Server - Accepts Linux Agent and DPI Probe telemetry
+After=network.target postgresql.service
+Requires=network.target
+ConditionPathExists=/opt/ransomeye/modules/core/ingest/bin/ingest-http
+ConditionPathExists=/etc/ransomeye/ingestion.env
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/opt/ransomeye/modules/core/ingest
+ExecStart=/opt/ransomeye/modules/core/ingest/bin/ingest-http
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/etc/ransomeye/ingestion.env
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+{
+  "model_name": "risk_model",
+  "model_version": "1.0.0",
+  "model_hash": "e21b1bd9622c351c8d08513129287f1249d67138ee335f20200b2e9bc7c69ca9",
+  "model_size_bytes": 1055801,
+  "signature": "D1xPQ7gW2ImnbMx8/MzrviuSqLaPqyTFpbJgd5nD6/LxiwJM5aC0Otw+MiWx3i5l+5XK6stjbSaor1p9dJqQxUfOSIu7CfnfQE4goXY6A9f4edpp2xflZcY5NLjpx6gFNyX/uCNWThLW4I37hXAcioyH+JBnYJhDgdaFKQ1U7/fM2xjOZhVwC2X0NKtMKfSnjOBysT2y7qcP1zN5SxZIEyqhPr0aZ8q4bJFFp8d/fLvK5tvtxxdr2KjTouGTMoS7pgzOwrbMGScp0Wz+pCkLEA1g8cRsUv/ycTJGmBZ3bvGbn9lmgFVH7co2eHcgkl7+2rHrX/2M9Vn79PV9XSLCFbuI4tqJGqIo8wrYaZCDgUm01aOZE2mYC0W+T4iYfSAn89m/v5eTZ4OlZIk1rjlXVwCgUp9ANB3HBVHscVDMtfrdsXsmLqBotJxd2I+3VJfvt6HODGdiHd63CUHfgXDmUtf7xV1GIziRuYk6nIfLswlXbzqPlpa3deln2Wdqm/i5UZ5G8hSNmAQFh6yqSt/sP7pdt/e4HogWWw+o7V8Yj/0HHhVoaOaJa+SHjN/ebbxIe3imkBoeb3883YGBW7PD87K23bVWh6tebkx5QJMBTqFSHSQjA8KaeToV3LpSOlnMk5NwuHuyDkyUL9Jxfth9l7O6g39SdMVCt8LIBSKtc9E=",
+  "trained_on": "2025-12-30T11:48:39.830633Z",
+  "model_type": "RandomForestClassifier",
+  "features": [
+    "network_connections",
+    "file_operations",
+    "process_creations",
+    "registry_modifications",
+    "network_bytes_sent",
+    "network_bytes_received",
+    "cpu_usage",
+    "memory_usage",
+    "disk_io",
+    "suspicious_strings"
+  ]
+}

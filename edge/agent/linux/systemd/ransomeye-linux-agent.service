@@ -1,0 +1,90 @@
+# Path and File Name : /home/ransomeye/rebuild/edge/agent/linux/systemd/ransomeye-linux-agent.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Linux Agent (STANDALONE)
+# CRITICAL: This is a STANDALONE module - NOT part of Core
+# RUNTIME: Uses /opt/ransomeye-linux-agent (NOT /opt/ransomeye)
+# USER: Runs as ransomeye-agent (NOT ransomeye)
+
+[Unit]
+Description=RansomEye Linux Agent - Host telemetry collection (Standalone)
+After=network.target
+Requires=network.target
+ConditionPathExists=/opt/ransomeye-linux-agent
+ConditionPathExists=/opt/ransomeye-linux-agent/bin/ransomeye_linux_agent
+ConditionPathExists=/etc/ransomeye/agent.env
+
+[Service]
+Type=notify
+# Rootless runtime enforcement - run as ransomeye-agent user (STANDALONE)
+User=ransomeye-agent
+Group=ransomeye-agent
+WorkingDirectory=/opt/ransomeye-linux-agent
+RuntimeDirectory=ransomeye-linux-agent
+StateDirectory=ransomeye-linux-agent
+ExecStart=/opt/ransomeye-linux-agent/bin/ransomeye_linux_agent
+# Watchdog timer - service must send heartbeat every 30 seconds
+WatchdogSec=30
+# Restart on failure (anti-kill protection)
+Restart=always
+RestartSec=10
+# Restart on watchdog timeout
+RestartForceExitStatus=143
+# Maximum restart attempts before escalation
+StartLimitIntervalSec=300
+StartLimitBurst=5
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits (prevent swap usage)
+LimitNOFILE=65536
+LimitNPROC=4096
+# NO swap allowed - hard limit
+MemoryMax=2G
+MemorySwapMax=0
+
+# Security hardening - Rootless runtime enforcement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ransomeye-linux-agent /var/lib/ransomeye-linux-agent /run/ransomeye-linux-agent /etc/ransomeye-linux-agent
+ReadOnlyPaths=/etc/ransomeye
+
+# Additional hardening
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateDevices=false
+# Allow network access but restrict listeners
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Capability-based privileges (no root required)
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_NET_RAW CAP_NET_ADMIN
+AmbientCapabilities=
+PrivateUsers=false
+
+# Memory policy (NO swap)
+# Systemd will enforce MemorySwapMax=0 above
+# Additional protection via mlock (if needed by binary)
+
+# Environment variables (canonical path)
+EnvironmentFile=/etc/ransomeye/agent.env
+
+# Kill settings - fail-closed on kill attempts
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# Send alert on unexpected termination
+TimeoutStartSec=60
+
+# Privilege downgrade is handled by the binary itself
+# Binary starts as root (SetUID) and drops to unprivileged user
+
+[Install]
+WantedBy=multi-user.target

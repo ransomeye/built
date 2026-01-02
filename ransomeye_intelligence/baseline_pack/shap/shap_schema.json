@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "shap_format": "json",
+  "required_fields": [
+    "model_name",
+    "inference_id",
+    "timestamp",
+    "base_value",
+    "shap_values",
+    "feature_names",
+    "feature_values",
+    "prediction",
+    "explanation"
+  ],
+  "shap_values_format": {
+    "type": "array",
+    "items": {
+      "type": "number"
+    },
+    "description": "SHAP values for each feature, one per feature"
+  },
+  "validation_rules": {
+    "shap_values_length": "Must match number of features",
+    "feature_names_length": "Must match number of features",
+    "feature_values_length": "Must match number of features",
+    "base_value": "Must be a number",
+    "prediction": "Must be a number or array",
+    "explanation": "Must be a non-empty string"
+  },
+  "example": {
+    "model_name": "ransomware_behavior.model",
+    "inference_id": "inf_1234567890",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "base_value": 0.5,
+    "shap_values": [0.1, -0.2, 0.3, -0.1, 0.05],
+    "feature_names": ["file_entropy", "process_tree_depth", "network_connections", "registry_modifications", "file_encryption"],
+    "feature_values": [7.2, 3, 5, 2, 1],
+    "prediction": 0.85,
+    "explanation": "High confidence ransomware detection based on file encryption patterns and process tree anomalies"
+  }
+}
+

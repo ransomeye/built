@@ -1,0 +1,114 @@
+PROMPT 32: ENTERPRISE LICENSING ENGINE (Offline DRM)
+Role: Cryptography Engineer & Backend Developer Target Path: /home/ransomeye/rebuild/core/licensing/
+
+Goal: Build the ransomeye-license crate.Context: The software must enforce usage limits (e.g., "Max 500 Agents", "Expires 2026-12-31") without requiring an internet connection. This module implements the logic to Verify these signed capabilities at runtime. It also includes a CLI tool for you (the vendor) to Issue new keys.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/licensing/
+
+Workspace: Add "core/licensing" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+ring: For Ed25519 signature verification.
+
+serde, serde_json: For the license struct.
+
+base64: For encoding the license string.
+
+chrono: For checking expiration dates.
+
+sysinfo: For "Node Locking" (checking Machine ID/CPU ID).
+
+Security Model:
+
+Offline Verification: The Core embeds the Vendor_Public_Key. It never stores the Private Key.
+
+Grace Period: If a license expires, the system should enter "ReadOnly Mode" (Alerts visible, but no new Agents allowed) rather than shutting down completely.
+
+Tamper Proof: Modifying 1 byte of the license JSON must invalidate the signature.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/licensing/:
+
+Plaintext
+
+core/licensing/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Exports LicenseVerifier
+    ├── models.rs               # License Structs (Claims)
+    ├── crypto.rs               # Signature Verification Logic
+    ├── hardware_id.rs          # Fingerprinting (CPU+MacAddr)
+    └── bin/
+        └── keygen.rs           # CLI tool for YOU to generate licenses
+3. ⚙️ IMPLEMENTATION DETAILS
+A. The License Model (src/models.rs)
+Struct:
+
+Rust
+
+#[derive(Serialize, Deserialize)]
+pub struct LicenseClaims {
+    pub customer: String,       // e.g., "Ministry of Defence"
+    pub issued_at: i64,
+    pub expires_at: i64,
+    pub max_agents: u32,        // Quota Limit
+    pub features: Vec<String>,  // e.g., ["AI_TRAINING", "DPI_PROBE"]
+    pub node_lock: Option<String>, // Optional Hardware ID hash
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LicenseFile {
+    pub claims: LicenseClaims,
+    pub signature: String,      // Base64 encoded Ed25519 signature
+}
+B. The Verifier (src/lib.rs / src/crypto.rs)
+Logic:
+
+Load: Read license file (JSON).
+
+Serialize: Convert claims to canonical JSON string.
+
+Verify: ring::signature::UnparsedPublicKey::verify(VENDOR_PUB_KEY, json_bytes, signature_bytes).
+
+Checks:
+
+now() < expires_at? If no -> Err(Expired).
+
+active_agents <= max_agents? If no -> Err(QuotaExceeded).
+
+If node_lock is present, does it match hardware_id::get_machine_id()?
+
+C. The Issuer CLI (src/bin/keygen.rs)
+Usage: cargo run --bin keygen -- --customer "Govt India" --days 365 --agents 1000Logic:
+
+Load VENDOR_PRIVATE_KEY (from local file/env, NEVER committed to git).
+
+Construct LicenseClaims.
+
+Sign the claims using the Private Key.
+
+Output the JSON LicenseFile.
+
+D. Hardware Fingerprinting (src/hardware_id.rs)
+Logic:
+
+Combine Machine ID (from /etc/machine-id) + MAC Address of primary interface.
+
+Hash with SHA256.
+
+This prevents the customer from copying one license.json to 50 different servers.
+
+4. ✅ ACCEPTANCE CRITERIA
+Generation Test: The CLI tool generates a JSON license file that passes verification.
+
+Tamper Test: Manually changing "max_agents": 1000 to 2000 in the JSON file causes verification to fail (Signature Mismatch).
+
+Expiry Test: A license with expires_at in the past returns Err(LicenseExpired).
+
+Hardware Lock: A Node-Locked license generated for Machine A fails validation when verified on Machine B (different MAC/Machine ID).
+
+Build: cargo build -p ransomeye-license succeeds.

@@ -1,0 +1,37 @@
+# Path and File Name : /home/ransomeye/rebuild/core/network_scanner/Cargo.toml
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Cargo manifest for Phase 9 Network Scanner
+
+[package]
+name = "ransomeye_network_scanner"
+version = "1.0.0"
+edition = "2021"
+authors = ["RansomEye Team"]
+description = "Phase 9: Network Scanner - Active and passive network discovery with rate limiting and signed results"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+base64 = { workspace = true }
+ring = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = "0.1"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "chrono", "uuid"] }
+parking_lot = { workspace = true }
+hex = { workspace = true }
+ipnetwork = "0.20"
+dns-lookup = "2.0"
+regex = "1.10"
+serde_yaml = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.0"
+mockall = "0.12"
+

@@ -1,0 +1,146 @@
+PROMPT 11: DYNAMIC INSTALLER, OS TUNING & RESOURCE GOVERNOR
+Role: Systems Reliability Engineer (SRE) & Linux Kernel Specialist Target Path: /home/ransomeye/rebuild/core/installer/ Goal: Build the ransomeye-installer binary. Context: This binary runs during installation and updates. It must Profile the Hardware (detect RAM/CPU) to apply the correct tuning (Small vs. Massive). It handles Single-Box Isolation (using cgroups to prevent the Network Probe from starving the Database CPU) and manages Atomic Updates (A/B partitioning or Symlink swapping) to ensure zero downtime or broken states.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/installer/
+
+Workspace: You must add "core/installer" to the [workspace.members] list in the root Cargo.toml.
+
+Dependencies (Strict):
+
+sys-info: For hardware detection.
+
+num_cpus: For core counting.
+
+cgroups-rs: For creating resource isolation groups (Linux Control Groups).
+
+fs2: For disk space checks.
+
+flate2, tar: For unpacking update packages.
+
+ring: For verifying update signatures.
+
+semver: For version comparison.
+
+core/kernel: For Trust Root keys.
+
+Security/Performance:
+
+Dynamic Tuning: DO NOT hardcode buffer sizes or connection limits. They must be calculated based on the detected hardware profile.
+
+Atomic Updates: Updates must be applied to a "Next" directory and swapped atomically. If the new version fails a health check, it must Auto-Rollback within 60 seconds.
+
+Isolation: On a single box running both Core and DPI, you MUST use cgroups to pin them to different CPU cores.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/installer/:
+
+Plaintext
+
+core/installer/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── main.rs                 # CLI Entrypoint
+    ├── lib.rs                  # Exports
+    ├── tuning/
+    │   ├── mod.rs
+    │   ├── hardware.rs         # Detect CPU/RAM/Disk/Topology
+    │   ├── profile.rs          # Logic: Small, Medium, or Massive?
+    │   ├── swap.rs             # Dynamic Swap Enforcement
+    │   ├── sysctl.rs           # Kernel Parameter Tuning (sysctl.conf)
+    │   └── isolation.rs        # CPU Pinning (cgroups)
+    ├── install_logic.rs        # Systemd & DB Setup
+    ├── update/
+    │   ├── mod.rs
+    │   ├── verify.rs           # Signature Check
+    │   ├── apply.rs            # Atomic Symlink Swap
+    │   └── rollback.rs         # Disaster Recovery
+    └── package.rs              # .reup File Format Definition
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Dynamic Hardware Profiling (src/tuning/profile.rs)
+Logic:
+
+Get RamGB and CpuCores.
+
+Determine Profile:
+
+Profile::Small: RAM < 16GB (Target: 100 Agents).
+
+Profile::Medium: RAM 16-64GB (Target: 5k Agents).
+
+Profile::Massive: RAM > 64GB (Target: 50k Agents).
+
+Output: Return a SystemConfig struct with target values (Swap size, Buffer sizes, DB Connections).
+
+B. Single-Box Resource Isolation (src/tuning/isolation.rs)
+Problem: On a single machine, 40Gbps DPI traffic interrupts the CPU so often that the Database slows down. Solution: CPU Pinning (Affinity). Logic:
+
+Check if ransomeye-dpi and ransomeye-core are both enabled.
+
+If YES (Single Box):
+
+DPI Group: Assign to CPU Cores 0 to (Cores/2 - 1) (The first half).
+
+Core/DB Group: Assign to CPU Cores (Cores/2) to (Cores - 1) (The second half).
+
+Implementation: Use cgroups-rs to create /sys/fs/cgroup/cpu/ransomeye_dpi and set cpuset.cpus.
+
+C. Dynamic Swap Enforcement (src/tuning/swap.rs)
+Goal: Prevent OOM kills during massive burst loads. Logic:
+
+Target Calculation:
+
+Small: 8GB.
+
+Medium: 16GB.
+
+Massive: 32GB.
+
+Safety Check: Check fs2::free_space. If Free < TargetSwap + 5GB, Log WARNING and reduce Swap allocation to Free / 2.
+
+Action: Execute fallocate, chmod 600, mkswap, swapon.
+
+D. Kernel Parameter Tuning (src/tuning/sysctl.rs)
+Logic:
+
+Generate /etc/sysctl.d/99-ransomeye.conf.
+
+Massive Profile Rules:
+
+fs.file-max = 1,000,000 (For 50k sockets).
+
+net.core.rmem_max = 33,554,432 (32MB Read Buffer for zero-loss capture).
+
+vm.swappiness = 10 (Prefer RAM).
+
+Apply: sysctl -p.
+
+E. Secure Atomic Updates (src/update/)
+Package: .reup (Signed, Encrypted ChaCha20, Versioned). Apply Logic (apply.rs):
+
+Verify Signature (Ed25519) against Core Trust Root.
+
+Unpack to /opt/ransomeye/next/.
+
+Stop Services.
+
+Symlink Swap: ln -sfn /opt/ransomeye/next /opt/ransomeye/current.
+
+Start Services.
+
+Health Check: Poll localhost:4000/health.
+
+Auto-Rollback: If Health Check fails or times out (60s), revert symlink and restart old version.
+
+4. ✅ ACCEPTANCE CRITERIA
+Profiling Test: On a mock 4GB RAM VM, the installer detects Profile::Small, sets 4MB network buffers, and creates 8GB Swap.
+
+Massive Scale Test: On a 196GB RAM server, it detects Profile::Massive, sets 32MB network buffers, and creates 32GB Swap.
+
+Isolation Test: On a machine running both Core and DPI, checking /proc/<dpi_pid>/status shows Cpus_allowed_list matches the first half of available cores.
+
+Rollback Test: Installing a broken binary (mocked to exit immediately) triggers an automatic rollback to the previous version within 60 seconds.
+
+Build: cargo build -p ransomeye-installer succeeds.

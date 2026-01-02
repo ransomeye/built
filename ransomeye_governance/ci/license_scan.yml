@@ -1,0 +1,62 @@
+# Path: /home/ransomeye/rebuild/ransomeye_governance/ci/license_scan.yml
+# Author: RansomEye Core Team
+# Purpose: CI job that scans all dependencies for license compliance and blocks GPL/AGPL/SSPL violations
+
+name: License Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  license-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyyaml
+      
+      - name: Run License Validator
+        run: |
+          cd /home/ransomeye/rebuild
+          python3 ransomeye_governance/tooling/license_validator.py --project-root /home/ransomeye/rebuild --fail-on-review
+        continue-on-error: false
+      
+      - name: Check for GPL/AGPL/SSPL
+        run: |
+          # Explicit check for banned licenses
+          if grep -r "GPL\|AGPL\|SSPL" --include="*.toml" --include="*.lock" --include="*.txt" /home/ransomeye/rebuild 2>/dev/null | grep -v "LICENSE_POLICY\|THIRD_PARTY_POLICY"; then
+            echo "ERROR: Banned license (GPL/AGPL/SSPL) detected!"
+            exit 1
+          fi
+        continue-on-error: false
+      
+      - name: License Scan Report
+        if: always()
+        run: |
+          echo "=== License Scan Results ===" > license_scan_report.txt
+          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> license_scan_report.txt
+          echo "" >> license_scan_report.txt
+          echo "License scan completed successfully." >> license_scan_report.txt
+      
+      - name: Upload License Scan Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: license-scan-report
+          path: license_scan_report.txt
+

@@ -1,0 +1,47 @@
+{
+  "customer_data_used": false,
+  "data_privacy": "no_pii",
+  "data_sources": [
+    {
+      "description": "Synthetic ransomware behavior patterns",
+      "samples": 100000,
+      "source": "synthetic_data_generator",
+      "type": "synthetic"
+    },
+    {
+      "description": "Red team exercise data",
+      "samples": 50000,
+      "source": "redteam_exercises",
+      "type": "redteam"
+    }
+  ],
+  "no_customer_data": true,
+  "reproducibility": {
+    "dependencies_hash": "sha256:dd85660b76a3bdf11221d4ba4f71d8b1e8b670a6b7efdc802a08a4b4bbdd1d0d",
+    "environment": "docker:ransomeye-training:1.0.0",
+    "python_version": "3.10",
+    "random_seed": 42
+  },
+  "signature": {
+    "algorithm": "RSA-4096-PSS-SHA256",
+    "signature": "iRDq9+pymYS2sk/+dBPRDjs/7SRANu3/gdCiL6+z4jgwlRputDTUnomwsyxttPxlwW8orzstZVvZstLjgVqorDcKIV2UUl8pPZi8zS2h3XQy0BLYo0dF/4WfgOMDzs590v67Omg1hsOF1JmnDJMwmHSIqQAkkkDHVxXHR6L/mHzD87TpbsBz2HI4uxJ4rQRQv7ivx9gkN3U64p5D3+U2x030d3Kps5FuFBANy6EKw0rR69Mr5fqzQRAZG37+FKWC69AIu1RTKGvFvuiCtHl4KNAd9BPT67ooMPldJi/Gn6xZvJuDPya2+zrBcYFvLH4bWrhAXzEXGV+BOQDT9fulpPVDOE35iFCh+3eaMRsCOxwRbdfgyGTxbf9emNossTjAIy08gkJ5UJ4Ohu1AceAKH3HJTWVuO74+SgV/9JGFTJrzo4b+uTCVCwqbebuwmKxiIbOmFkpM3/AUW7cfNTsVsr7paXLtJkq4nY5CI5h+W+zn3fbhyNB/IztgSDTqb7P6DzR1UfWIRSWJ449JTlsULpncu+1e8URvgEKJVhF/1gM/4LV6qAo3XBMlDp00Nk8REZu9pLlC/7mTSt0pkq1gNd97CFrJUWP1SiBGGBSq293391IZLn72xNF5huTYgQJSNkOpUp6J952QAAuIyCoCQvFk6KffHP5/mJgXOSx5XCw=",
+    "signer": "ransomeye_training_system",
+    "timestamp": "2025-12-31T08:30:31.310314Z"
+  },
+  "signer": "policy",
+  "training_artifacts": [
+    "models/ransomware_behavior.model",
+    "models/anomaly_baseline.model",
+    "models/confidence_calibration.model",
+    "shap/baseline_shap_values.json"
+  ],
+  "training_date": "2025-12-22T08:11:31.332169Z",
+  "training_manifest_version": "1.0.0",
+  "training_methodology": "synthetic_and_redteam",
+  "training_parameters": {
+    "cross_validation_folds": 5,
+    "random_seed": 42,
+    "train_test_split": 0.8,
+    "validation_split": 0.1
+  }
+}

@@ -1,0 +1,92 @@
+🧱 PHASE 0: PROJECT SKELETON, LEGAL GOVERNANCE & PREFLIGHT
+
+Role: Lead Architect & Security Compliance Officer
+Target Environment: Linux (Ubuntu 22.04+ / RHEL 8+)
+Root Path: /home/ransomeye/rebuild/
+
+1. 🛑 CRITICAL ARCHITECTURAL CONSTRAINTS
+
+Monorepo Structure: Use a Rust Workspace. Every crate directory and crate name MUST start with ransomeye_.
+
+Fail-Closed Governance: The build tools created here must exit with exit(1) if any violation (GPL license, missing header, or low swap) is detected.
+
+No Exceptions: Do not use unwrap() or expect() in the governance tools; implement proper error handling with anyhow or thiserror.
+
+2. 📂 DIRECTORY STRUCTURE TO CREATE
+
+/home/ransomeye/rebuild/
+├── .gitignore                  # Standard Rust/Node gitignore + .env
+├── Cargo.toml                  # Workspace Root Manifest
+├── governance/
+│   └── ransomeye_governor_tools/
+│       ├── Cargo.toml
+│       └── src/
+│           └── bin/
+│               ├── license_check.rs # Dependency Auditor
+│               ├── header_check.rs  # Copyright Header Enforcer
+│               └── preflight.rs     # 16GB Swap & Resource Verifier
+├── core/                       # (Placeholder for backend crates)
+├── edge/                       # (Placeholder for agent/probe crates)
+├── ops/                        # (Placeholder for SRE crates)
+└── ui/                         # (Placeholder for console/wasm crates)
+
+
+3. ⚙️ COMPONENT SPECIFICATIONS
+
+A. Root Workspace (Cargo.toml)
+
+Resolver: 2
+
+Members: "governance/ransomeye_governor_tools", "core/ransomeye_kernel", "core/ransomeye_bus", "core/ransomeye_db", "core/ransomeye_api", "core/ransomeye_intel", "core/ransomeye_ingest", "core/ransomeye_engine", "core/ransomeye_policy", "core/ransomeye_dispatch", "core/ransomeye_ai", "core/ransomeye_forensics", "core/ransomeye_narrative", "core/ransomeye_governor", "core/ransomeye_threat_feed", "core/ransomeye_trainer", "core/ransomeye_audit", "core/ransomeye_server", "edge/ransomeye_agent", "edge/ransomeye_dpi", "edge/ransomeye_sentinel", "edge/ransomeye_loader", "ops/ransomeye_tuner", "ops/ransomeye_portguard", "ops/ransomeye_ops_cli", "ui/ransomeye_wasm"
+
+B. Governor Tools (governance/ransomeye_governor_tools/Cargo.toml)
+
+Dependencies:
+
+cargo_metadata = "0.23" (For dependency tree auditing)
+
+toml = "0.8" (For manifest parsing)
+
+walkdir = "2.5" (For header scanning)
+
+colored = "3.0" (For terminal feedback)
+
+sysinfo = "0.33" (For hardware/swap verification)
+
+C. Tool Logic: license_check.rs
+
+Initialize cargo_metadata::MetadataCommand.
+
+Iterate through every package in the workspace and their dependencies.
+
+Blocked List: If package.license contains GPL, AGPL, SSPL, or Commons Clause, print a RED [VIOLATION] message with the package name and exit with code 1.
+
+Clean: If all pass, print GREEN [PASSED] Legal Compliance.
+
+D. Tool Logic: header_check.rs
+
+Target Header: // Copyright (c) RansomEye. Proprietary & Confidential.
+
+Scan root recursively for files ending in .rs, .ts, .tsx, .py.
+
+Verify the first line matches the target header exactly.
+
+Failure: Exit with code 1 and list all offending files in Red.
+
+E. Tool Logic: preflight.rs
+
+Swap Check: Use sysinfo to verify total_swap. If < 16,000,000,000 (16GB), print [CRITICAL] System requires 16GB SWAP for production stability and exit 1.
+
+Permission Check: Verify write access to /home/ransomeye/rebuild/.
+
+Tool Check: Verify cargo and npm are in the PATH.
+
+4. ✅ ACCEPTANCE CRITERIA FOR CURSOR
+
+Running cargo build at the root succeeds.
+
+The directory names and Cargo.toml names are perfectly aligned with the ransomeye_ prefix.
+
+Running cargo run --bin preflight successfully detects if the system meets the 16GB swap requirement.
+
+Running cargo run --bin header_check fails if a new file is added without the RansomEye copyright.

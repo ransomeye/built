@@ -1,0 +1,51 @@
+[package]
+name = "agent-linux"
+version = "0.1.0"
+edition = "2021"
+authors = ["nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU"]
+description = "RansomEye Linux Agent - Host-based telemetry sensor (standalone)"
+
+[[bin]]
+name = "agent-linux"
+path = "agent/src/main.rs"
+
+[lib]
+name = "agent_linux"
+path = "agent/src/lib.rs"
+
+[dependencies]
+ed25519-dalek = { workspace = true }
+rand = "0.8"
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+hostname = "0.4"
+libc = "0.2"
+nix = "0.27"
+audit = { version = "0.6", optional = true }
+bpf-sys = { version = "0.3", optional = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+crossbeam-channel = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
+url = "2.4"
+ring = "0.17"
+pkcs8 = "0.10"
+der = "0.7"
+spki = "0.7"
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = []
+bpf = ["dep:bpf-sys"]
+audit = ["dep:audit"]

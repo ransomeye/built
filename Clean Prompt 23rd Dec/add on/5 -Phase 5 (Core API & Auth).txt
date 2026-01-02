@@ -1,0 +1,123 @@
+Here is Phase 5 of 11: Core API & Authentication.
+
+Copy and paste the prompt below into your IDE or AI coding assistant to continue the build.
+
+Role: Backend Lead & Security Architect Target Path: /home/ransomeye/rebuild/core/ransomeye_api/ Goal: Build the REST API Gateway using axum. This is the entry point for the UI and CLI. Critically, it implements JWT Authentication immediately to ensure no "insecure default" state exists.
+
+Context: The API binds to Port 8000 (to avoid conflict with the Agent on 8080). It connects to ransomeye_db to verify credentials against the users table created in Phase 2. It issues JWTs that must be presented in the Authorization: Bearer header for all protected routes.
+
+1. 🛑 HARD CONSTRAINTS (MUST OBEY)
+Directory Standards:
+
+Root: /home/ransomeye/rebuild/core/ransomeye_api/
+
+Workspace: This crate must be reachable as ransomeye_api.
+
+Dependencies (Strict):
+
+axum: Web framework.
+
+tokio: Async runtime.
+
+tower-http: For CORS and Tracing middleware.
+
+serde, serde_json: JSON handling.
+
+jsonwebtoken: For minting and validating tokens.
+
+bcrypt: For verifying password hashes.
+
+utoipa: For auto-generating OpenAPI documentation (Swagger).
+
+ransomeye_db, ransomeye_kernel, ransomeye_bus: Internal dependencies.
+
+Security/Governance:
+
+
+Port: Must bind to 8000.
+
+
+
+Fail-Closed Auth: All routes (except /health and /login) MUST require a valid JWT.
+
+Password Storage: Never log passwords. Use bcrypt for verification.
+
+2. 📂 DIRECTORY STRUCTURE & FILES
+Create exactly this structure under /home/ransomeye/rebuild/core/ransomeye_api/:
+
+Plaintext
+
+/home/ransomeye/rebuild/core/ransomeye_api/
+├── Cargo.toml                  # Dependencies
+└── src/
+    ├── lib.rs                  # Server Entrypoint & Router
+    ├── auth.rs                 # JWT Logic & Middleware
+    ├── error.rs                # ApiError Enum
+    └── routes/
+        ├── mod.rs
+        ├── health.rs           # Public Health Check
+        └── auth_routes.rs      # Login Handler
+3. ⚙️ IMPLEMENTATION DETAILS
+A. Authentication Logic (src/auth.rs)
+Struct: pub struct Claims { sub: String, role: String, exp: usize }
+
+Logic:
+
+Token Generation: pub fn sign(user_id: String, role: String, secret: &[u8]) -> String.
+
+Create a JWT expiring in 8 hours.
+
+Password Check: pub fn verify_password(hash: &str, password: &str) -> bool using bcrypt.
+
+Middleware: Implement an Axum extractor or middleware layer that checks the Authorization header. If missing/invalid, return 401 Unauthorized immediately.
+
+B. Route Handlers (src/routes/auth_routes.rs)
+Handler: pub async fn login(State(state): State<AppState>, Json(payload): Json<LoginRequest>) -> Result<Json<LoginResponse>, ApiError>
+
+Logic:
+
+Query ransomeye_db::users for the username.
+
+If not found -> Return 401 (Don't reveal "User not found").
+
+Verify password hash.
+
+If valid, generate JWT using auth::sign.
+
+Return { token: "..." }.
+
+C. The Server (src/lib.rs)
+Function: pub async fn serve(config: AppConfig, db: PgPool, bus: BusClient) -> Result<(), ApiError>
+
+Logic:
+
+Router:
+
+/api/v1/health -> routes::health::check (Public).
+
+/api/v1/login -> routes::auth_routes::login (Public).
+
+/api/v1/secure/* -> Protected Routes (require Auth Middleware).
+
+Middleware: Add CorsLayer::permissive() (for development) and TraceLayer.
+
+Bind: TcpListener::bind(format!("0.0.0.0:{}", 8000)).
+
+Loop: axum::serve(listener, app).await.
+
+4. ✅ ACCEPTANCE CRITERIA
+Build Check: cargo build -p ransomeye_api succeeds.
+
+Health Check: curl http://localhost:8000/api/v1/health returns 200 OK.
+
+Login Flow:
+
+Seed a dummy user in the DB (hash "password123").
+
+POST /login with correct creds returns a JWT.
+
+POST /login with wrong creds returns 401.
+
+Protection Test: Accessing a protected route without a Bearer token returns 401 Unauthorized.
+
+Port Check: The server logs "Listening on 0.0.0.0:8000".

@@ -1,0 +1,14 @@
+{
+  "name": "vocabulary.pkl",
+  "version": "1.0.0",
+  "type": "vocabulary",
+  "description": "TF-IDF vocabulary and IDF scores for RAG index",
+  "trained_on": "2025-12-23T00:00:00Z",
+  "hash": "sha256:6bf07d3160aae6f568df44fc33e5d2d933765adaa35a0602ab45efada666f097",
+  "training_script": "build_rag_index_simple.py",
+  "features": ["vocabulary", "idf_scores"],
+  "model_type": "vocabulary_dict",
+  "signature": "",
+  "signature_hash": ""
+}
+

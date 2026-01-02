@@ -1,0 +1,25 @@
+{
+  "test_name": "missing_trust_material",
+  "timestamp": "2025-12-30T08:32:02Z",
+  "expected_behavior": {
+    "orchestrator_startup_aborts": true,
+    "systemd_service_failed": true,
+    "clear_error_in_journal": true,
+    "no_restart": true
+  },
+  "observed_behavior": {
+    "service_status": "failed
+failed",
+    "exit_code": "1",
+    "restart_count": "0",
+    "failure_detection_time_seconds": ".362379885",
+    "error_visible_in_journal": true
+  },
+  "test_results": {
+    "failed_correctly": false,
+    "exit_code_correct": true,
+    "no_restart": true,
+    "error_visible": true
+  },
+  "pass": false
+}
