@@ -190,23 +190,24 @@ async fn handle_linux_ingest(
     let uid = data.get("uid").and_then(|v| v.as_u64()).map(|v| v as i64);
     let gid = data.get("gid").and_then(|v| v.as_u64()).map(|v| v as i64);
     let username: Option<String> = None; // Not in current envelope structure
-    let process_name = data.get("process_data")
+    let process_name: Option<String> = data.get("process_data")
         .and_then(|v| v.get("executable"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let process_path = data.get("process_data")
+    let process_path: Option<String> = data.get("process_data")
         .and_then(|v| v.get("executable"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let cmdline = data.get("process_data")
+    let cmdline: Option<String> = data.get("process_data")
         .and_then(|v| v.get("command_line"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let file_path = data.get("filesystem_data")
+    // Extract and pre-allocate Option<String> with proper lifetimes
+    let file_path: Option<String> = data.get("filesystem_data")
         .and_then(|v| v.get("path"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let network_src_ip = data.get("network_data")
+    let network_src_ip: Option<String> = data.get("network_data")
         .and_then(|v| v.get("remote_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
@@ -214,7 +215,7 @@ async fn handle_linux_ingest(
         .and_then(|v| v.get("remote_port"))
         .and_then(|v| v.as_u64())
         .map(|v| v as i64);
-    let network_dst_ip = data.get("network_data")
+    let network_dst_ip: Option<String> = data.get("network_data")
         .and_then(|v| v.get("local_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
@@ -259,6 +260,7 @@ async fn handle_linux_ingest(
     // Pre-allocate strings that need to live for the duration of the query
     let host_id = hostname::get().unwrap_or_default().to_string_lossy().to_string();
     let signature_alg = "Ed25519".to_string();
+    let event_category_str: &str = event_category.as_deref().unwrap_or("");
     let payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
     let payload_sha256 = {
         let data_json_bytes = serde_json::to_vec(data).unwrap_or_default();
@@ -277,8 +279,8 @@ async fn handle_linux_ingest(
             network_dst_ip, network_dst_port, protocol, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NULL,
-            NULL, NULL, NULL, NULL, $16::inet, $17, $18::inet, $19, NULL, $20::jsonb, $21
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20, $21::inet, $22, $23::inet, $24, $25, $26::jsonb, $27
         )
         "#,
         &[
@@ -290,22 +292,25 @@ async fn handle_linux_ingest(
             &payload.signature,
             &signature_alg,
             &payload.payload_hash,
-            &timestamp, // Use extracted timestamp, not payload.timestamp
+            &timestamp,
             &event_name,
-            &event_category.as_deref().unwrap_or(""),
+            &event_category_str,
             &pid.map(|v| v as i32),
             &ppid.map(|v| v as i32),
             &uid.map(|v| v as i32),
             &gid.map(|v| v as i32),
-            // All Option<String> TEXT fields removed - using NULL in SQL
-            // &username, &process_name, &process_path, &cmdline, &file_path, &protocol
-            &network_src_ip.as_deref(),
+            &username.as_deref().unwrap_or(""),
+            &process_name.as_deref().unwrap_or(""),
+            &process_path.as_deref().unwrap_or(""),
+            &cmdline.as_deref().unwrap_or(""),
+            &file_path.as_deref().unwrap_or(""),
+            &network_src_ip.as_deref().unwrap_or(""),
             &network_src_port.map(|v| v as i32),
-            &network_dst_ip.as_deref(),
+            &network_dst_ip.as_deref().unwrap_or(""),
             &network_dst_port.map(|v| v as i32),
-            // &protocol removed
-            &payload_json, // Use pre-allocated string
-            &payload_sha256, // Use pre-computed hash
+            &protocol.as_deref().unwrap_or(""),
+            &payload_json,
+            &payload_sha256,
         ],
     ).await;
 
