@@ -269,6 +269,9 @@ async fn handle_linux_ingest(
         Some(data_hasher.finalize().to_vec())
     };
     
+    // Create explicit owned variable for file_path parameter
+    let file_path_param: Option<String> = file_path.clone();
+    
     let result = db.execute(
         r#"
         INSERT INTO linux_agent_telemetry (
@@ -303,7 +306,7 @@ async fn handle_linux_ingest(
             &process_name.as_deref(),
             &process_path.as_deref(),
             &cmdline.as_deref(),
-            &file_path,
+            &file_path_param.as_deref(),
             &network_src_ip.as_deref(),
             &network_src_port.map(|v| v as i32),
             &network_dst_ip.as_deref(),
