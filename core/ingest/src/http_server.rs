@@ -212,11 +212,9 @@ async fn handle_linux_ingest(
         .and_then(|v| v.get("remote_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    // Parse and validate IP, then convert back to string for PostgreSQL INET type
-    let network_src_ip_param: Option<String> =
-        network_src_ip.as_ref()
-            .and_then(|s| s.parse::<IpAddr>().ok())
-            .map(|ip| ip.to_string());
+    // Parse and validate IP as IpAddr for PostgreSQL INET type
+    let network_src_ip_param: Option<IpAddr> =
+        network_src_ip.as_ref().and_then(|s| s.parse().ok());
     let network_src_port = data.get("network_data")
         .and_then(|v| v.get("remote_port"))
         .and_then(|v| v.as_u64())
@@ -225,11 +223,9 @@ async fn handle_linux_ingest(
         .and_then(|v| v.get("local_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    // Parse and validate IP, then convert back to string for PostgreSQL INET type
-    let network_dst_ip_param: Option<String> =
-        network_dst_ip.as_ref()
-            .and_then(|s| s.parse::<IpAddr>().ok())
-            .map(|ip| ip.to_string());
+    // Parse and validate IP as IpAddr for PostgreSQL INET type
+    let network_dst_ip_param: Option<IpAddr> =
+        network_dst_ip.as_ref().and_then(|s| s.parse().ok());
     let network_dst_port = data.get("network_data")
         .and_then(|v| v.get("local_port"))
         .and_then(|v| v.as_u64())
@@ -280,6 +276,26 @@ async fn handle_linux_ingest(
         Some(data_hasher.finalize().to_vec())
     };
     
+    // Convert IpAddr to String for PostgreSQL INET binding (validated as IpAddr above)
+    let network_src_ip_str: Option<String> = network_src_ip_param.as_ref().map(|ip| ip.to_string());
+    let network_dst_ip_str: Option<String> = network_dst_ip_param.as_ref().map(|ip| ip.to_string());
+    
+    // Materialize all parameters as named variables to ensure proper lifetimes
+    let pid_param: Option<i32> = pid.map(|v| v as i32);
+    let ppid_param: Option<i32> = ppid.map(|v| v as i32);
+    let uid_param: Option<i32> = uid.map(|v| v as i32);
+    let gid_param: Option<i32> = gid.map(|v| v as i32);
+    let username_param: Option<String> = username.clone();
+    let process_name_param: Option<String> = process_name.clone();
+    let process_path_param: Option<String> = process_path.clone();
+    let cmdline_param: Option<String> = cmdline.clone();
+    let file_path_param: Option<String> = file_path.clone();
+    let network_src_ip_param_str: Option<String> = network_src_ip_str.clone();
+    let network_src_port_param: Option<i32> = network_src_port.map(|v| v as i32);
+    let network_dst_ip_param_str: Option<String> = network_dst_ip_str.clone();
+    let network_dst_port_param: Option<i32> = network_dst_port.map(|v| v as i32);
+    let protocol_param: Option<String> = protocol.clone();
+    
     let result = db.execute(
         r#"
         INSERT INTO linux_agent_telemetry (
@@ -306,20 +322,20 @@ async fn handle_linux_ingest(
             &timestamp,
             &event_name,
             &event_category_str,
-            &pid.map(|v| v as i32),
-            &ppid.map(|v| v as i32),
-            &uid.map(|v| v as i32),
-            &gid.map(|v| v as i32),
-            &username.as_deref(),
-            &process_name.as_deref(),
-            &process_path.as_deref(),
-            &cmdline.as_deref(),
-            &file_path.as_deref(),
-            &network_src_ip_param.as_deref(),
-            &network_src_port.map(|v| v as i32),
-            &network_dst_ip_param.as_deref(),
-            &network_dst_port.map(|v| v as i32),
-            &protocol.as_deref(),
+            &pid_param,
+            &ppid_param,
+            &uid_param,
+            &gid_param,
+            &username_param.as_deref(),
+            &process_name_param.as_deref(),
+            &process_path_param.as_deref(),
+            &cmdline_param.as_deref(),
+            &file_path_param.as_deref(),
+            &network_src_ip_param_str.as_deref(),
+            &network_src_port_param,
+            &network_dst_ip_param_str.as_deref(),
+            &network_dst_port_param,
+            &protocol_param.as_deref(),
             &payload_json,
             &payload_sha256,
         ],
@@ -482,16 +498,14 @@ async fn handle_dpi_ingest(
 
     // Parse event data to extract fields
     let src_ip: Option<String> = data.get("src_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
-    // Parse and validate IP, then convert back to string for PostgreSQL INET type
-    let src_ip_param: Option<String> = src_ip.as_ref()
-        .and_then(|s| s.parse::<IpAddr>().ok())
-        .map(|ip| ip.to_string());
+    // Parse and validate IP as IpAddr for PostgreSQL INET type
+    let src_ip_param: Option<IpAddr> = src_ip.as_ref()
+        .and_then(|s| s.parse().ok());
     let src_port = data.get("src_port").and_then(|v| v.as_u64()).map(|v| v as i64);
     let dst_ip: Option<String> = data.get("dst_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
-    // Parse and validate IP, then convert back to string for PostgreSQL INET type
-    let dst_ip_param: Option<String> = dst_ip.as_ref()
-        .and_then(|s| s.parse::<IpAddr>().ok())
-        .map(|ip| ip.to_string());
+    // Parse and validate IP as IpAddr for PostgreSQL INET type
+    let dst_ip_param: Option<IpAddr> = dst_ip.as_ref()
+        .and_then(|s| s.parse().ok());
     let dst_port = data.get("dst_port").and_then(|v| v.as_u64()).map(|v| v as i64);
     let protocol = data.get("protocol").and_then(|v| v.as_str()).map(|s| s.to_string());
     let bytes_in: Option<i64> = None; // Not in current envelope structure
@@ -519,6 +533,27 @@ async fn handle_dpi_ingest(
             StatusCode::BAD_REQUEST
         })?;
 
+    // Convert IpAddr to String for PostgreSQL INET binding (validated as IpAddr above)
+    let src_ip_str: Option<String> = src_ip_param.as_ref().map(|ip| ip.to_string());
+    let dst_ip_str: Option<String> = dst_ip_param.as_ref().map(|ip| ip.to_string());
+
+    // Materialize all parameters as named variables to ensure proper lifetimes
+    let dpi_nonce = Uuid::new_v4().to_string();
+    let dpi_signature_alg = Some("RSA-PSS-SHA256".to_string());
+    let src_ip_param_str: Option<&str> = src_ip_str.as_deref();
+    let src_port_param: Option<i32> = src_port.map(|v| v as i32);
+    let dst_ip_param_str: Option<&str> = dst_ip_str.as_deref();
+    let dst_port_param: Option<i32> = dst_port.map(|v| v as i32);
+    let protocol_param: Option<&str> = protocol.as_deref();
+    let tls_sni_param: Option<&str> = tls_sni.as_deref();
+    let http_host_param: Option<&str> = http_host.as_deref();
+    let http_method_param: Option<&str> = http_method.as_deref();
+    let http_path_param: Option<&str> = http_path.as_deref();
+    let iface_name_param: Option<&str> = iface_name.as_deref();
+    let flow_id_param: Option<&str> = flow_id.as_deref();
+    let dpi_payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
+    let dpi_payload_sha256 = Some(hex::decode(&payload.payload_hash).unwrap_or_default());
+
     // Insert into dpi_probe_telemetry
     let result = db.execute(
         r#"
@@ -537,29 +572,29 @@ async fn handle_dpi_ingest(
         &[
             &agent_id,
             &message_id_uuid,
-            &Uuid::new_v4().to_string(), // nonce (generate new since not in envelope)
+            &dpi_nonce,
             &component_id,
             &payload.signature,
-            &Some("RSA-PSS-SHA256".to_string()),
+            &dpi_signature_alg,
             &payload.payload_hash,
             &timestamp,
-            &src_ip_param.as_deref(),
-            &src_port.map(|v| v as i32),
-            &dst_ip_param.as_deref(),
-            &dst_port.map(|v| v as i32),
-            &protocol,
+            &src_ip_param_str,
+            &src_port_param,
+            &dst_ip_param_str,
+            &dst_port_param,
+            &protocol_param,
             &bytes_in,
             &bytes_out,
             &packets_in,
             &packets_out,
-            &tls_sni,
-            &http_host,
-            &http_method,
-            &http_path,
-            &iface_name,
-            &flow_id,
-            &serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string()), // Serialize JsonValue to string for JSONB
-            &Some(hex::decode(&payload.payload_hash).unwrap_or_default()),
+            &tls_sni_param,
+            &http_host_param,
+            &http_method_param,
+            &http_path_param,
+            &iface_name_param,
+            &flow_id_param,
+            &dpi_payload_json,
+            &dpi_payload_sha256,
         ],
     ).await;
 
