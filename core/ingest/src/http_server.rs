@@ -259,7 +259,14 @@ async fn handle_linux_ingest(
     envelope_hasher.update(&envelope_json_bytes);
     let envelope_payload_sha256 = envelope_hasher.finalize().to_vec();
 
-    // PROMPT-38.1: Start transaction for atomic raw_events + telemetry persistence
+    // PROMPT-40A: Get ingestion component for audit attribution
+    let ingestion_component_id = get_or_create_ingestion_component(&db).await
+        .map_err(|e| {
+            error!("FAIL-CLOSED: Failed to get/create ingestion component: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // PROMPT-38.1: Start transaction for atomic raw_events + telemetry + audit persistence
     // Use explicit SQL BEGIN since we have Arc<Client> (can't use transaction API)
     db.execute("BEGIN", &[]).await
         .map_err(|e| {
@@ -267,14 +274,49 @@ async fn handle_linux_ingest(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
+    // PROMPT-40A: Audit INGEST_ACCEPT (after signature verification + agent resolution, before DB writes)
+    let ingest_accept_payload = serde_json::json!({
+        "message_id": message_id,
+        "signer_id": payload.signer_id,
+        "payload_hash": payload.payload_hash,
+        "source": "linux_agent",
+        "agent_id": agent_id.to_string(),
+        "envelope_keys": payload.envelope.as_object().map(|o| o.keys().collect::<Vec<_>>()).unwrap_or_default()
+    });
+    let ingest_accept_payload_str = serde_json::to_string(&ingest_accept_payload)
+        .map_err(|e| {
+            error!("Failed to serialize ingest accept audit payload: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let mut ingest_accept_hasher = Sha256::new();
+    ingest_accept_hasher.update(ingest_accept_payload_str.as_bytes());
+    let ingest_accept_payload_sha256 = ingest_accept_hasher.finalize().to_vec();
+    
+    insert_immutable_audit_log(
+        &db,
+        Some(ingestion_component_id),
+        Some(agent_id),
+        "INGEST_ACCEPT",
+        "raw_event",
+        None,
+        Some(timestamp),
+        &ingest_accept_payload,
+        &ingest_accept_payload_sha256,
+    ).await.map_err(|e| {
+        error!("FAIL-CLOSED: Failed to insert INGEST_ACCEPT audit log: {}", e);
+        let _ = db.execute("ROLLBACK", &[]).await;
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     // Insert into raw_events with minimal canonical fields only (within transaction)
-    let raw_events_result = db.execute(
+    let raw_event_id = match db.query_one(
         r#"
         INSERT INTO raw_events (
             source_type, source_agent_id, observed_at, received_at,
             event_name, payload_json, payload_sha256
         )
         VALUES ('linux_agent'::event_source_type, $1, $2, NOW(), $3, $4, $5)
+        RETURNING raw_event_id
         "#,
         &[
             &agent_id,
@@ -283,11 +325,11 @@ async fn handle_linux_ingest(
             &full_envelope_json,
             &envelope_payload_sha256,
         ],
-    ).await;
-
-    match raw_events_result {
-        Ok(_) => {
-            info!("raw_events inserted | agent_id={} | event_name={} | message_id={}", agent_id, event_name, message_id);
+    ).await {
+        Ok(row) => {
+            let raw_event_id: Uuid = row.get(0);
+            info!("raw_events inserted | raw_event_id={} | agent_id={} | event_name={} | message_id={}", raw_event_id, agent_id, event_name, message_id);
+            raw_event_id
         }
         Err(e) => {
             error!("FAIL-CLOSED: Failed to insert raw_events: {}", e);
@@ -295,7 +337,41 @@ async fn handle_linux_ingest(
             let _ = db.execute("ROLLBACK", &[]).await;
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
-    }
+    };
+
+    // PROMPT-40A: Audit RAW_EVENT_INSERT (after successful raw_events INSERT, same transaction)
+    let raw_event_insert_payload = serde_json::json!({
+        "raw_event_id": raw_event_id.to_string(),
+        "source_type": "linux_agent",
+        "agent_id": agent_id.to_string(),
+        "event_name": event_name,
+        "observed_at": timestamp.to_rfc3339(),
+        "payload_sha256": hex::encode(&envelope_payload_sha256)
+    });
+    let raw_event_insert_payload_str = serde_json::to_string(&raw_event_insert_payload)
+        .map_err(|e| {
+            error!("Failed to serialize raw event insert audit payload: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let mut raw_event_insert_hasher = Sha256::new();
+    raw_event_insert_hasher.update(raw_event_insert_payload_str.as_bytes());
+    let raw_event_insert_payload_sha256 = raw_event_insert_hasher.finalize().to_vec();
+    
+    insert_immutable_audit_log(
+        &db,
+        Some(ingestion_component_id),
+        Some(agent_id),
+        "RAW_EVENT_INSERT",
+        "raw_event",
+        Some(raw_event_id),
+        Some(timestamp),
+        &raw_event_insert_payload,
+        &raw_event_insert_payload_sha256,
+    ).await.map_err(|e| {
+        error!("FAIL-CLOSED: Failed to insert RAW_EVENT_INSERT audit log: {}", e);
+        let _ = db.execute("ROLLBACK", &[]).await;
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Insert into linux_agent_telemetry
     // Generate 64-character hex nonce (32 bytes = 64 hex chars) to match schema CHECK constraint
@@ -541,6 +617,66 @@ async fn handle_dpi_ingest(
             StatusCode::BAD_REQUEST
         })?;
 
+    // PROMPT-40A: Get ingestion component for audit attribution
+    let ingestion_component_id = get_or_create_ingestion_component(&db).await
+        .map_err(|e| {
+            error!("FAIL-CLOSED: Failed to get/create ingestion component: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Prepare envelope JSON and hash for audit
+    let full_envelope_json = serde_json::to_value(&payload.envelope)
+        .map_err(|e| {
+            error!("Failed to serialize envelope: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let envelope_json_bytes = serde_json::to_vec(&full_envelope_json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut envelope_hasher = Sha256::new();
+    envelope_hasher.update(&envelope_json_bytes);
+    let envelope_payload_sha256 = envelope_hasher.finalize().to_vec();
+
+    // PROMPT-40A: Start transaction for atomic operations
+    db.execute("BEGIN", &[]).await
+        .map_err(|e| {
+            error!("Failed to start transaction: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // PROMPT-40A: Audit INGEST_ACCEPT (after signature verification + agent resolution)
+    let ingest_accept_payload = serde_json::json!({
+        "message_id": message_id,
+        "signer_id": payload.signer_id,
+        "payload_hash": payload.payload_hash,
+        "source": "dpi_probe",
+        "agent_id": agent_id.to_string(),
+        "envelope_keys": payload.envelope.as_object().map(|o| o.keys().collect::<Vec<_>>()).unwrap_or_default()
+    });
+    let ingest_accept_payload_str = serde_json::to_string(&ingest_accept_payload)
+        .map_err(|e| {
+            error!("Failed to serialize ingest accept audit payload: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let mut ingest_accept_hasher = Sha256::new();
+    ingest_accept_hasher.update(ingest_accept_payload_str.as_bytes());
+    let ingest_accept_payload_sha256 = ingest_accept_hasher.finalize().to_vec();
+    
+    insert_immutable_audit_log(
+        &db,
+        Some(ingestion_component_id),
+        Some(agent_id),
+        "INGEST_ACCEPT",
+        "raw_event",
+        None,
+        Some(timestamp),
+        &ingest_accept_payload,
+        &ingest_accept_payload_sha256,
+    ).await.map_err(|e| {
+        error!("FAIL-CLOSED: Failed to insert INGEST_ACCEPT audit log: {}", e);
+        let _ = db.execute("ROLLBACK", &[]).await;
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     // Convert IpAddr to String for PostgreSQL INET binding (validated as IpAddr above)
     let src_ip_str: Option<String> = src_ip_param.as_ref().map(|ip| ip.to_string());
     let dst_ip_str: Option<String> = dst_ip_param.as_ref().map(|ip| ip.to_string());
@@ -561,6 +697,70 @@ async fn handle_dpi_ingest(
     let flow_id_param: Option<&str> = flow_id.as_deref();
     let dpi_payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
     let dpi_payload_sha256 = Some(hex::decode(&payload.payload_hash).unwrap_or_default());
+
+    // Insert into raw_events for DPI (within transaction)
+    let raw_event_id = match db.query_one(
+        r#"
+        INSERT INTO raw_events (
+            source_type, source_agent_id, observed_at, received_at,
+            event_name, payload_json, payload_sha256
+        )
+        VALUES ('dpi_probe'::event_source_type, $1, $2, NOW(), $3, $4, $5)
+        RETURNING raw_event_id
+        "#,
+        &[
+            &agent_id,
+            &timestamp,
+            &"flow",
+            &data,
+            &envelope_payload_sha256,
+        ],
+    ).await {
+        Ok(row) => {
+            let raw_event_id: Uuid = row.get(0);
+            info!("raw_events inserted for DPI | raw_event_id={} | agent_id={} | message_id={}", raw_event_id, agent_id, message_id);
+            raw_event_id
+        }
+        Err(e) => {
+            error!("FAIL-CLOSED: Failed to insert raw_events for DPI: {}", e);
+            let _ = db.execute("ROLLBACK", &[]).await;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // PROMPT-40A: Audit RAW_EVENT_INSERT (after successful raw_events INSERT, same transaction)
+    let raw_event_insert_payload = serde_json::json!({
+        "raw_event_id": raw_event_id.to_string(),
+        "source_type": "dpi_probe",
+        "agent_id": agent_id.to_string(),
+        "event_name": "flow",
+        "observed_at": timestamp.to_rfc3339(),
+        "payload_sha256": hex::encode(&envelope_payload_sha256)
+    });
+    let raw_event_insert_payload_str = serde_json::to_string(&raw_event_insert_payload)
+        .map_err(|e| {
+            error!("Failed to serialize raw event insert audit payload: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let mut raw_event_insert_hasher = Sha256::new();
+    raw_event_insert_hasher.update(raw_event_insert_payload_str.as_bytes());
+    let raw_event_insert_payload_sha256 = raw_event_insert_hasher.finalize().to_vec();
+    
+    insert_immutable_audit_log(
+        &db,
+        Some(ingestion_component_id),
+        Some(agent_id),
+        "RAW_EVENT_INSERT",
+        "raw_event",
+        Some(raw_event_id),
+        Some(timestamp),
+        &raw_event_insert_payload,
+        &raw_event_insert_payload_sha256,
+    ).await.map_err(|e| {
+        error!("FAIL-CLOSED: Failed to insert RAW_EVENT_INSERT audit log: {}", e);
+        let _ = db.execute("ROLLBACK", &[]).await;
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Insert into dpi_probe_telemetry
     let result = db.execute(
@@ -610,30 +810,12 @@ async fn handle_dpi_ingest(
         Ok(_) => {
             info!("Ingested dpi event {} | Persisted raw_event_id={}", message_id, message_id_uuid);
             
-            // Also write to raw_events
-            let payload_json_bytes = serde_json::to_vec(&data)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let mut hasher = Sha256::new();
-            hasher.update(&payload_json_bytes);
-            let payload_sha256 = hasher.finalize().to_vec();
-            
-            // Safe to inject "dpi_probe" as it's a hardcoded literal
-            let _raw_result = db.execute(
-                r#"
-                INSERT INTO raw_events (
-                    source_type, source_agent_id, observed_at, received_at,
-                    event_name, payload_json, payload_sha256
-                )
-                VALUES ('dpi_probe'::event_source_type, $1, $2, NOW(), $3, $4, $5)
-                "#,
-                &[
-                    &agent_id,
-                    &timestamp,
-                    &"flow",
-                    &data,
-                    &payload_sha256,
-                ],
-            ).await;
+            // Commit transaction (raw_events + telemetry + audit persisted atomically)
+            db.execute("COMMIT", &[]).await
+                .map_err(|e| {
+                    error!("FAIL-CLOSED: Failed to commit transaction: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
             
             Ok(Json(IngestResponse {
                 status: "ok".to_string(),
@@ -740,5 +922,121 @@ async fn get_or_create_agent(
     error!("Successfully created agent | agent_id={} | component_identity={} | agent_type={}", 
         agent_id, component_identity, agent_type);
     Ok(agent_id)
+}
+
+// PROMPT-40A: Get or create ingestion component for audit attribution
+async fn get_or_create_ingestion_component(
+    db: &Client,
+) -> Result<Uuid, Box<dyn std::error::Error>> {
+    let component_name = "ransomeye_ingestion";
+    let instance_id = hostname::get()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    
+    // Try to find existing component
+    let row = db.query_opt(
+        r#"
+        SELECT component_id FROM components
+        WHERE component_type = 'core_engine'::component_type
+          AND component_name = $1
+          AND (instance_id = $2 OR (instance_id IS NULL AND $2 IS NULL))
+        LIMIT 1
+        "#,
+        &[&component_name, &instance_id],
+    ).await?;
+
+    if let Some(r) = row {
+        let component_id: Uuid = r.get(0);
+        // Update last_heartbeat_at
+        db.execute(
+            r#"UPDATE components SET last_heartbeat_at = NOW() WHERE component_id = $1"#,
+            &[&component_id],
+        ).await?;
+        return Ok(component_id);
+    }
+
+    // Create new component
+    let component_id = Uuid::new_v4();
+    db.execute(
+        r#"
+        INSERT INTO components (component_id, component_type, component_name, instance_id, started_at, last_heartbeat_at)
+        VALUES ($1, 'core_engine'::component_type, $2, $3, NOW(), NOW())
+        "#,
+        &[&component_id, &component_name, &instance_id],
+    ).await?;
+
+    Ok(component_id)
+}
+
+// PROMPT-40A: Insert into immutable_audit_log (fail-closed)
+async fn insert_immutable_audit_log(
+    db: &Client,
+    actor_component_id: Option<Uuid>,
+    actor_agent_id: Option<Uuid>,
+    action: &str,
+    object_type: &str,
+    object_id: Option<Uuid>,
+    event_time: Option<chrono::DateTime<chrono::Utc>>,
+    payload_json: &JsonValue,
+    payload_sha256: &[u8],
+) -> Result<Uuid, Box<dyn std::error::Error>> {
+    // Get previous audit chain entry for hash chaining
+    let prev_row = db.query_opt(
+        r#"
+        SELECT audit_id, chain_hash_sha256, payload_sha256
+        FROM immutable_audit_log
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+        &[],
+    ).await?;
+
+    let (prev_audit_id, prev_chain_hash, prev_payload_sha256): (Option<Uuid>, Option<Vec<u8>>, Option<Vec<u8>>) = 
+        if let Some(row) = prev_row {
+            (
+                Some(row.get(0)),
+                Some(row.get::<usize, Vec<u8>>(1)),
+                Some(row.get::<usize, Vec<u8>>(2)),
+            )
+        } else {
+            (None, None, None)
+        };
+
+    // Compute chain hash: SHA256(prev_chain_hash || payload_sha256)
+    let prev_chain_hash_bytes = prev_chain_hash.as_deref().unwrap_or(&[0u8; 32]);
+    let mut chain_input = Vec::with_capacity(64);
+    chain_input.extend_from_slice(prev_chain_hash_bytes);
+    chain_input.extend_from_slice(payload_sha256);
+    let mut chain_hasher = Sha256::new();
+    chain_hasher.update(&chain_input);
+    let chain_hash_sha256 = chain_hasher.finalize().to_vec();
+
+    // Insert audit log entry
+    let row = db.query_one(
+        r#"
+        INSERT INTO immutable_audit_log (
+            actor_component_id, actor_agent_id, action, object_type, object_id, event_time,
+            payload_json, payload_sha256, prev_audit_id, prev_payload_sha256, chain_hash_sha256, signature_status
+        )
+        VALUES ($1, $2, $3, $4::text::trust_object_type, $5, $6, $7, $8, $9, $10, $11, 'unknown')
+        RETURNING audit_id
+        "#,
+        &[
+            &actor_component_id,
+            &actor_agent_id,
+            &action,
+            &object_type,
+            &object_id,
+            &event_time,
+            &payload_json,
+            &payload_sha256,
+            &prev_audit_id,
+            &prev_payload_sha256,
+            &chain_hash_sha256,
+        ],
+    ).await?;
+
+    Ok(row.get(0))
 }
 

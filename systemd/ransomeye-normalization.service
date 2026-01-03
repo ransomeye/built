@@ -1,0 +1,40 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-normalization.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Normalization Worker - deterministic mapping from raw_events to normalized_events (PROMPT-39)
+
+[Unit]
+Description=RansomEye Normalization Worker - Deterministic mapping from raw_events to normalized_events
+After=network.target postgresql.service
+Requires=network.target postgresql.service
+ConditionPathExists=/home/ransomeye/rebuild/core/normalization_worker/normalize.py
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/core/normalization_worker/normalize.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+Environment="NORMALIZATION_BATCH_SIZE=100"
+Environment="NORMALIZATION_POLL_INTERVAL=1.0"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ransomeye/rebuild
+
+[Install]
+WantedBy=multi-user.target
+

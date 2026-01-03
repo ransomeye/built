@@ -17,3 +17,4 @@ cryptography>=41.0.0
 # sentence-transformers>=2.2.0  # For RAG embeddings (optional)
 # faiss-cpu>=1.7.4  # For vector search (optional)
 
+psycopg2-binary
