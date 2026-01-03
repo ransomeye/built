@@ -8,6 +8,7 @@ use std::cmp::Ordering;
 use tracing::debug;
 
 use crate::errors::ReportingError;
+#[cfg(feature = "future-reporting")]
 use crate::collector::CollectedEvidence;
 
 /// Timeline event - represents a single event in the forensic timeline
@@ -25,10 +26,12 @@ pub struct TimelineEvent {
 
 /// Forensic timeline - deterministic chronological ordering of events
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "future-reporting")]
 pub struct ForensicTimeline {
     events: Vec<TimelineEvent>,
 }
 
+#[cfg(feature = "future-reporting")]
 impl ForensicTimeline {
     pub fn new() -> Self {
         Self {
@@ -182,6 +185,7 @@ impl ForensicTimeline {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "future-reporting")]
 pub struct TimelineSummary {
     pub total_events: usize,
     pub time_span_start: Option<DateTime<Utc>>,

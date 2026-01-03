@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Cryptographic hashing - creates SHA-256 hashes for evidence integrity verification and hash chaining
 
+#![cfg(feature = "future-reporting")]
+
 use sha2::{Sha256, Digest};
 use serde_json::Value;
 use hex;

@@ -4,7 +4,8 @@
 This is a personal backup system that continuously syncs your `/home/ransomeye/rebuild` folder to an external pendrive at `/mnt/pendrive/rebuild`, excluding venv files and other unnecessary files.
 
 ## Features
-- **Continuous Sync**: Automatically syncs every 30 seconds
+- **Continuous Sync**: Automatically syncs every 1 hour
+- **Git Commit**: Automatically commits changes to git before each sync
 - **Auto-Mount**: Pendrive automatically mounts at boot
 - **Auto-Start**: Backup service automatically starts at boot
 - **Excludes venv**: All virtual environment files are excluded from backup
@@ -110,7 +111,9 @@ sudo journalctl -u backup-sync.service -f
 ```
 
 ## Notes
-- Sync interval is set to 30 seconds (configurable in `backup_sync.py`)
+- Sync interval is set to 1 hour (3600 seconds, configurable in `backup_sync.py`)
+- Git commit is performed automatically before each sync (if source is a git repository)
+- Git push is attempted after commit (non-blocking if it fails)
 - The service will wait for the pendrive to be mounted before starting
 - If the pendrive is removed, the service will keep retrying until it's reconnected
 - The backup uses `rsync` with `--delete` flag, so files deleted in source will be deleted in backup

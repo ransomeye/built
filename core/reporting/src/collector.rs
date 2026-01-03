@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Evidence collector - gathers evidence from various sources and prepares it for preservation
 
+#![cfg(feature = "future-reporting")]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -14,7 +16,6 @@ use crate::hasher::EvidenceHasher;
 
 /// Evidence collector - gathers and prepares evidence for preservation
 /// Ensures all evidence is properly attributed and timestamped
-#[cfg(feature = "future-reporting")]
 pub struct EvidenceCollector {
     hasher: EvidenceHasher,
     engine_version: String,
@@ -22,7 +23,6 @@ pub struct EvidenceCollector {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "future-reporting")]
 pub struct CollectedEvidence {
     pub evidence_id: String,
     pub source: String,
@@ -34,7 +34,6 @@ pub struct CollectedEvidence {
     pub integrity_hash: String,
 }
 
-#[cfg(feature = "future-reporting")]
 impl EvidenceCollector {
     pub fn new(engine_version: &str, policy_version: &str) -> Self {
         Self {

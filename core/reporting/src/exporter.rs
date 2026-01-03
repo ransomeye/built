@@ -6,12 +6,15 @@ use std::path::Path;
 use tracing::{debug, error};
 
 use crate::errors::ReportingError;
+#[cfg(feature = "future-reporting")]
 use crate::report_builder::ForensicReport;
 use crate::formats;
 
 /// Report exporter - handles export to multiple formats
+#[cfg(feature = "future-reporting")]
 pub struct ReportExporter;
 
+#[cfg(feature = "future-reporting")]
 impl ReportExporter {
     pub fn new() -> Self {
         Self

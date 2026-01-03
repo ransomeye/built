@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Report builder - constructs reproducible reports with evidence references, engine versions, and policy versions
 
+#![cfg(feature = "future-reporting")]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,7 +15,6 @@ use crate::timeline::ForensicTimeline;
 
 /// Report metadata - version information and build hashes
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "future-reporting")]
 pub struct ReportMetadata {
     pub report_id: String,
     pub created_at: DateTime<Utc>,
@@ -25,7 +26,6 @@ pub struct ReportMetadata {
 
 /// Forensic report - complete report with evidence references
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "future-reporting")]
 pub struct ForensicReport {
     pub metadata: ReportMetadata,
     pub title: String,
@@ -39,7 +39,6 @@ pub struct ForensicReport {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "future-reporting")]
 pub struct ReportSummary {
     pub total_evidence_items: usize,
     pub time_range_start: Option<DateTime<Utc>>,
@@ -49,7 +48,6 @@ pub struct ReportSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg(feature = "future-reporting")]
 pub struct ReportSection {
     pub title: String,
     pub content: String,
@@ -58,7 +56,6 @@ pub struct ReportSection {
 }
 
 /// Report builder - constructs reproducible reports
-#[cfg(feature = "future-reporting")]
 pub struct ReportBuilder {
     engine_version: String,
     policy_version: String,
@@ -66,7 +63,6 @@ pub struct ReportBuilder {
     model_version_hash: Option<String>,
 }
 
-#[cfg(feature = "future-reporting")]
 impl ReportBuilder {
     pub fn new(
         engine_version: &str,

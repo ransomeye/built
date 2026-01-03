@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Immutable evidence store - provides append-only storage with hash chaining and cryptographic signatures
 
+#![cfg(feature = "future-reporting")]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
