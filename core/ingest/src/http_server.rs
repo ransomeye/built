@@ -303,7 +303,7 @@ async fn handle_linux_ingest(
             &process_name.as_deref(),
             &process_path.as_deref(),
             &cmdline.as_deref(),
-            &file_path.as_deref(),
+            &file_path,
             &network_src_ip.as_deref(),
             &network_src_port.map(|v| v as i32),
             &network_dst_ip.as_deref(),
