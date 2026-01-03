@@ -110,9 +110,11 @@ def build_rsync_command():
         "rsync",
         "-av",  # archive mode, verbose
         "--delete",  # delete files in destination that don't exist in source
-        "--progress",  # show progress
+        "--info=progress2",  # show overall progress
         "--human-readable",  # human-readable sizes
         "--stats",  # show statistics
+        "--partial",  # keep partial files on interruption
+        "--partial-dir=.rsync-partial",  # store partial files here
     ] + exclude_args + [
         f"{SOURCE_DIR}/",
         f"{BACKUP_DIR}/"
@@ -134,21 +136,86 @@ def perform_sync():
     
     try:
         start_time = time.time()
-        result = subprocess.run(
+        last_progress_log = start_time
+        
+        # Log initial sync start with size info
+        try:
+            import shutil
+            source_size = shutil.disk_usage(SOURCE_DIR).used
+            dest_size = shutil.disk_usage(BACKUP_DIR).used if BACKUP_DIR.exists() else 0
+            logger.info(f"Source size: {source_size / (1024**3):.2f} GB, Already synced: {dest_size / (1024**3):.2f} GB")
+        except:
+            pass
+        
+        # Run rsync with progress monitoring
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Combine stderr into stdout
             text=True,
-            timeout=3600  # 1 hour timeout
+            bufsize=1
         )
+        
+        output_lines = []
+        
+        # Monitor progress - log every 30 seconds
+        while True:
+            return_code = process.poll()
+            if return_code is not None:
+                # Process finished, read remaining output
+                remaining = process.stdout.read()
+                if remaining:
+                    output_lines.append(remaining)
+                break
+            
+            # Log progress every 30 seconds
+            current_time = time.time()
+            if current_time - last_progress_log >= 30:
+                elapsed_so_far = current_time - start_time
+                elapsed_min = int(elapsed_so_far // 60)
+                elapsed_sec = int(elapsed_so_far % 60)
+                
+                # Check current backup size
+                try:
+                    current_dest_size = shutil.disk_usage(BACKUP_DIR).used if BACKUP_DIR.exists() else 0
+                    progress_pct = (current_dest_size / source_size * 100) if source_size > 0 else 0
+                    logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed, ~{progress_pct:.1f}% complete, {current_dest_size / (1024**3):.2f} GB synced)")
+                except:
+                    logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
+                
+                last_progress_log = current_time
+            
+            time.sleep(5)  # Check every 5 seconds
+        
+        # Read any remaining output
+        remaining = process.stdout.read()
+        if remaining:
+            output_lines.append(remaining)
+        
         elapsed = time.time() - start_time
+        result_stdout = ''.join(output_lines)
+        
+        # Create a result-like object
+        class Result:
+            def __init__(self, returncode, stdout, stderr):
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = stderr or ""
+        
+        result = Result(return_code, result_stdout, "")
         
         if result.returncode == 0:
-            logger.info(f"Sync completed successfully in {elapsed:.2f} seconds")
+            elapsed_min = int(elapsed // 60)
+            elapsed_sec = int(elapsed % 60)
+            logger.info(f"Sync completed successfully in {elapsed_min}m {elapsed_sec}s")
             # Log statistics if available
             if result.stdout:
-                stats_lines = [line for line in result.stdout.split('\n') if 'Total file size' in line or 'Number of files' in line]
+                stats_lines = [line for line in result.stdout.split('\n') 
+                             if any(keyword in line.lower() for keyword in 
+                                   ['total file size', 'number of files', 'total transferred', 'speedup'])]
                 for stat in stats_lines:
-                    logger.info(f"  {stat}")
+                    if stat.strip():
+                        logger.info(f"  {stat.strip()}")
             return True
         else:
             logger.error(f"Sync failed with return code {result.returncode}")

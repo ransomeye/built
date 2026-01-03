@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Evidence store - content-addressed immutable storage
 
+#![cfg(feature = "future-forensics")]
+
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::collections::HashMap;

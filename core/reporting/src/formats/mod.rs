@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Format modules - exports PDF, HTML, and CSV export functions
 
+#![cfg(feature = "future-reporting")]
+
 pub mod pdf;
 pub mod html;
 pub mod csv;

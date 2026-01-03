@@ -6,15 +6,24 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use tracing::{info, error};
 
+#[cfg(feature = "future-reporting")]
 mod collector;
+#[cfg(feature = "future-reporting")]
 mod evidence_store;
+#[cfg(feature = "future-reporting")]
 mod hasher;
+#[cfg(feature = "future-reporting")]
 mod timeline;
+#[cfg(feature = "future-reporting")]
 mod report_builder;
+#[cfg(feature = "future-reporting")]
 mod exporter;
+#[cfg(feature = "future-reporting")]
 mod verifier;
+#[cfg(feature = "future-retention")]
 mod retention;
 mod errors;
+#[cfg(feature = "future-reporting")]
 mod formats;
 
 use errors::ReportingError;

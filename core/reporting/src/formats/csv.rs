@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: CSV export - generates machine-readable CSV reports with all evidence data
 
+#![cfg(feature = "future-reporting")]
+
 use std::fs::File;
 use std::path::Path;
 use csv::Writer;

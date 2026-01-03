@@ -2,24 +2,22 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Evidence verifier - validates evidence integrity, detects tampering, and verifies hash chains
 
+#![cfg(feature = "future-reporting")]
+
 use std::path::Path;
 use std::fs;
 use tracing::{debug, error, warn};
 
 use crate::errors::ReportingError;
-#[cfg(feature = "future-reporting")]
 use crate::evidence_store::EvidenceStore;
-#[cfg(feature = "future-reporting")]
 use crate::hasher::EvidenceHasher;
 
 /// Evidence verifier - validates evidence integrity and detects corruption
-#[cfg(feature = "future-reporting")]
 pub struct EvidenceVerifier {
     hasher: EvidenceHasher,
 }
 
 #[derive(Debug, Clone)]
-#[cfg(feature = "future-reporting")]
 pub struct VerificationResult {
     pub is_valid: bool,
     pub errors: Vec<String>,
@@ -29,7 +27,6 @@ pub struct VerificationResult {
     pub corrupted_bundles: usize,
 }
 
-#[cfg(feature = "future-reporting")]
 impl EvidenceVerifier {
     pub fn new() -> Self {
         Self {

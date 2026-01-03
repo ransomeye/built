@@ -2,19 +2,18 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Report exporter - exports reports in multiple formats (PDF, HTML, CSV) with proper branding and metadata
 
+#![cfg(feature = "future-reporting")]
+
 use std::path::Path;
 use tracing::{debug, error};
 
 use crate::errors::ReportingError;
-#[cfg(feature = "future-reporting")]
 use crate::report_builder::ForensicReport;
 use crate::formats;
 
 /// Report exporter - handles export to multiple formats
-#[cfg(feature = "future-reporting")]
 pub struct ReportExporter;
 
-#[cfg(feature = "future-reporting")]
 impl ReportExporter {
     pub fn new() -> Self {
         Self

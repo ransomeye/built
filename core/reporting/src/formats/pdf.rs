@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: PDF export - generates PDF reports with proper formatting, branding, and evidence references
 
+#![cfg(feature = "future-reporting")]
+
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
