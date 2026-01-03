@@ -246,6 +246,57 @@ async fn handle_linux_ingest(
             StatusCode::BAD_REQUEST
         })?;
 
+    // PROMPT-38.1: Insert into raw_events IMMEDIATELY after acceptance (signature verified + agent resolved)
+    // This is the canonical append-only capture point - no normalization, no enrichment, no schema changes
+    let full_envelope_json = serde_json::to_value(&payload.envelope)
+        .map_err(|e| {
+            error!("Failed to serialize envelope for raw_events: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let envelope_json_bytes = serde_json::to_vec(&full_envelope_json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut envelope_hasher = Sha256::new();
+    envelope_hasher.update(&envelope_json_bytes);
+    let envelope_payload_sha256 = envelope_hasher.finalize().to_vec();
+
+    // PROMPT-38.1: Start transaction for atomic raw_events + telemetry persistence
+    // Use explicit SQL BEGIN since we have Arc<Client> (can't use transaction API)
+    db.execute("BEGIN", &[]).await
+        .map_err(|e| {
+            error!("Failed to start transaction: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Insert into raw_events with minimal canonical fields only (within transaction)
+    let raw_events_result = db.execute(
+        r#"
+        INSERT INTO raw_events (
+            source_type, source_agent_id, observed_at, received_at,
+            event_name, payload_json, payload_sha256
+        )
+        VALUES ('linux_agent'::event_source_type, $1, $2, NOW(), $3, $4, $5)
+        "#,
+        &[
+            &agent_id,
+            &timestamp,
+            &event_name,
+            &full_envelope_json,
+            &envelope_payload_sha256,
+        ],
+    ).await;
+
+    match raw_events_result {
+        Ok(_) => {
+            info!("raw_events inserted | agent_id={} | event_name={} | message_id={}", agent_id, event_name, message_id);
+        }
+        Err(e) => {
+            error!("FAIL-CLOSED: Failed to insert raw_events: {}", e);
+            // Rollback transaction on failure
+            let _ = db.execute("ROLLBACK", &[]).await;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    }
+
     // Insert into linux_agent_telemetry
     // Generate 64-character hex nonce (32 bytes = 64 hex chars) to match schema CHECK constraint
     let rng = SystemRandom::new();
@@ -282,32 +333,27 @@ async fn handle_linux_ingest(
     
     // Materialize all parameters as named variables to ensure proper lifetimes
     let pid_param: Option<i32> = pid.map(|v| v as i32);
-    let ppid_param: Option<i32> = ppid.map(|v| v as i32);
     let uid_param: Option<i32> = uid.map(|v| v as i32);
-    let gid_param: Option<i32> = gid.map(|v| v as i32);
-    let username_param: Option<String> = username.clone();
     let process_name_param: Option<String> = process_name.clone();
-    let process_path_param: Option<String> = process_path.clone();
+    let process_name_param_str: Option<&str> = process_name_param.as_deref();
+    
+    // Optional fields for UPDATE
     let cmdline_param: Option<String> = cmdline.clone();
     let file_path_param: Option<String> = file_path.clone();
     let network_src_ip_param_str: Option<String> = network_src_ip_str.clone();
-    let network_src_port_param: Option<i32> = network_src_port.map(|v| v as i32);
     let network_dst_ip_param_str: Option<String> = network_dst_ip_str.clone();
-    let network_dst_port_param: Option<i32> = network_dst_port.map(|v| v as i32);
     let protocol_param: Option<String> = protocol.clone();
     
-    let result = db.execute(
+    // INSERT #1 — REQUIRED FIELDS ONLY (within transaction)
+    let insert_result = db.execute(
         r#"
         INSERT INTO linux_agent_telemetry (
             agent_id, source_message_id, source_nonce, source_component_identity,
             source_host_id, source_signature_b64, source_signature_alg, source_data_hash_hex,
-            observed_at, event_name, event_category, pid, ppid, uid, gid, username,
-            process_name, process_path, cmdline, file_path, network_src_ip, network_src_port,
-            network_dst_ip, network_dst_port, protocol, payload, payload_sha256
+            observed_at, event_name, event_category, pid, uid, process_name
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20::text, $21::inet, $22, $23::inet, $24, $25, $26::jsonb, $27
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
         )
         "#,
         &[
@@ -323,52 +369,53 @@ async fn handle_linux_ingest(
             &event_name,
             &event_category_str,
             &pid_param,
-            &ppid_param,
             &uid_param,
-            &gid_param,
-            &username_param.as_deref(),
-            &process_name_param.as_deref(),
-            &process_path_param.as_deref(),
-            &cmdline_param.as_deref(),
-            &file_path_param.as_deref(),
-            &network_src_ip_param_str.as_deref(),
-            &network_src_port_param,
-            &network_dst_ip_param_str.as_deref(),
-            &network_dst_port_param,
-            &protocol_param.as_deref(),
-            &payload_json,
-            &payload_sha256,
+            &process_name_param_str,
         ],
     ).await;
 
-    match result {
+    match insert_result {
         Ok(_) => {
-            info!("Ingested linux event {} | Persisted raw_event_id={}", message_id, message_id_uuid);
-            
-            // Also write to raw_events
-            let payload_json_bytes = serde_json::to_vec(&data)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let mut hasher = Sha256::new();
-            hasher.update(&payload_json_bytes);
-            let payload_sha256 = hasher.finalize().to_vec();
-            
-            // Safe to inject "linux_agent" as it's a hardcoded literal
-            let _raw_result = db.execute(
+            // UPDATE #2 — OPTIONAL FIELDS (within transaction)
+            let update_result = db.execute(
                 r#"
-                INSERT INTO raw_events (
-                    source_type, source_agent_id, observed_at, received_at,
-                    event_name, payload_json, payload_sha256
-                )
-                VALUES ('linux_agent'::event_source_type, $1, $2, NOW(), $3, $4, $5)
+                UPDATE linux_agent_telemetry
+                SET file_path = $1,
+                    network_src_ip = $2::inet,
+                    network_dst_ip = $3::inet,
+                    payload = $4::jsonb,
+                    payload_sha256 = $5,
+                    protocol = $6,
+                    cmdline = $7
+                WHERE source_message_id = $8
                 "#,
                 &[
-                    &agent_id,
-                    &timestamp,
-                    &event_name,
-                    &data,
+                    &file_path_param.as_deref(),
+                    &network_src_ip_param_str.as_deref(),
+                    &network_dst_ip_param_str.as_deref(),
+                    &payload_json,
                     &payload_sha256,
+                    &protocol_param.as_deref(),
+                    &cmdline_param.as_deref(),
+                    &message_id_uuid,
                 ],
             ).await;
+            
+            // UPDATE is optional - if it fails, we still commit raw_events + required telemetry fields
+            if let Err(e) = update_result {
+                warn!("Failed to update linux_agent_telemetry optional fields (non-fatal): {}", e);
+                // Continue to commit - raw_events and required telemetry fields are already inserted
+            }
+            
+            // Commit transaction (raw_events + telemetry persisted atomically)
+            db.execute("COMMIT", &[]).await
+                .map_err(|e| {
+                    error!("FAIL-CLOSED: Failed to commit transaction: {}", e);
+                    // Transaction will be rolled back automatically by PostgreSQL on connection close
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+            
+            info!("Ingested linux event {} | raw_events + telemetry persisted atomically", message_id);
             
             Ok(Json(IngestResponse {
                 status: "ok".to_string(),
@@ -376,54 +423,15 @@ async fn handle_linux_ingest(
             }))
         }
         Err(e) => {
-            // Log full PostgreSQL error details
-            error!("Failed to insert linux_agent_telemetry: {}", e);
+            error!("Failed to insert linux_agent_telemetry (required fields): {}", e);
             if let Some(db_err) = e.as_db_error() {
-                error!("PostgreSQL Error Details:");
-                error!("  Code: {:?}", db_err.code());
-                error!("  Message: {}", db_err.message());
-                if let Some(constraint) = db_err.constraint() {
-                    error!("  Constraint: {}", constraint);
-                }
-                if let Some(column) = db_err.column() {
-                    error!("  Column: {}", column);
-                }
+                error!("PostgreSQL Error: Code={:?}, Message={}", db_err.code(), db_err.message());
                 if let Some(detail) = db_err.detail() {
-                    error!("  Detail: {}", detail);
-                }
-                if let Some(hint) = db_err.hint() {
-                    error!("  Hint: {}", hint);
+                    error!("Detail: {}", detail);
                 }
             }
-            // Log parameter details for debugging
-            error!("INSERT Parameters:");
-            error!("  $1 (agent_id): {:?}", agent_id);
-            error!("  $2 (source_message_id): {:?}", message_id_uuid);
-            error!("  $3 (source_nonce): {:?}", nonce);
-            error!("  $4 (source_component_identity): {:?}", component_id);
-            error!("  $5 (host_id): {:?}", host_id);
-            error!("  $6 (signature): {:?}", payload.signature);
-            error!("  $7 (signature_alg): {:?}", signature_alg);
-            error!("  $8 (payload_hash): {:?}", payload.payload_hash);
-            error!("  $9 (observed_at): {:?}", timestamp);
-            error!("  $10 (event_name): {:?}", event_name);
-            error!("  $11 (event_category): {:?}", event_category);
-            error!("  $12 (pid): {:?}", pid);
-            error!("  $13 (ppid): {:?}", ppid);
-            error!("  $14 (uid): {:?}", uid);
-            error!("  $15 (gid): {:?}", gid);
-            error!("  $16 (username): {:?}", username);
-            error!("  $17 (process_name): {:?}", process_name);
-            error!("  $18 (process_path): {:?}", process_path);
-            error!("  $19 (cmdline): {:?}", cmdline);
-            error!("  $20 (file_path): {:?}", file_path);
-            error!("  $21 (network_src_ip): {:?} (parsed: {:?})", network_src_ip, network_src_ip_param);
-            error!("  $22 (network_src_port): {:?}", network_src_port);
-            error!("  $23 (network_dst_ip): {:?} (parsed: {:?})", network_dst_ip, network_dst_ip_param);
-            error!("  $24 (network_dst_port): {:?}", network_dst_port);
-            error!("  $25 (protocol): {:?}", protocol);
-            error!("  $26 (payload_json): {} bytes", payload_json.len());
-            error!("  $27 (payload_sha256): {:?}", payload_sha256);
+            // Rollback transaction on failure
+            let _ = db.execute("ROLLBACK", &[]).await;
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
