@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Feed validation - signature verification and schema validation with fail-closed semantics
 
+#![cfg(feature = "future-threat-feed")]
+
 use std::path::Path;
 use std::fs;
 use tracing::{warn, error};

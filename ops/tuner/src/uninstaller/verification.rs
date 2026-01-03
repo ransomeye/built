@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Uninstall verification - verifies install state before uninstallation
 
+#![cfg(feature = "future-tuner")]
+
 use crate::installer::state::InstallStateManager;
 use crate::errors::OperationsError;
 use tracing::{debug, error};

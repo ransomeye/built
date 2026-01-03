@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Append-only audit logging with hash-chained records
 
+#![cfg(feature = "future-policy")]
+
 use std::path::Path;
 use std::fs::OpenOptions;
 use std::io::{Write, BufWriter};

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Real cryptographic policy signature verification using RSA-4096
 
+#![cfg(feature = "future-policy")]
+
 use ring::signature::{self, UnparsedPublicKey};
 use base64::{Engine as _, engine::general_purpose};
 use std::path::Path;

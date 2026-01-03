@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Cleanup manager - securely removes services, configs, and optionally evidence
 
+#![cfg(feature = "future-tuner")]
+
 use std::fs;
 use std::path::Path;
 use chrono::Utc;

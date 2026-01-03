@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Cryptographic identity - generates and manages Ed25519 key pairs for signing install state
 
+#![cfg(feature = "future-tuner")]
+
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use ring::rand::SystemRandom;
 use std::fs;

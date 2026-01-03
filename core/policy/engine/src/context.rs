@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Evaluation context - deterministic evaluation context
 
+#![cfg(feature = "future-policy")]
+
 use serde_json::Value;
 use chrono::{DateTime, Utc};
 use tracing::{error, debug};

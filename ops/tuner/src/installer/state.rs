@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Install state - signed, immutable install state that must be verified before operations
 
+#![cfg(feature = "future-tuner")]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;

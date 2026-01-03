@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Retention configurator - configures data retention policies with validation
 
+#![cfg(feature = "future-tuner")]
+
 use std::fs;
 use std::path::Path;
 use serde::{Deserialize, Serialize};

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Main uninstaller - orchestrates complete uninstallation with verification and cleanup
 
+#![cfg(feature = "future-tuner")]
+
 use tracing::{info, error};
 
 use crate::errors::OperationsError;

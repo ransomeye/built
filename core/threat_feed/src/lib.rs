@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Threat feed library root - exports all threat intel ingestion modules
 
+#![cfg(feature = "future-threat-feed")]
+
 pub mod ingestion;
 pub mod normalization;
 pub mod validation;

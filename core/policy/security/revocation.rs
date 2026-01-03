@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy revocation checking with persistent storage
 
+#![cfg(feature = "future-policy")]
+
 use std::collections::HashSet;
 use std::path::Path;
 use std::fs;

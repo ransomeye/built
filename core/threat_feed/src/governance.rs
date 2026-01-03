@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Feed governance - graceful degradation, feed health monitoring, fail-closed enforcement
 
+#![cfg(feature = "future-threat-feed")]
+
 use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
 use tracing::{info, warn, error};

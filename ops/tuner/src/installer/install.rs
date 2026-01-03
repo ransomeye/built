@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Main installer - orchestrates the complete installation flow
 
+#![cfg(feature = "future-tuner")]
+
 use std::path::Path;
 use tracing::{info, error, debug};
 

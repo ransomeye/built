@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Integration with Phase 6 playbooks - explicit mapping from deception signals to playbook IDs
 
+#![cfg(feature = "future-deception")]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;

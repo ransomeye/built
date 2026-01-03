@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: SOC Copilot visibility - read-only access to deception assets, health, interactions, and triggered playbooks
 
+#![cfg(feature = "future-deception")]
+
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

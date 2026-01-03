@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Service status - checks service status and validates install state
 
+#![cfg(feature = "future-tuner")]
+
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 

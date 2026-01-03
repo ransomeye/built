@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Installation summary - prints installation summary and next steps
 
+#![cfg(feature = "future-tuner")]
+
 use crate::installer::state::InstallState;
 use tracing::info;
 

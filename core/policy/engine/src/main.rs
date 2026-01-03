@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy engine binary entry point
 
+#![cfg(feature = "future-policy")]
+
 fn main() {
     println!("RansomEye Policy Engine v1.0.0");
     println!("Policy engine library - use via API");

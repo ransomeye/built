@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Teardown and rollback engine - explicit teardown, automatic teardown on timeout, emergency teardown via playbook rollback
 
+#![cfg(feature = "future-deception")]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Preflight checks - validates OS, disk space, time synchronization, and permissions before installation
 
+#![cfg(feature = "future-tuner")]
+
 use sysinfo::{System, Disks};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};

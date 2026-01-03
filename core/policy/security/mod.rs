@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Security module exports
 
+#![cfg(feature = "future-policy")]
+
 pub mod signature;
 pub mod verification;
 pub mod trust_chain;

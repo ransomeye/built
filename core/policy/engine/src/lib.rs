@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy engine library exports
 
+#![cfg(feature = "future-policy")]
+
 pub mod engine;
 pub mod evaluator;
 pub mod compiler;

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Uninstaller module - exports all uninstaller components
 
+#![cfg(feature = "future-tuner")]
+
 pub mod uninstall;
 pub mod verification;
 pub mod cleanup;

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Intel normalization - standardizes IOCs, TTPs, campaigns to unified ontology
 
+#![cfg(feature = "future-threat-feed")]
+
 use crate::ingestion::{IOC, IOCType, TTP, Campaign, ProcessedIntel};
 use crate::errors::ThreatFeedError;
 use tracing::debug;

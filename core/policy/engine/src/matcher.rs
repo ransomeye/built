@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy matcher - deterministic policy matching
 
+#![cfg(feature = "future-policy")]
+
 use serde_json::Value;
 use tracing::{debug, warn};
 use regex::Regex;

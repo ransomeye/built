@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Lifecycle module - exports all lifecycle management components
 
+#![cfg(feature = "future-tuner")]
+
 pub mod start;
 pub mod stop;
 pub mod restart;

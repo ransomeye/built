@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Integration with Phase 5 correlation engine - exposes deception signals as strong indicators
 
+#![cfg(feature = "future-deception")]
+
 use std::sync::Arc;
 use tracing::{info, debug};
 use chrono::Utc;
