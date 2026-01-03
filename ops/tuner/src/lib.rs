@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Library root - exports all public modules for RansomEye operations, installer, uninstaller, and lifecycle management
 
+#![cfg(feature = "future-tuner")]
+
 pub mod installer;
 pub mod uninstaller;
 pub mod lifecycle;

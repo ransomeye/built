@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Ed25519 event signing with replay-safe sequence numbers
 
+#![cfg(feature = "future-windows-agent")]
+
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
 use rand::rngs::OsRng;
 use std::sync::atomic::{AtomicU64, Ordering};

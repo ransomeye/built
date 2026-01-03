@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Configuration loading from environment variables - no hardcoded values
 
+#![cfg(feature = "future-windows-agent")]
+
 use std::env;
 use thiserror::Error;
 

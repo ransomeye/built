@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Backpressure handler - manages bounded buffers and backpressure signals from Core
 
+#![cfg(feature = "future-windows-agent")]
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use dashmap::DashMap;

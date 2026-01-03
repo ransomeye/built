@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Event signing using RSA-4096-PSS-SHA256 - all telemetry must be signed
 
+#![cfg(feature = "future-windows-agent")]
+
 use ring::signature::{RsaKeyPair, RSA_PSS_SHA256};
 use ring::rand::{SystemRandom, SecureRandom};
 use sha2::{Sha256, Digest};

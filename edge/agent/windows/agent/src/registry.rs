@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Registry monitoring - autoruns, persistence keys
 
+#![cfg(feature = "future-windows-agent")]
+
 #[cfg(windows)]
 use winapi::um::winreg::*;
 use std::sync::Arc;

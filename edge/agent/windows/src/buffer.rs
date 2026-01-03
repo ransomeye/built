@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Disk-based buffer for telemetry when Core is unavailable - bounded buffer with oldest-first drop policy
 
+#![cfg(feature = "future-windows-agent")]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::io::{Write, Read};

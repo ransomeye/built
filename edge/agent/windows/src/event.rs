@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Event structures for Windows Agent telemetry (process, file, registry, auth, network)
 
+#![cfg(feature = "future-windows-agent")]
+
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 

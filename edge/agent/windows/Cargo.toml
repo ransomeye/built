@@ -11,6 +11,10 @@ description = "RansomEye Windows Agent - Standalone host-based telemetry sensor 
 autobins = false
 autolib = false
 
+[features]
+default = []
+future-windows-agent = []
+
 [[bin]]
 name = "agent-windows"
 path = "agent/src/main.rs"

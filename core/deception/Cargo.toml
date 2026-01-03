@@ -9,6 +9,10 @@ edition = "2021"
 authors = ["RansomEye Team"]
 license = "PROPRIETARY"
 
+[features]
+default = []
+future-deception = []
+
 [dependencies]
 tokio = { workspace = true }
 serde = { workspace = true }

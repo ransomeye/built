@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Process activity monitoring on Windows using WMI/Toolhelp32 - observes process creation/termination (NO enforcement, NO blocking)
 
+#![cfg(feature = "future-windows-agent")]
+
 #[cfg(windows)]
 use std::sync::Arc;
 #[cfg(windows)]

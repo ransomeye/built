@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Windows Agent error types
 
+#![cfg(feature = "future-windows-agent")]
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]

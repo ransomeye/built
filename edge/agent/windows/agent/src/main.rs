@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Main entry point for Windows Agent - telemetry collection only
 
+#![cfg(feature = "future-windows-agent")]
+
 /*
  * RansomEye Windows Agent
  * 

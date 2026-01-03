@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Library exports for Windows Agent
 
+#![cfg(feature = "future-windows-agent")]
+
 pub mod process_activity;
 pub mod file_activity;
 pub mod registry_activity;

@@ -3,6 +3,10 @@ name = "threat_feed"
 version = "1.0.0"
 edition = "2021"
 
+[features]
+default = []
+future-threat-feed = []
+
 [lib]
 name = "threat_feed"
 path = "src/lib.rs"

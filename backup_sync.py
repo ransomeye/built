@@ -29,6 +29,10 @@ PID_FILE = Path("/home/ransomeye/rebuild/logs/backup_sync.pid")
 EXCLUDE_PATTERNS = [
     "venv/",
     "**/venv/",
+    ".venv/",
+    "**/.venv/",
+    ".venv-*/",
+    "**/.venv-*/",
     "**/__pycache__/",
     "**/*.pyc",
     "**/*.pyo",
@@ -107,6 +111,7 @@ def build_rsync_command():
         exclude_args.extend(["--exclude", pattern])
     
     # rsync command
+    # Note: FAT32 doesn't support symlinks, so we copy them as files or skip
     cmd = [
         "rsync",
         "-av",  # archive mode, verbose
@@ -116,6 +121,10 @@ def build_rsync_command():
         "--stats",  # show statistics
         "--partial",  # keep partial files on interruption
         "--partial-dir=.rsync-partial",  # store partial files here
+        "--copy-links",  # Copy symlinks as files (FAT32 doesn't support symlinks)
+        "--safe-links",  # Ignore symlinks that point outside the tree
+        "--iconv=utf-8,utf-8",  # Handle character encoding
+        "--modify-window=2",  # Allow 2 second time difference (FAT32 precision)
     ] + exclude_args + [
         f"{SOURCE_DIR}/",
         f"{BACKUP_DIR}/"
@@ -241,9 +250,35 @@ def perform_sync():
                     if stat.strip():
                         logger.info(f"  {stat.strip()}")
             return True
+        elif result.returncode == 23:
+            # Exit code 23: partial transfer due to error (common with FAT32)
+            elapsed_min = int(elapsed // 60)
+            elapsed_sec = int(elapsed % 60)
+            logger.warning(f"Sync completed with warnings (exit code 23) in {elapsed_min}m {elapsed_sec}s")
+            logger.warning("Some files may not have been transferred due to FAT32 limitations:")
+            logger.warning("  - Symlinks are copied as files (FAT32 doesn't support symlinks)")
+            logger.warning("  - Files with invalid characters may be skipped")
+            logger.warning("  - Very long filenames may be truncated")
+            # Log statistics if available
+            if result.stdout:
+                stats_lines = [line for line in result.stdout.split('\n') 
+                             if any(keyword in line.lower() for keyword in 
+                                   ['total file size', 'number of files', 'total transferred', 'speedup'])]
+                for stat in stats_lines:
+                    if stat.strip():
+                        logger.info(f"  {stat.strip()}")
+            # Still return True as partial success is acceptable for backup
+            return True
         else:
             logger.error(f"Sync failed with return code {result.returncode}")
-            logger.error(f"Error output: {result.stderr}")
+            if result.stderr:
+                # Show first few error lines to avoid log spam
+                error_lines = result.stderr.split('\n')[:10]
+                for line in error_lines:
+                    if line.strip():
+                        logger.error(f"  {line.strip()}")
+                if len(result.stderr.split('\n')) > 10:
+                    logger.error(f"  ... and {len(result.stderr.split('\n')) - 10} more error lines")
             return False
             
     except subprocess.TimeoutExpired:

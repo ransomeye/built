@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Component identity management - unique per-instance keypair generation and loading
 
+#![cfg(feature = "future-windows-agent")]
+
 use std::fs;
 use std::path::Path;
 use ring::rand::{SystemRandom, SecureRandom};

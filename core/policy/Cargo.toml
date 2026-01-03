@@ -3,6 +3,10 @@ name = "policy"
 version = "1.0.0"
 edition = "2021"
 
+[features]
+default = []
+future-policy = []
+
 [lib]
 path = "engine/src/lib.rs"
 

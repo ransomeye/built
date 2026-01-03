@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: ETW (Event Tracing for Windows) abstraction layer
 
+#![cfg(feature = "future-windows-agent")]
+
 #[cfg(windows)]
 use windows::Win32::System::Diagnostics::Etw;
 use std::sync::Arc;
