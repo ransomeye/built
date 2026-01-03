@@ -3,6 +3,7 @@
 // Details of functionality of this file: HTTP ingestion server with POST /ingest/linux and /ingest/dpi endpoints - verifies signatures and writes to database
 
 use std::sync::Arc;
+use std::net::IpAddr;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -211,6 +212,11 @@ async fn handle_linux_ingest(
         .and_then(|v| v.get("remote_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    // Parse and validate IP, then convert back to string for PostgreSQL INET type
+    let network_src_ip_param: Option<String> =
+        network_src_ip.as_ref()
+            .and_then(|s| s.parse::<IpAddr>().ok())
+            .map(|ip| ip.to_string());
     let network_src_port = data.get("network_data")
         .and_then(|v| v.get("remote_port"))
         .and_then(|v| v.as_u64())
@@ -219,6 +225,11 @@ async fn handle_linux_ingest(
         .and_then(|v| v.get("local_addr"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    // Parse and validate IP, then convert back to string for PostgreSQL INET type
+    let network_dst_ip_param: Option<String> =
+        network_dst_ip.as_ref()
+            .and_then(|s| s.parse::<IpAddr>().ok())
+            .map(|ip| ip.to_string());
     let network_dst_port = data.get("network_data")
         .and_then(|v| v.get("local_port"))
         .and_then(|v| v.as_u64())
@@ -253,8 +264,8 @@ async fn handle_linux_ingest(
     // Diagnostic logging for all extracted values before insert
     error!("PRE-INSERT DIAGNOSTICS:");
     error!("  file_path (param 20): {:?}", file_path);
-    error!("  network_src_ip (param 21/inet): {:?}", network_src_ip);
-    error!("  network_dst_ip (param 23/inet): {:?}", network_dst_ip);
+    error!("  network_src_ip (param 21/inet): {:?} -> parsed: {:?}", network_src_ip, network_src_ip_param);
+    error!("  network_dst_ip (param 23/inet): {:?} -> parsed: {:?}", network_dst_ip, network_dst_ip_param);
     error!("  Data JSON keys: {:?}", data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
     
     // Pre-allocate strings that need to live for the duration of the query
@@ -269,9 +280,6 @@ async fn handle_linux_ingest(
         Some(data_hasher.finalize().to_vec())
     };
     
-    // Create explicit owned variable for file_path parameter
-    let file_path_param: Option<String> = file_path.clone();
-    
     let result = db.execute(
         r#"
         INSERT INTO linux_agent_telemetry (
@@ -283,7 +291,7 @@ async fn handle_linux_ingest(
         )
         VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20, $21::inet, $22, $23::inet, $24, $25, $26::jsonb, $27
+            $17, $18, $19, $20::text, $21::inet, $22, $23::inet, $24, $25, $26::jsonb, $27
         )
         "#,
         &[
@@ -306,10 +314,10 @@ async fn handle_linux_ingest(
             &process_name.as_deref(),
             &process_path.as_deref(),
             &cmdline.as_deref(),
-            &file_path_param.as_deref(),
-            &network_src_ip.as_deref(),
+            &file_path.as_deref(),
+            &network_src_ip_param.as_deref(),
             &network_src_port.map(|v| v as i32),
-            &network_dst_ip.as_deref(),
+            &network_dst_ip_param.as_deref(),
             &network_dst_port.map(|v| v as i32),
             &protocol.as_deref(),
             &payload_json,
@@ -393,9 +401,9 @@ async fn handle_linux_ingest(
             error!("  $18 (process_path): {:?}", process_path);
             error!("  $19 (cmdline): {:?}", cmdline);
             error!("  $20 (file_path): {:?}", file_path);
-            error!("  $21 (network_src_ip): {:?}", network_src_ip);
+            error!("  $21 (network_src_ip): {:?} (parsed: {:?})", network_src_ip, network_src_ip_param);
             error!("  $22 (network_src_port): {:?}", network_src_port);
-            error!("  $23 (network_dst_ip): {:?}", network_dst_ip);
+            error!("  $23 (network_dst_ip): {:?} (parsed: {:?})", network_dst_ip, network_dst_ip_param);
             error!("  $24 (network_dst_port): {:?}", network_dst_port);
             error!("  $25 (protocol): {:?}", protocol);
             error!("  $26 (payload_json): {} bytes", payload_json.len());
@@ -473,9 +481,17 @@ async fn handle_dpi_ingest(
         })?;
 
     // Parse event data to extract fields
-    let src_ip = data.get("src_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let src_ip: Option<String> = data.get("src_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
+    // Parse and validate IP, then convert back to string for PostgreSQL INET type
+    let src_ip_param: Option<String> = src_ip.as_ref()
+        .and_then(|s| s.parse::<IpAddr>().ok())
+        .map(|ip| ip.to_string());
     let src_port = data.get("src_port").and_then(|v| v.as_u64()).map(|v| v as i64);
-    let dst_ip = data.get("dst_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let dst_ip: Option<String> = data.get("dst_ip").and_then(|v| v.as_str()).map(|s| s.to_string());
+    // Parse and validate IP, then convert back to string for PostgreSQL INET type
+    let dst_ip_param: Option<String> = dst_ip.as_ref()
+        .and_then(|s| s.parse::<IpAddr>().ok())
+        .map(|ip| ip.to_string());
     let dst_port = data.get("dst_port").and_then(|v| v.as_u64()).map(|v| v as i64);
     let protocol = data.get("protocol").and_then(|v| v.as_str()).map(|s| s.to_string());
     let bytes_in: Option<i64> = None; // Not in current envelope structure
@@ -514,8 +530,8 @@ async fn handle_dpi_ingest(
             http_host, http_method, http_path, iface_name, flow_id, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, CAST($9 AS inet), $10, CAST($11 AS inet), $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, CAST($23 AS jsonb), $24, $25
+            $1, $2, $3, $4, $5, $6, $7, $8, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21, $22, $23, $24::jsonb, $25
         )
         "#,
         &[
@@ -527,9 +543,9 @@ async fn handle_dpi_ingest(
             &Some("RSA-PSS-SHA256".to_string()),
             &payload.payload_hash,
             &timestamp,
-            &src_ip,
+            &src_ip_param.as_deref(),
             &src_port.map(|v| v as i32),
-            &dst_ip,
+            &dst_ip_param.as_deref(),
             &dst_port.map(|v| v as i32),
             &protocol,
             &bytes_in,
