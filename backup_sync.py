@@ -21,7 +21,7 @@ from datetime import datetime
 SOURCE_DIR = Path("/home/ransomeye/rebuild")
 BACKUP_DIR = Path("/mnt/pendrive/rebuild")
 LOG_FILE = Path("/home/ransomeye/rebuild/logs/backup_sync.log")
-SYNC_INTERVAL = 30  # seconds between syncs
+SYNC_INTERVAL = 3600  # 1 hour between syncs
 PID_FILE = Path("/home/ransomeye/rebuild/logs/backup_sync.pid")
 
 # Exclude patterns for rsync
@@ -181,6 +181,96 @@ def remove_pid_file():
     except Exception as e:
         logger.error(f"Failed to remove PID file: {e}")
 
+def is_git_repository():
+    """Check if source directory is a git repository."""
+    git_dir = SOURCE_DIR / ".git"
+    return git_dir.exists() and git_dir.is_dir()
+
+def perform_git_commit():
+    """Perform git add, commit before sync."""
+    if not is_git_repository():
+        logger.debug("Source directory is not a git repository, skipping git commit")
+        return True
+    
+    try:
+        # Change to source directory
+        os.chdir(SOURCE_DIR)
+        
+        # Check if there are any changes
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            logger.warning(f"Git status check failed: {result.stderr}")
+            return False
+        
+        # If no changes, skip commit
+        if not result.stdout.strip():
+            logger.debug("No git changes detected, skipping commit")
+            return True
+        
+        # Add all changes
+        logger.info("Staging git changes...")
+        add_result = subprocess.run(
+            ["git", "add", "-A"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        if add_result.returncode != 0:
+            logger.error(f"Git add failed: {add_result.stderr}")
+            return False
+        
+        # Create commit with timestamp
+        commit_message = f"Auto-backup commit: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        logger.info(f"Creating git commit: {commit_message}")
+        
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if commit_result.returncode == 0:
+            logger.info("Git commit created successfully")
+            # Try to push if remote is configured (non-blocking)
+            try:
+                push_result = subprocess.run(
+                    ["git", "push"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                if push_result.returncode == 0:
+                    logger.info("Git push completed successfully")
+                else:
+                    logger.debug(f"Git push skipped or failed (non-critical): {push_result.stderr[:100]}")
+            except Exception as e:
+                logger.debug(f"Git push skipped (non-critical): {e}")
+            return True
+        elif "nothing to commit" in commit_result.stdout.lower() or "nothing to commit" in commit_result.stderr.lower():
+            logger.debug("No changes to commit")
+            return True
+        else:
+            logger.warning(f"Git commit failed: {commit_result.stderr}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Git operation timed out")
+        return False
+    except Exception as e:
+        logger.error(f"Exception during git commit: {e}")
+        return False
+    finally:
+        # Restore working directory
+        os.chdir(SOURCE_DIR.parent if SOURCE_DIR.parent else "/")
+
 def main():
     """Main sync loop."""
     global shutdown_flag
@@ -193,14 +283,15 @@ def main():
     write_pid_file()
     
     logger.info("=" * 60)
-    logger.info("RansomEye Backup Sync Service Started")
+    logger.info("Personal Backup Sync Service Started")
     logger.info(f"Source: {SOURCE_DIR}")
     logger.info(f"Destination: {BACKUP_DIR}")
-    logger.info(f"Sync Interval: {SYNC_INTERVAL} seconds")
+    logger.info(f"Sync Interval: {SYNC_INTERVAL} seconds ({SYNC_INTERVAL // 60} minutes)")
     logger.info("=" * 60)
     
     # Initial sync
     logger.info("Performing initial sync...")
+    perform_git_commit()
     perform_sync()
     
     # Continuous sync loop
@@ -214,6 +305,8 @@ def main():
             
             sync_count += 1
             logger.info(f"\n--- Sync Cycle #{sync_count} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
+            # Perform git commit before sync
+            perform_git_commit()
             perform_sync()
             
         except KeyboardInterrupt:

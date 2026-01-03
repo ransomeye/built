@@ -14,6 +14,7 @@ use crate::hasher::EvidenceHasher;
 
 /// Evidence collector - gathers and prepares evidence for preservation
 /// Ensures all evidence is properly attributed and timestamped
+#[cfg(feature = "future-reporting")]
 pub struct EvidenceCollector {
     hasher: EvidenceHasher,
     engine_version: String,
@@ -21,6 +22,7 @@ pub struct EvidenceCollector {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "future-reporting")]
 pub struct CollectedEvidence {
     pub evidence_id: String,
     pub source: String,
@@ -32,6 +34,7 @@ pub struct CollectedEvidence {
     pub integrity_hash: String,
 }
 
+#[cfg(feature = "future-reporting")]
 impl EvidenceCollector {
     pub fn new(engine_version: &str, policy_version: &str) -> Self {
         Self {

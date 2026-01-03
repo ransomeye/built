@@ -3,6 +3,12 @@ name = "reporting"
 version = "1.0.0"
 edition = "2021"
 
+[features]
+default = []
+# Feature flags for planned/future reporting subsystems
+future-reporting = []  # Advanced reporting features (ReportBuilder, EvidenceCollector, etc.)
+future-retention = []   # Retention management features
+
 [dependencies]
 tokio = { workspace = true }
 serde = { workspace = true }

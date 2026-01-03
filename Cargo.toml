@@ -34,6 +34,10 @@ members = [
     "qa/lifecycle",
 ]
 resolver = "2"
+# Feature flags for inactive/planned subsystems
+# Production build uses default = [] (no features enabled)
+# Future phases can enable specific features as needed
+default = []
 
 [workspace.package]
 version = "1.0.0"

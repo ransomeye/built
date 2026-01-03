@@ -3,6 +3,11 @@ name = "forensics"
 version = "1.0.0"
 edition = "2021"
 
+[features]
+default = []
+# Feature flags for planned/future forensics subsystems
+future-forensics = []  # Advanced forensics features (EvidenceCollector, etc.)
+
 [lib]
 name = "forensics"
 path = "src/lib.rs"

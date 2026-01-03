@@ -1,0 +1,18 @@
+# Path and File Name : /home/ransomeye/rebuild/pendrive-mount.mount
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd mount unit for auto-mounting external pendrive at boot
+
+[Unit]
+Description=Personal Backup Pendrive Mount
+Before=backup-sync.service
+Requires=systemd-fsck@dev-sdc1.service
+
+[Mount]
+What=/dev/disk/by-uuid/1601-1054
+Where=/mnt/pendrive
+Type=vfat
+Options=defaults,uid=1000,gid=1000,umask=0002
+
+[Install]
+WantedBy=multi-user.target
+

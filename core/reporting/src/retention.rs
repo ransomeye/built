@@ -15,12 +15,14 @@ use crate::hasher::EvidenceHasher;
 
 /// Retention policy configuration
 #[derive(Debug, Clone)]
+#[cfg(feature = "future-retention")]
 pub struct RetentionPolicy {
     pub forensic_retention_days: i64,
     pub ai_artifact_min_retention_years: i64,
     pub disk_max_usage_percent: u8,
 }
 
+#[cfg(feature = "future-retention")]
 impl Default for RetentionPolicy {
     fn default() -> Self {
         Self {
@@ -33,6 +35,7 @@ impl Default for RetentionPolicy {
 
 /// Purge event - logged for audit trail
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(feature = "future-retention")]
 pub struct PurgeEvent {
     pub timestamp: DateTime<Utc>,
     pub event_type: String,
@@ -44,6 +47,7 @@ pub struct PurgeEvent {
 }
 
 /// Retention manager - enforces retention policies
+#[cfg(feature = "future-retention")]
 pub struct RetentionManager {
     policy: RetentionPolicy,
     store: EvidenceStore,
@@ -51,6 +55,7 @@ pub struct RetentionManager {
     ledger_path: PathBuf,
 }
 
+#[cfg(feature = "future-retention")]
 impl RetentionManager {
     pub fn new(
         store: EvidenceStore,
