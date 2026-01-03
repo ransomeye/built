@@ -7,6 +7,7 @@ use std::path::Path;
 use std::fs;
 use sha2::{Sha256, Digest};
 use hex;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tracing::{error, debug, warn};
 use parking_lot::RwLock;
 use once_cell::sync::Lazy;
@@ -119,7 +120,7 @@ impl TrustChain {
             
             if path.is_file() {
                 let key_data = fs::read_to_string(&path)?;
-                let key_bytes = base64::decode(key_data.trim())?;
+                let key_bytes = STANDARD.decode(key_data.trim())?;
                 let key_id = path.file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown")

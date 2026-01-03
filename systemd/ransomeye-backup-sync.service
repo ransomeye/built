@@ -1,0 +1,32 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-backup-sync.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for continuous backup sync to external pendrive
+
+[Unit]
+Description=RansomEye Continuous Backup Sync Service
+Documentation=https://ransomeye.tech
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/backup_sync.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ransomeye-backup-sync
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

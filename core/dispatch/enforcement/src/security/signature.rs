@@ -5,6 +5,7 @@
 use ring::signature::{UnparsedPublicKey, RSA_PSS_SHA256};
 use x509_parser::pem::Pem;
 use x509_parser::prelude::*;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tracing::{error, warn, debug};
 use crate::errors::EnforcementError;
 
@@ -43,7 +44,7 @@ impl SignatureVerifier {
             .collect();
         
         let base64_content = pem_lines.join("");
-        let key_bytes = base64::decode(&base64_content)
+        let key_bytes = STANDARD.decode(&base64_content)
             .map_err(|e| EnforcementError::ConfigurationError(format!("Base64 decode failed: {}", e)))?;
         
         // Try to parse as SubjectPublicKeyInfo
@@ -57,7 +58,7 @@ impl SignatureVerifier {
     
     /// Verify signature using RSA-PSS-SHA256
     pub fn verify(&self, data: &[u8], signature: &str) -> Result<bool, EnforcementError> {
-        let signature_bytes = base64::decode(signature)
+        let signature_bytes = STANDARD.decode(signature)
             .map_err(|e| EnforcementError::InvalidSignature(format!("Base64 decode failed: {}", e)))?;
         
         // Verify signature using UnparsedPublicKey

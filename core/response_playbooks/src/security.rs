@@ -5,7 +5,7 @@
 use std::fs;
 use ring::signature::{self, UnparsedPublicKey};
 use sha2::{Sha256, Digest};
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::errors::PlaybookError;
 
 pub struct PlaybookSignatureVerifier {
@@ -63,7 +63,7 @@ impl PlaybookSignatureVerifier {
         }
         
         // Decode signature
-        let signature_bytes = base64::decode(signature)
+        let signature_bytes = STANDARD.decode(signature)
             .map_err(|e| PlaybookError::InvalidSignature(
                 format!("Failed to decode signature: {}", e)
             ))?;

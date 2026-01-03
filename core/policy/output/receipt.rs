@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use sha2::{Sha256, Digest};
 use hex;
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecisionReceipt {
@@ -47,7 +47,7 @@ impl DecisionReceipt {
         let json_bytes = serde_json::to_vec(self).expect("Failed to serialize receipt");
         hasher.update(&json_bytes);
         let hash = hasher.finalize();
-        base64::encode(hash)
+        STANDARD.encode(hash)
     }
 
     pub fn verify(&self) -> bool {

@@ -7,7 +7,7 @@ use ring::rand::{SystemRandom, SecureRandom};
 use sha2::{Sha256, Digest};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hex;
 use serde::{Serialize, Deserialize};
 use thiserror::Error;
@@ -74,7 +74,7 @@ impl EventSigner {
         self.keypair.sign(&RSA_PSS_SHA256, &self.rng, &hash, &mut signature_bytes)
             .map_err(|e| SigningError::SigningFailed(format!("{}", e)))?;
         
-        let signature = base64::encode(&signature_bytes);
+        let signature = STANDARD.encode(&signature_bytes);
         
         Ok(SignedEvent {
             message_id,

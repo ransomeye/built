@@ -304,7 +304,6 @@ async fn handle_linux_ingest(
         &ingest_accept_payload_sha256,
     ).await.map_err(|e| {
         error!("FAIL-CLOSED: Failed to insert INGEST_ACCEPT audit log: {}", e);
-        let _ = db.execute("ROLLBACK", &[]).await;
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -369,7 +368,6 @@ async fn handle_linux_ingest(
         &raw_event_insert_payload_sha256,
     ).await.map_err(|e| {
         error!("FAIL-CLOSED: Failed to insert RAW_EVENT_INSERT audit log: {}", e);
-        let _ = db.execute("ROLLBACK", &[]).await;
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -673,7 +671,6 @@ async fn handle_dpi_ingest(
         &ingest_accept_payload_sha256,
     ).await.map_err(|e| {
         error!("FAIL-CLOSED: Failed to insert INGEST_ACCEPT audit log: {}", e);
-        let _ = db.execute("ROLLBACK", &[]).await;
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -758,7 +755,6 @@ async fn handle_dpi_ingest(
         &raw_event_insert_payload_sha256,
     ).await.map_err(|e| {
         error!("FAIL-CLOSED: Failed to insert RAW_EVENT_INSERT audit log: {}", e);
-        let _ = db.execute("ROLLBACK", &[]).await;
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

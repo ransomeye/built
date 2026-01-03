@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnforcementDirective {
@@ -82,7 +82,7 @@ impl DirectiveGenerator {
         let mut hasher = Sha256::new();
         hasher.update(&json_bytes);
         let hash = hasher.finalize();
-        Ok(base64::encode(hash))
+        Ok(STANDARD.encode(hash))
     }
 
     pub fn verify_directive(&self, directive: &EnforcementDirective) -> Result<bool, Box<dyn std::error::Error>> {

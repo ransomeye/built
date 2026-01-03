@@ -17,6 +17,7 @@ use sha2::{Sha256, Digest};
 use x509_parser::prelude::*;
 use x509_parser::public_key::PublicKey;
 use chrono::{DateTime, Utc};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tracing::{error, warn, debug};
 use base64;
 
@@ -182,7 +183,7 @@ impl IdentityVerifier {
                 let hash = hasher.finalize();
                 
                 // Decode signature
-                let signature_bytes = base64::decode(&envelope.signature)
+                let signature_bytes = STANDARD.decode(&envelope.signature)
                     .map_err(|e| IdentityError::SignatureVerificationFailed(
                         format!("Failed to decode signature: {}", e)
                     ))?;

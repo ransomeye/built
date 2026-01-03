@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use tracing::{info, error};
+use tracing::info;
 use thiserror::Error;
 
 pub mod core;

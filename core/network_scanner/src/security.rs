@@ -5,7 +5,7 @@
 use std::fs;
 use ring::signature::{self, UnparsedPublicKey, KeyPair, Ed25519KeyPair};
 use sha2::{Sha256, Digest};
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::errors::ScannerError;
 use crate::result::ScanResult;
 
@@ -52,7 +52,7 @@ impl ScanResultSigner {
         let signature_bytes = self.key_pair.sign(hash.as_bytes());
         
         // Encode signature
-        Ok(base64::encode(signature_bytes.as_ref()))
+        Ok(STANDARD.encode(signature_bytes.as_ref()))
     }
     
     /// Sign and attach signature to result
@@ -94,7 +94,7 @@ impl ScanResultVerifier {
         }
         
         // Decode signature
-        let signature_bytes = base64::decode(&result.signature)
+        let signature_bytes = STANDARD.decode(&result.signature)
             .map_err(|e| ScannerError::InvalidSignature(
                 format!("Failed to decode signature: {}", e)
             ))?;

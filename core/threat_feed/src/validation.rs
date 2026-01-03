@@ -7,7 +7,7 @@ use std::fs;
 use tracing::{warn, error};
 use ring::signature::{UnparsedPublicKey, VerificationAlgorithm};
 use ring::signature::RSA_PSS_2048_8192_SHA256;
-use base64;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sha2::{Sha256, Digest};
 use hex;
 
@@ -58,7 +58,7 @@ impl FeedValidator {
         // For now, we'll do a basic validation
         
         // Decode signature
-        let signature_bytes = base64::decode(&bundle.signature)
+        let signature_bytes = STANDARD.decode(&bundle.signature)
             .map_err(|e| ThreatFeedError::InvalidSignature(format!("Failed to decode signature: {}", e)))?;
         
         // Compute hash of bundle data (excluding signature)
