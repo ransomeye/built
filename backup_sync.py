@@ -14,6 +14,7 @@ import time
 import subprocess
 import signal
 import logging
+import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -138,14 +139,25 @@ def perform_sync():
         start_time = time.time()
         last_progress_log = start_time
         
-        # Log initial sync start with size info
+        # Log initial sync start
+        logger.info("Calculating directory sizes...")
         try:
-            import shutil
-            source_size = shutil.disk_usage(SOURCE_DIR).used
-            dest_size = shutil.disk_usage(BACKUP_DIR).used if BACKUP_DIR.exists() else 0
-            logger.info(f"Source size: {source_size / (1024**3):.2f} GB, Already synced: {dest_size / (1024**3):.2f} GB")
-        except:
-            pass
+            # Use du command for accurate directory sizes
+            source_result = subprocess.run(
+                ["du", "-sb", str(SOURCE_DIR)],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if source_result.returncode == 0:
+                source_size = int(source_result.stdout.split()[0])
+                logger.info(f"Source directory size: {source_size / (1024**3):.2f} GB")
+            else:
+                source_size = 0
+                logger.info("Could not calculate source size")
+        except Exception as e:
+            logger.debug(f"Size calculation error: {e}")
+            source_size = 0
         
         # Run rsync with progress monitoring
         process = subprocess.Popen(
@@ -175,12 +187,24 @@ def perform_sync():
                 elapsed_min = int(elapsed_so_far // 60)
                 elapsed_sec = int(elapsed_so_far % 60)
                 
-                # Check current backup size
+                # Check current backup size (quick check every 30s, full check every 2 min)
                 try:
-                    current_dest_size = shutil.disk_usage(BACKUP_DIR).used if BACKUP_DIR.exists() else 0
-                    progress_pct = (current_dest_size / source_size * 100) if source_size > 0 else 0
-                    logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed, ~{progress_pct:.1f}% complete, {current_dest_size / (1024**3):.2f} GB synced)")
-                except:
+                    if int(elapsed_so_far) % 120 < 30:  # Full check every 2 minutes
+                        dest_result = subprocess.run(
+                            ["du", "-sb", str(BACKUP_DIR)],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        if dest_result.returncode == 0:
+                            current_dest_size = int(dest_result.stdout.split()[0])
+                            progress_pct = (current_dest_size / source_size * 100) if source_size > 0 else 0
+                            logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed, ~{progress_pct:.1f}% complete, {current_dest_size / (1024**3):.2f} GB synced)")
+                        else:
+                            logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
+                    else:
+                        logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
+                except Exception as e:
                     logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
                 
                 last_progress_log = current_time
