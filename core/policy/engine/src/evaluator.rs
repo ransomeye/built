@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy evaluator with runtime safety guards
 
-#![cfg(feature = "future-policy")]
 
 use std::sync::Arc;
 use std::collections::HashSet;

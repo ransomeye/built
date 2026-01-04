@@ -4,8 +4,6 @@
 
 use crate::input::validated_events::ValidatedEvent;
 use crate::kill_chain::rules::Signal;
-use chrono::Utc;
-use std::collections::HashMap;
 
 /// Event normalizer
 pub struct EventNormalizer;
@@ -50,6 +48,7 @@ impl EventNormalizer {
 mod tests {
     use super::*;
     use crate::input::validated_events::ValidationMetadata;
+    use std::collections::HashMap;
 
     #[test]
     fn test_normalization() {
@@ -59,11 +58,11 @@ mod tests {
         let event = ValidatedEvent {
             event_id: "e1".to_string(),
             entity_id: "entity1".to_string(),
-            timestamp: Utc::now(),
+            timestamp: chrono::Utc::now(),
             signal_type: "test_signal".to_string(),
             payload,
             validation_metadata: ValidationMetadata {
-                validated_at: Utc::now(),
+                validated_at: chrono::Utc::now(),
                 validator_version: "1.0".to_string(),
                 checks_passed: vec![],
                 validation_hash: None,

@@ -17,20 +17,20 @@ use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
 
 pub struct SignatureVerifier {
-    config: Config,
+    _config: Config,
 }
 
 impl SignatureVerifier {
     pub fn new(config: &Config) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
         })
     }
     
     /// Verify signature
     /// NOTE: Signature verification is now performed by IdentityVerifier during authentication.
     /// This method is kept for backward compatibility but always returns Ok.
-    pub async fn verify(&self, envelope: &EventEnvelope) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn verify(&self, _envelope: &EventEnvelope) -> Result<(), Box<dyn std::error::Error>> {
         // Signature is already verified by IdentityVerifier during authentication
         debug!("Signature verification skipped (handled by identity verification)");
         Ok(())

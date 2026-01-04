@@ -2,7 +2,7 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details: Detection result output - authoritative detection outputs for Policy Engine
 
-use crate::explainability::{ExplainabilityArtifact, ConfidenceBreakdown};
+use crate::explainability::ExplainabilityArtifact;
 use crate::kill_chain::stages::RansomwareStage;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

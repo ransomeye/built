@@ -14,7 +14,7 @@ use std::sync::Arc;
 use x509_parser::prelude::*;
 use ring::signature::{UnparsedPublicKey, RSA_PSS_2048_8192_SHA256};
 use sha2::{Sha256, Digest};
-use tracing::{error, debug, warn};
+use tracing::{debug, warn};
 
 use crate::security::errors::IdentityError;
 use crate::security::trust_store::TrustStore;

@@ -10,12 +10,11 @@
  */
 
 use std::env;
-use tracing::error;
 
 // Import validation from config directory
 #[path = "../config/validation.rs"]
 mod validation;
-use validation::{ConfigValidator, ValidationError};
+use validation::ConfigValidator;
 
 #[derive(Clone)]
 pub struct Config {

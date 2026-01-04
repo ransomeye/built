@@ -19,7 +19,7 @@ use tracing::{warn, debug};
 use crate::config::Config;
 
 pub struct BackpressureController {
-    config: Config,
+    _config: Config,
     backpressure_states: Arc<DashMap<String, BackpressureState>>,
     global_backpressure: Arc<RwLock<bool>>,
 }

@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Deterministic conflict detection and resolution
 
-#![cfg(feature = "future-policy")]
 
 use tracing::{error, debug, warn};
 use crate::errors::PolicyError;

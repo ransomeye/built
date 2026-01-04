@@ -64,12 +64,12 @@ pub struct CorrelationEngine {
     inferencer: KillChainInferencer,
     /// Confidence scorer
     scorer: ConfidenceScorer,
-    /// Temporal correlator
-    temporal_correlator: Arc<parking_lot::RwLock<TemporalCorrelator>>,
-    /// Entity graph
-    graph: Arc<parking_lot::RwLock<EntityGraph>>,
-    /// Scheduler
-    scheduler: Arc<EntityScheduler>,
+    /// Temporal correlator (stored for future use)
+    _temporal_correlator: Arc<parking_lot::RwLock<TemporalCorrelator>>,
+    /// Entity graph (stored for future use)
+    _graph: Arc<parking_lot::RwLock<EntityGraph>>,
+    /// Scheduler (stored for future use)
+    _scheduler: Arc<EntityScheduler>,
     /// Invariant enforcer
     invariant_enforcer: Arc<parking_lot::RwLock<InvariantEnforcer>>,
     /// Configuration
@@ -110,9 +110,9 @@ impl CorrelationEngine {
             state_manager,
             inferencer: KillChainInferencer::new(),
             scorer: ConfidenceScorer::new(),
-            temporal_correlator,
-            graph,
-            scheduler,
+            _temporal_correlator: temporal_correlator,
+            _graph: graph,
+            _scheduler: scheduler,
             invariant_enforcer,
             config,
         }

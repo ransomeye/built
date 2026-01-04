@@ -16,9 +16,9 @@ use ring::signature::{UnparsedPublicKey, RSA_PSS_2048_8192_SHA256};
 use sha2::{Sha256, Digest};
 use x509_parser::prelude::*;
 use x509_parser::public_key::PublicKey;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use tracing::{error, warn, debug};
+use tracing::debug;
 use base64;
 
 use crate::security::errors::{IdentityError, VerifiedIdentity};

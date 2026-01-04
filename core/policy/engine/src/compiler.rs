@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Policy language compiler - validates and compiles policies
 
-#![cfg(feature = "future-policy")]
 
 use tracing::{error, debug};
 use crate::errors::PolicyError;

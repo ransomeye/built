@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Test RSA-PSS sign and verify roundtrip
 
-#![cfg(feature = "future-policy")]
 
 use ring::signature::{RsaKeyPair, UnparsedPublicKey, RSA_PSS_SHA256, RSA_PSS_2048_8192_SHA256};
 use ring::rand::SystemRandom;

@@ -20,7 +20,6 @@ use dashmap::DashMap;
 use parking_lot::RwLock;
 use sha2::{Sha256, Digest};
 use tracing::{warn, debug};
-use chrono::Utc;
 
 use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
@@ -32,7 +31,7 @@ struct ContentHashRecord {
 }
 
 pub struct ContentDeduplicator {
-    config: Config,
+    _config: Config,
     content_hashes: Arc<DashMap<String, ContentHashRecord>>,
     dedup_window: Duration,
     last_cleanup: Arc<RwLock<Instant>>,
@@ -48,7 +47,7 @@ impl ContentDeduplicator {
         let dedup_window = Duration::from_secs(dedup_window_seconds);
         
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             content_hashes: Arc::new(DashMap::new()),
             dedup_window,
             last_cleanup: Arc::new(RwLock::new(Instant::now())),

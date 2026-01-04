@@ -83,7 +83,7 @@ impl EntityGraph {
     }
 
     /// Find path between entities (BFS)
-    pub fn find_path(&self, from: &str, to: &str, max_depth: usize) -> Option<Vec<String>> {
+    pub fn find_path(&self, from: &str, to: &str, _max_depth: usize) -> Option<Vec<String>> {
         if from == to {
             return Some(vec![from.to_string()]);
         }

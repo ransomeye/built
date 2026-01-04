@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{info, error, warn, debug};
+use tracing::{info, error, debug};
 
 use crate::auth::Authenticator;
 use crate::signature::SignatureVerifier;

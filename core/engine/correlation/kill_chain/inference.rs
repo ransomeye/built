@@ -5,7 +5,6 @@
 use crate::kill_chain::rules::{KillChainRuleEngine, Signal};
 use crate::kill_chain::stages::{RansomwareStage, StageMetadata};
 use crate::kill_chain::transitions::{TransitionResult, TransitionRules};
-use chrono::{DateTime, Utc};
 
 /// Kill-chain inference result
 #[derive(Debug, Clone)]

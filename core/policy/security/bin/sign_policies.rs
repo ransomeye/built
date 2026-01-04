@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Binary tool to sign policy files using ring
 
-#![cfg(feature = "future-policy")]
 
 use std::env;
 use std::path::{Path, PathBuf};

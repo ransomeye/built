@@ -13,7 +13,6 @@
 
 use std::sync::Arc;
 use dashmap::DashMap;
-use parking_lot::RwLock;
 use tracing::{warn, debug};
 
 use crate::protocol::event_envelope::EventEnvelope;
@@ -21,7 +20,7 @@ use crate::config::Config;
 use crate::security::replay_protection::ReplayProtector;
 
 pub struct OrderingManager {
-    config: Config,
+    _config: Config,
     replay_protector: Arc<ReplayProtector>,
     producer_sequences: Arc<DashMap<String, u64>>,
     expected_sequences: Arc<DashMap<String, u64>>,
@@ -30,7 +29,7 @@ pub struct OrderingManager {
 impl OrderingManager {
     pub fn new(config: &Config) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             replay_protector: Arc::new(ReplayProtector::new()?),
             producer_sequences: Arc::new(DashMap::new()),
             expected_sequences: Arc::new(DashMap::new()),

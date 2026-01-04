@@ -13,10 +13,8 @@
 use std::sync::Arc;
 use std::path::Path;
 use std::fs;
-use std::collections::HashSet;
 use dashmap::DashMap;
 use x509_parser::prelude::*;
-use x509_parser::revocation_list::*;
 use chrono::{DateTime, Utc};
 use tracing::{warn, debug, error, info};
 use parking_lot::RwLock;

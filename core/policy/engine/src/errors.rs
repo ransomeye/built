@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Error types for policy engine - all errors are fail-closed
 
-#![cfg(feature = "future-policy")]
 
 use thiserror::Error;
 

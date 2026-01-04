@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Ring-based RSA-4096 policy signing tool (build-time)
 
-#![cfg(feature = "future-policy")]
 
 /*
  * Policy Signing Tool

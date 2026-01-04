@@ -2,7 +2,6 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Standalone tool to sign policy files using ring RSA-PSS-SHA256
 
-#![cfg(feature = "future-policy")]
 
 use std::path::Path;
 use std::fs;

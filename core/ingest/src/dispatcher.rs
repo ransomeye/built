@@ -19,14 +19,14 @@ use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
 
 pub struct EventDispatcher {
-    config: Config,
+    _config: Config,
     control_plane_address: String,
 }
 
 impl EventDispatcher {
     pub fn new(config: &Config) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             control_plane_address: config.control_plane_address.clone(),
         })
     }

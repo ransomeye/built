@@ -186,7 +186,8 @@ impl RateLimiter {
         self.check_component_quota(component_type).await
     }
     
-    async fn check_global_cap(&self) -> bool {
+    #[allow(dead_code)]
+    async fn _check_global_cap(&self) -> bool {
         let mut cap = self.global_cap.write();
         let now = Instant::now();
         

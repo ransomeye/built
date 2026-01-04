@@ -14,16 +14,16 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use serde_json::Value;
 use tracing::{error, debug};
-use jsonschema::{JSONSchema, Draft};
+use jsonschema::JSONSchema;
 
 use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
 use crate::versioning::VersionManager;
 
 pub struct SchemaValidator {
-    config: Config,
+    _config: Config,
     version_manager: Arc<VersionManager>,
-    schemas: HashMap<u32, Value>,
+    _schemas: HashMap<u32, Value>,
     compiled_schemas: HashMap<u32, JSONSchema>,
 }
 
@@ -45,9 +45,9 @@ impl SchemaValidator {
         compiled_schemas.insert(1, compiled);
         
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             version_manager: Arc::new(VersionManager::new()?),
-            schemas,
+            _schemas: schemas,
             compiled_schemas,
         })
     }

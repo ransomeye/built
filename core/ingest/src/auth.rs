@@ -14,27 +14,25 @@ use std::sync::Arc;
 use std::net::SocketAddr;
 use dashmap::DashMap;
 use chrono::{DateTime, Utc};
-use tracing::{error, warn, debug};
+use tracing::{error, debug};
 
 use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
 use crate::security::identity::IdentityVerifier;
-use crate::security::revocation::RevocationChecker;
 use crate::security::replay_protection::ReplayProtector;
-use crate::security::errors::IdentityError;
 
 pub struct Authenticator {
-    config: Config,
+    _config: Config,
     identity_verifier: Arc<IdentityVerifier>,
     replay_protector: Arc<ReplayProtector>,
     producer_cache: Arc<DashMap<String, ProducerInfo>>,
 }
 
 struct ProducerInfo {
-    producer_id: String,
-    component_type: String,
-    authenticated_at: DateTime<Utc>,
-    expires_at: DateTime<Utc>,
+    _producer_id: String,
+    _component_type: String,
+    _authenticated_at: DateTime<Utc>,
+    _expires_at: DateTime<Utc>,
 }
 
 impl Authenticator {
@@ -44,7 +42,7 @@ impl Authenticator {
         replay_protector: Arc<ReplayProtector>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             identity_verifier,
             replay_protector,
             producer_cache: Arc::new(DashMap::new()),
@@ -88,10 +86,10 @@ impl Authenticator {
         
         // Step 4: Cache producer info
         let producer_info = ProducerInfo {
-            producer_id: producer_id.clone(),
-            component_type,
-            authenticated_at: Utc::now(),
-            expires_at: verified_identity.valid_until,
+            _producer_id: producer_id.clone(),
+            _component_type: component_type,
+            _authenticated_at: Utc::now(),
+            _expires_at: verified_identity.valid_until,
         };
         self.producer_cache.insert(producer_id.clone(), producer_info);
         
