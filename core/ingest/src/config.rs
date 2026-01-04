@@ -20,6 +20,7 @@ use validation::ConfigValidator;
 pub struct Config {
     pub listen_address: String,
     pub control_plane_address: String,
+    pub public_hostname: Option<String>,
     pub buffer_capacity: usize,
     pub producer_rate_limit: u64,
     pub global_rate_limit: u64,
@@ -40,6 +41,8 @@ impl Config {
             .unwrap_or_else(|_| "127.0.0.1:9090".to_string());
         ConfigValidator::validate_address(&control_plane_address)
             .map_err(|e| format!("Invalid control plane address: {}", e))?;
+        
+        let public_hostname = env::var("RANSOMEYE_PUBLIC_HOSTNAME").ok();
         
         let buffer_capacity = env::var("RANSOMEYE_BUFFER_CAPACITY")
             .unwrap_or_else(|_| "10000".to_string())
@@ -88,6 +91,7 @@ impl Config {
         Ok(Config {
             listen_address,
             control_plane_address,
+            public_hostname,
             buffer_capacity,
             producer_rate_limit,
             global_rate_limit,

@@ -9,12 +9,9 @@ pub enum SentinelError {
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
     #[error("Hardening error: {0}")]
-    #[allow(dead_code)]
     HardeningError(String),
-    #[allow(dead_code)]
     #[error("Monitor error: {0}")]
     MonitorError(String),
-    #[allow(dead_code)]
     #[error("Alert error: {0}")]
     AlertError(String),
 }
