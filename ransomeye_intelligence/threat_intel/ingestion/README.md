@@ -19,11 +19,14 @@ This directory contains collectors for threat intelligence feeds that enhance Ra
 **Credentials:**
 - Auth-Key: `483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f`
 - Set via `RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY` environment variable
+- Enable via `RANSOMEYE_FEED_MALWAREBAZAAR_ENABLED=true` environment variable
 
 **Usage:**
 ```bash
+export RANSOMEYE_FEED_MALWAREBAZAAR_ENABLED="true"
 export RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
-python3 -m ransomeye_intelligence.threat_intel.ingestion.malwarebazaar_feed --limit 100
+cd /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/ingestion
+python3 malwarebazaar_feed.py --limit 100
 ```
 
 **Cache Location:** `/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/cache/malwarebazaar/`
@@ -36,9 +39,13 @@ python3 -m ransomeye_intelligence.threat_intel.ingestion.malwarebazaar_feed --li
 
 **Format:** STIX 2.1 JSON
 
+**Enable via:** `RANSOMEYE_FEED_WIZ_ENABLED=true` environment variable
+
 **Usage:**
 ```bash
-python3 -m ransomeye_intelligence.threat_intel.ingestion.wiz_feed
+export RANSOMEYE_FEED_WIZ_ENABLED="true"
+cd /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/ingestion
+python3 wiz_feed.py
 ```
 
 **Cache Location:** `/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/cache/wiz/`
@@ -52,14 +59,31 @@ python3 -m ransomeye_intelligence.threat_intel.ingestion.wiz_feed
 **Credentials:**
 - API Key: `6c0cca08-3419-43e6-8014-0a4f87f353a3`
 - Set via `RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY` environment variable
+- Enable via `RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED=true` environment variable
 
 **Usage:**
 ```bash
+export RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED="true"
 export RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
-python3 -m ransomeye_intelligence.threat_intel.ingestion.ransomware_live_feed --limit 100
+cd /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/ingestion
+python3 ransomware_live_feed.py --limit 100
 ```
 
 **Cache Location:** `/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/cache/ransomware_live/`
+
+### 4. Additional Enterprise-Grade Sources
+
+**Collector:** `additional_sources.py`
+
+**Available Feeds:**
+- **URLhaus** (Abuse.ch) - Malware URL feed (no API key required)
+- **ThreatFox** (Abuse.ch) - Malware IOCs feed (no API key required)
+- **CISA KEV** - Known Exploited Vulnerabilities catalog (no API key required) - Enterprise-grade vulnerability intelligence
+- **AlienVault OTX** - Open Threat Exchange (requires `OTX_KEY` environment variable)
+- **VirusTotal** - VirusTotal Intelligence API (requires `VIRUSTOTAL_KEY` environment variable)
+
+**Usage:**
+All additional sources are automatically included when running `fetch_all_feeds.py`.
 
 ## Unified Feed Fetcher
 
@@ -68,14 +92,26 @@ python3 -m ransomeye_intelligence.threat_intel.ingestion.ransomware_live_feed --
 Fetches all feeds in one command:
 
 ```bash
+export RANSOMEYE_FEED_MALWAREBAZAAR_ENABLED="true"
+export RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
+export RANSOMEYE_FEED_WIZ_ENABLED="true"
+export RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED="true"
+export RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
+cd /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/ingestion
+python3 fetch_all_feeds.py
+```
+
+**Alternative (using PYTHONPATH):**
+```bash
 export RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
 export RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
-python -m ransomeye_intelligence.threat_intel.ingestion.fetch_all_feeds
+PYTHONPATH=/home/ransomeye/rebuild python3 ransomeye_intelligence/threat_intel/ingestion/fetch_all_feeds.py
 ```
 
 **Cache-only mode:**
 ```bash
-python3 -m ransomeye_intelligence.threat_intel.ingestion.fetch_all_feeds --cache-only
+cd /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/ingestion
+python3 fetch_all_feeds.py --cache-only
 ```
 
 ## Integration with Training

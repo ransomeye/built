@@ -65,7 +65,10 @@ sudo journalctl -u ransomeye-feed-fetcher.service --since "5 minutes ago"
 ### Environment Variables
 
 The service uses these environment variables (set in service file):
+- `RANSOMEYE_FEED_MALWAREBAZAAR_ENABLED`: Set to "true" to enable MalwareBazaar feed
 - `RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY`: MalwareBazaar API key
+- `RANSOMEYE_FEED_WIZ_ENABLED`: Set to "true" to enable Wiz.io feed
+- `RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED`: Set to "true" to enable Ransomware.live feed
 - `RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY`: Ransomware.live API key
 - `OTX_KEY`: (Optional) AlienVault OTX API key
 - `VIRUSTOTAL_KEY`: (Optional) VirusTotal API key

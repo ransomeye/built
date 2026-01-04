@@ -18,10 +18,11 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-# Environment variable for WIZ URL (MANDATORY when online)
+# Environment variables (PROMPT-46: No hardcoded URLs/IPs)
+ENV_ENABLED = "RANSOMEYE_FEED_WIZ_ENABLED"
 ENV_WIZ_URL = "RANSOMEYE_FEED_WIZ_URL"
 
-# Default Wiz.io API endpoint (fallback if env var not set)
+# Default Wiz.io API endpoint (only used if env var not set, but feed should be disabled by default)
 DEFAULT_WIZ_API_URL = "https://www.wiz.io/api/feed/cloud-threat-landscape/stix.json"
 
 FEEDS_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/feeds")
@@ -71,9 +72,14 @@ class WizFeedCollector:
             wiz_url: Optional WIZ URL (overrides environment variable)
         
         Raises:
-            FeedError: If internet is available but WIZ URL is missing
+            FeedError: If feed is enabled but required config is missing
         """
-        # Read WIZ URL from environment (MANDATORY when online)
+        # PROMPT-46: Check if feed is enabled via env
+        enabled = os.getenv(ENV_ENABLED, "false").lower() in ("true", "1", "yes")
+        if not enabled:
+            raise FeedError(f"Wiz feed is disabled (set {ENV_ENABLED}=true to enable)")
+        
+        # Read WIZ URL from environment (PROMPT-46: No hardcoded values)
         self.api_url = wiz_url or os.getenv(ENV_WIZ_URL) or DEFAULT_WIZ_API_URL
         FEEDS_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)

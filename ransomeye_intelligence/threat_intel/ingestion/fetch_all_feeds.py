@@ -15,9 +15,13 @@ from datetime import datetime
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from malwarebazaar_feed import MalwareBazaarFeedCollector
+from malwarebazaar_feed import MalwareBazaarFeedCollector, FeedError
 from wiz_feed import WizFeedCollector
 from ransomware_live_feed import RansomwareLiveFeedCollector
+try:
+    from additional_sources import get_all_feed_collectors
+except ImportError:
+    get_all_feed_collectors = None
 
 
 def fetch_all_feeds(use_cache: bool = False):
@@ -40,6 +44,9 @@ def fetch_all_feeds(use_cache: bool = False):
         'ransomware_live': {'groups': 0, 'victims': 0, 'cached': False}
     }
     
+    # Track additional sources
+    additional_sources_results = {}
+    
     # 1. MalwareBazaar
     print("1. MalwareBazaar Feed...")
     try:
@@ -60,6 +67,8 @@ def fetch_all_feeds(use_cache: bool = False):
         
         results['malwarebazaar']['samples'] = len(samples)
         results['malwarebazaar']['cached'] = True
+    except FeedError as e:
+        print(f"   ⚠ Feed disabled or misconfigured: {e}")
     except Exception as e:
         print(f"   ✗ Error: {e}")
     
@@ -86,6 +95,8 @@ def fetch_all_feeds(use_cache: bool = False):
         
         results['wiz']['iocs'] = len(iocs)
         results['wiz']['cached'] = True
+    except FeedError as e:
+        print(f"   ⚠ Feed disabled or misconfigured: {e}")
     except Exception as e:
         print(f"   ✗ Error: {e}")
     
@@ -117,8 +128,50 @@ def fetch_all_feeds(use_cache: bool = False):
         results['ransomware_live']['groups'] = len(groups)
         results['ransomware_live']['victims'] = len(victims)
         results['ransomware_live']['cached'] = True
+    except FeedError as e:
+        print(f"   ⚠ Feed disabled or misconfigured: {e}")
     except Exception as e:
         print(f"   ✗ Error: {e}")
+    
+    print()
+    
+    # 4. Additional feed sources (URLhaus, ThreatFox, OTX, VirusTotal, etc.)
+    if get_all_feed_collectors:
+        print("4. Additional Feed Sources...")
+        try:
+            additional_collectors = get_all_feed_collectors()
+            for collector in additional_collectors:
+                source_name = collector.source_name
+                print(f"   {source_name}...")
+                try:
+                    if use_cache:
+                        iocs = collector.load_cached()
+                        print(f"      ✓ Loaded {len(iocs)} IOCs from cache")
+                        additional_sources_results[source_name] = {'iocs': len(iocs), 'cached': True}
+                    else:
+                        data = collector.fetch()
+                        if data:
+                            cache_path = collector.cache(data)
+                            iocs = collector.parse(data)
+                            print(f"      ✓ Cached {len(iocs)} IOCs to {cache_path}")
+                            additional_sources_results[source_name] = {'iocs': len(iocs), 'cached': True}
+                        else:
+                            # Try loading from cache if fetch failed
+                            iocs = collector.load_cached()
+                            if iocs:
+                                print(f"      ⚠ Fetch failed, loaded {len(iocs)} IOCs from cache")
+                                additional_sources_results[source_name] = {'iocs': len(iocs), 'cached': True}
+                            else:
+                                print(f"      ✗ Failed to fetch and no cached data available")
+                                additional_sources_results[source_name] = {'iocs': 0, 'cached': False}
+                except Exception as e:
+                    print(f"      ✗ Error: {e}")
+                    additional_sources_results[source_name] = {'iocs': 0, 'cached': False}
+        except Exception as e:
+            print(f"   ✗ Error loading additional sources: {e}")
+    else:
+        print("4. Additional Feed Sources...")
+        print("   ⚠ Additional sources module not available")
     
     print()
     print("=" * 80)
@@ -127,6 +180,12 @@ def fetch_all_feeds(use_cache: bool = False):
     print(f"MalwareBazaar: {results['malwarebazaar']['samples']} samples")
     print(f"Wiz.io: {results['wiz']['iocs']} IOCs")
     print(f"Ransomware.live: {results['ransomware_live']['groups']} groups, {results['ransomware_live']['victims']} victims")
+    
+    if additional_sources_results:
+        print("\nAdditional Sources:")
+        for source_name, source_results in additional_sources_results.items():
+            print(f"  {source_name}: {source_results['iocs']} IOCs")
+    
     print()
     print("✓ All feeds processed")
     print()

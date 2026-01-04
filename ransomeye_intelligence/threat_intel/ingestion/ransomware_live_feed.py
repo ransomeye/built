@@ -18,11 +18,13 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-# Ransomware.live API endpoint
-RANSOMWARE_LIVE_API_URL = "https://api.ransomware.live/v1"
-
-# Environment variable for API key (MANDATORY when online)
+# Environment variables (PROMPT-46: No hardcoded URLs/IPs)
+ENV_ENABLED = "RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED"
 ENV_API_KEY = "RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY"
+ENV_API_URL = "RANSOMEYE_FEED_RANSOMWARELIVE_URL"
+
+# Default URL (only used if env var not set, but feed should be disabled by default)
+DEFAULT_RANSOMWARE_LIVE_API_URL = "https://api.ransomware.live/v1"
 
 FEEDS_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/feeds")
 CACHE_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/cache/ransomware_live")
@@ -63,19 +65,25 @@ def check_internet_connectivity(timeout: int = 5) -> bool:
 class RansomwareLiveFeedCollector:
     """Collects threat intelligence from Ransomware.live API (Phase 6 - Secure, Key-Safe)."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, api_url: Optional[str] = None):
         """
         Initialize Ransomware.live feed collector.
         
         Args:
             api_key: Optional API key (overrides environment variable)
+            api_url: Optional API URL (overrides environment variable)
         
         Raises:
-            FeedError: If internet is available but API key is missing
+            FeedError: If feed is enabled but required config is missing
         """
-        # Read API key from environment (MANDATORY when online)
+        # PROMPT-46: Check if feed is enabled via env
+        enabled = os.getenv(ENV_ENABLED, "false").lower() in ("true", "1", "yes")
+        if not enabled:
+            raise FeedError(f"Ransomware.live feed is disabled (set {ENV_ENABLED}=true to enable)")
+        
+        # Read API key and URL from environment (PROMPT-46: No hardcoded values)
         self.api_key = api_key or os.getenv(ENV_API_KEY)
-        self.api_url = RANSOMWARE_LIVE_API_URL
+        self.api_url = api_url or os.getenv(ENV_API_URL) or DEFAULT_RANSOMWARE_LIVE_API_URL
         FEEDS_DIR.mkdir(parents=True, exist_ok=True)
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         

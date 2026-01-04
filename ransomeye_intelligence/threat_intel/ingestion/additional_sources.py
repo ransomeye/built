@@ -17,6 +17,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 
+class FeedError(Exception):
+    """Feed-specific error that does not crash the system."""
+    pass
+
 FEEDS_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/feeds")
 CACHE_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/cache")
 
@@ -265,11 +269,58 @@ class ThreatFoxFeed(ThreatIntelligenceFeed):
         return iocs
 
 
+class CISAKEVFeed(ThreatIntelligenceFeed):
+    """CISA Known Exploited Vulnerabilities (KEV) Catalog feed (no API key required)."""
+    
+    def __init__(self):
+        super().__init__('cisa_kev', 'cisa_kev')
+        self.api_url = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+    
+    def fetch(self) -> Optional[Dict]:
+        """Fetch CISA KEV catalog."""
+        try:
+            response = requests.get(
+                self.api_url,
+                timeout=60,
+                headers={'User-Agent': 'RansomEye/1.0'}
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            return None
+        except Exception as e:
+            print(f"Warning: CISA KEV fetch error: {e}", file=sys.stderr)
+            return None
+    
+    def parse(self, data: Dict) -> List[Dict]:
+        """Parse CISA KEV data into IOCs."""
+        iocs = []
+        vulnerabilities = data.get('vulnerabilities', [])
+        
+        for vuln in vulnerabilities:
+            ioc = {
+                'type': 'cve',
+                'cve_id': vuln.get('cveID', ''),
+                'vendor': vuln.get('vendorProject', ''),
+                'product': vuln.get('product', ''),
+                'vulnerability_name': vuln.get('vulnerabilityName', ''),
+                'date_added': vuln.get('dateAdded', ''),
+                'due_date': vuln.get('dueDate', ''),
+                'required_action': vuln.get('requiredAction', ''),
+                'short_description': vuln.get('shortDescription', ''),
+                'source': 'cisa_kev'
+            }
+            iocs.append(ioc)
+        
+        return iocs
+
+
 def get_all_feed_collectors() -> List[ThreatIntelligenceFeed]:
     """Get all available feed collectors."""
     collectors = [
         AbuseCHURLhausFeed(),
         ThreatFoxFeed(),
+        CISAKEVFeed(),  # CISA KEV - Enterprise-grade vulnerability intelligence
     ]
     
     # Add optional feeds if API keys are available
@@ -289,7 +340,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Additional Threat Intelligence Feed Collectors')
-    parser.add_argument('--source', choices=['urlhaus', 'threatfox', 'otx', 'virustotal', 'all'],
+    parser.add_argument('--source', choices=['urlhaus', 'threatfox', 'cisa_kev', 'otx', 'virustotal', 'all'],
                        default='all', help='Feed source to fetch')
     
     args = parser.parse_args()
