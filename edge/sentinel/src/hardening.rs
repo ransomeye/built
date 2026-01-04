@@ -274,11 +274,11 @@ impl RuntimeHardening {
         Ok(())
     }
 
-    pub(crate) fn crash_count(&self) -> u64 {
+    pub(crate) fn _crash_count(&self) -> u64 {
         self.crash_count.load(Ordering::Acquire)
     }
 
-    pub(crate) fn reset_crash_count(&self) {
+    pub(crate) fn _reset_crash_count(&self) {
         self.crash_count.store(0, Ordering::Release);
     }
 

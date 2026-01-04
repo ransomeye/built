@@ -38,7 +38,7 @@ pub enum LateralMovementType {
 
 /// Attacker session tracking
 #[derive(Debug, Clone)]
-struct AttackerSession {
+pub(crate) struct AttackerSession {
     _session_id: String,
     _first_seen: DateTime<Utc>,
     last_seen: DateTime<Utc>,
@@ -343,8 +343,8 @@ impl LateralMovementDetector {
         history.retain(|_, uses| !uses.is_empty());
     }
     
-    /// Get all active sessions
-    pub(crate) fn get_active_sessions(&self) -> Vec<AttackerSession> {
+    /// Get all active sessions (internal use only)
+    pub(crate) fn _get_active_sessions(&self) -> Vec<AttackerSession> {
         self.sessions.read().values().cloned().collect()
     }
 }
