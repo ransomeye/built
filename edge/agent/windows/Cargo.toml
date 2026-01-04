@@ -18,10 +18,12 @@ future-windows-agent = []
 [[bin]]
 name = "agent-windows"
 path = "agent/src/main.rs"
+required-features = ["future-windows-agent"]
 
 [lib]
 name = "agent_windows"
 path = "agent/src/lib.rs"
+required-features = ["future-windows-agent"]
 
 [dependencies]
 # Core dependencies

@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Isolated signature verification test using ring
 
+#![cfg(feature = "future-policy")]
+
 use ring::signature::{UnparsedPublicKey, RSA_PSS_2048_8192_SHA256};
 use std::fs;
 use std::env;

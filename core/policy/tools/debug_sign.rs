@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Debug tool to show what was signed and verify hash
 
+#![cfg(feature = "future-policy")]
+
 use std::env;
 use std::fs;
 use std::path::Path;

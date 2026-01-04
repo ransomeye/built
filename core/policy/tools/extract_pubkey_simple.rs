@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details: Extract public key using ring
 
+#![cfg(feature = "future-policy")]
+
 use std::env;
 use std::fs;
 use ring::signature::{RsaKeyPair, KeyPair};

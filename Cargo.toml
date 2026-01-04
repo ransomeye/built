@@ -37,14 +37,7 @@ resolver = "2"
 # Feature flags for inactive/planned subsystems
 # Production build uses default = [] (no features enabled)
 # Future phases can enable specific features as needed
-default = []
-
-[features]
-future-windows-agent = []
-future-tuner = []
-future-threat-feed = []
-future-deception = []
-future-policy = []
+# Note: Features are defined in individual crate Cargo.toml files, not in workspace root
 
 [workspace.package]
 version = "1.0.0"

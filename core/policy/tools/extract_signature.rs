@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Tool to extract raw signature bytes from a policy file (base64 decode)
 
+#![cfg(feature = "future-policy")]
+
 use std::env;
 use std::fs;
 use std::path::Path;

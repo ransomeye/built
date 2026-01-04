@@ -7,6 +7,10 @@ edition = "2021"
 default = []
 future-tuner = []
 
+[lib]
+path = "src/lib.rs"
+required-features = ["future-tuner"]
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -37,4 +41,5 @@ mockall = "0.12"
 [[bin]]
 name = "tuner"
 path = "src/main.rs"
+required-features = ["future-tuner"]
 

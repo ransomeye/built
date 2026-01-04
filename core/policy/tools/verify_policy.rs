@@ -2,6 +2,8 @@
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
 // Details of functionality of this file: Tool to verify policy signatures using ring
 
+#![cfg(feature = "future-policy")]
+
 use std::env;
 use std::fs;
 use std::path::Path;
