@@ -5,7 +5,6 @@
 use std::path::Path;
 use std::fs;
 use std::process::Command;
-use tracing::error;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

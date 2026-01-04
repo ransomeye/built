@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use tracing::{warn, debug};
+use tracing::warn;
 
 use crate::config::Config;
 

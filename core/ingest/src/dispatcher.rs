@@ -10,10 +10,9 @@
  * Maintains delivery guarantees.
  */
 
-use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, warn, debug};
+use tracing::{error, debug};
 
 use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;

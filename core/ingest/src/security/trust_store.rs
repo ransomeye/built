@@ -17,7 +17,7 @@ use dashmap::DashMap;
 use x509_parser::prelude::*;
 use rustls_pemfile::{Item, read_one};
 use std::io::Cursor;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use parking_lot::RwLock;
 
 use crate::security::errors::IdentityError;

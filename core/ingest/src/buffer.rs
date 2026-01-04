@@ -20,7 +20,7 @@ use crate::protocol::event_envelope::EventEnvelope;
 use crate::config::Config;
 
 pub struct EventBuffer {
-    config: Config,
+    _config: Config,
     capacity: usize,
     sender: Sender<EventEnvelope>,
     receiver: Receiver<EventEnvelope>,
@@ -33,7 +33,7 @@ impl EventBuffer {
         let (sender, receiver) = bounded(capacity);
         
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
             capacity,
             sender,
             receiver,

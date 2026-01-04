@@ -19,7 +19,7 @@ use tracing::{warn, debug};
 use crate::config::Config;
 
 pub struct BackpressureController {
-    _config: Config,
+    config: Config,
     backpressure_states: Arc<DashMap<String, BackpressureState>>,
     global_backpressure: Arc<RwLock<bool>>,
 }
@@ -27,7 +27,7 @@ pub struct BackpressureController {
 struct BackpressureState {
     active: bool,
     signaled_at: Instant,
-    reason: String,
+    _reason: String,
 }
 
 impl BackpressureController {
@@ -68,7 +68,7 @@ impl BackpressureController {
         let state = BackpressureState {
             active: true,
             signaled_at: Instant::now(),
-            reason: "Buffer full or system overloaded".to_string(),
+            _reason: "Buffer full or system overloaded".to_string(),
         };
         
         self.backpressure_states.insert(producer_id.to_string(), state);

@@ -26,7 +26,7 @@ use crate::security::trust_store::TrustStore;
 
 #[derive(Clone)]
 struct RevocationEntry {
-    producer_id: String,
+    _producer_id: String,
     certificate_serial: Vec<u8>,
     revoked_at: DateTime<Utc>,
     reason: String,
@@ -137,7 +137,7 @@ impl RevocationChecker {
                             if let Ok(cert) = cert_data.parse_certificate() {
                                 if cert.tbs_certificate.serial.to_bytes_be() == serial {
                                 let entry = RevocationEntry {
-                                    producer_id: producer_id.clone(),
+                                    _producer_id: producer_id.clone(),
                                     certificate_serial: serial.clone(),
                                     revoked_at: DateTime::from_timestamp(revoked_cert.revocation_date.timestamp(), 0)
                                         .unwrap_or_else(|| Utc::now()),
@@ -193,7 +193,7 @@ impl RevocationChecker {
                         .to_string();
                     
                     let rev_entry = RevocationEntry {
-                        producer_id: producer_id.to_string(),
+                        _producer_id: producer_id.to_string(),
                         certificate_serial: serial,
                         revoked_at,
                         reason,

@@ -39,12 +39,12 @@ pub enum LateralMovementType {
 /// Attacker session tracking
 #[derive(Debug, Clone)]
 struct AttackerSession {
-    session_id: String,
-    first_seen: DateTime<Utc>,
+    _session_id: String,
+    _first_seen: DateTime<Utc>,
     last_seen: DateTime<Utc>,
     source_hosts: Vec<String>,
     target_hosts: Vec<String>,
-    credential_hashes: Vec<String>,
+    _credential_hashes: Vec<String>,
     event_count: u64,
     patterns: Vec<String>,
 }
@@ -54,14 +54,14 @@ pub struct LateralMovementDetector {
     sessions: Arc<RwLock<HashMap<String, AttackerSession>>>,
     credential_history: Arc<RwLock<HashMap<String, Vec<CredentialUse>>>>,
     event_window: Duration,
-    correlation_threshold: f64,
+    _correlation_threshold: f64,
 }
 
 #[derive(Debug, Clone)]
 struct CredentialUse {
     host: String,
     timestamp: DateTime<Utc>,
-    success: bool,
+    _success: bool,
 }
 
 impl LateralMovementDetector {
@@ -71,7 +71,7 @@ impl LateralMovementDetector {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             credential_history: Arc::new(RwLock::new(HashMap::new())),
             event_window: Duration::from_secs(event_window_secs),
-            correlation_threshold,
+            _correlation_threshold: correlation_threshold,
         }
     }
     
@@ -125,7 +125,7 @@ impl LateralMovementDetector {
             .push(CredentialUse {
                 host: target_host.to_string(),
                 timestamp,
-                success: true,
+                _success: true,
             });
         
         // Clean old entries
@@ -293,12 +293,12 @@ impl LateralMovementDetector {
         // Create new session
         let session_id = format!("session_{}", uuid::Uuid::new_v4().to_string());
         let session = AttackerSession {
-            session_id: session_id.clone(),
-            first_seen: timestamp,
+            _session_id: session_id.clone(),
+            _first_seen: timestamp,
             last_seen: timestamp,
             source_hosts: vec![source_host.to_string()],
             target_hosts: vec![target_host.to_string()],
-            credential_hashes: Vec::new(),
+            _credential_hashes: Vec::new(),
             event_count: 1,
             patterns: Vec::new(),
         };
@@ -344,7 +344,7 @@ impl LateralMovementDetector {
     }
     
     /// Get all active sessions
-    pub fn get_active_sessions(&self) -> Vec<AttackerSession> {
+    pub(crate) fn get_active_sessions(&self) -> Vec<AttackerSession> {
         self.sessions.read().values().cloned().collect()
     }
 }

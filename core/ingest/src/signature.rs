@@ -10,7 +10,6 @@
  * but signature verification is performed during authentication.
  */
 
-use std::sync::Arc;
 use tracing::debug;
 
 use crate::protocol::event_envelope::EventEnvelope;

@@ -24,7 +24,7 @@ use crate::security::errors::IdentityError;
 #[derive(Clone)]
 struct NonceEntry {
     timestamp: DateTime<Utc>,
-    sequence_number: u64,
+    _sequence_number: u64,
 }
 
 #[derive(Clone)]
@@ -133,7 +133,7 @@ impl ReplayProtector {
         // Step 5: Add nonce to cache
         producer_nonces.insert(nonce.to_string(), NonceEntry {
             timestamp: *timestamp,
-            sequence_number,
+            _sequence_number: sequence_number,
         });
         
         // Step 6: Cleanup expired nonces (async, after releasing all locks)

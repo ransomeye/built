@@ -4,7 +4,7 @@
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
-use tracing::{info, error};
+use tracing::info;
 
 #[cfg(feature = "future-reporting")]
 mod collector;
