@@ -33,7 +33,7 @@ pub struct Config {
 impl Config {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
         let listen_address = env::var("RANSOMEYE_INGESTION_LISTEN_ADDR")
-            .unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+            .unwrap_or_else(|_| "127.0.0.1:8080".to_string());
         ConfigValidator::validate_address(&listen_address)
             .map_err(|e| format!("Invalid listen address: {}", e))?;
         

@@ -18,11 +18,11 @@ This directory contains collectors for threat intelligence feeds that enhance Ra
 
 **Credentials:**
 - Auth-Key: `483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f`
-- Set via `MALWARBAZAAR_AUTH_KEY` environment variable
+- Set via `RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY` environment variable
 
 **Usage:**
 ```bash
-export MALWARBAZAAR_AUTH_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
+export RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
 python3 -m ransomeye_intelligence.threat_intel.ingestion.malwarebazaar_feed --limit 100
 ```
 
@@ -51,11 +51,11 @@ python3 -m ransomeye_intelligence.threat_intel.ingestion.wiz_feed
 
 **Credentials:**
 - API Key: `6c0cca08-3419-43e6-8014-0a4f87f353a3`
-- Set via `RANSOMWARE_LIVE_API_KEY` environment variable
+- Set via `RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY` environment variable
 
 **Usage:**
 ```bash
-export RANSOMWARE_LIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
+export RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
 python3 -m ransomeye_intelligence.threat_intel.ingestion.ransomware_live_feed --limit 100
 ```
 
@@ -68,8 +68,8 @@ python3 -m ransomeye_intelligence.threat_intel.ingestion.ransomware_live_feed --
 Fetches all feeds in one command:
 
 ```bash
-export MALWARBAZAAR_AUTH_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
-export RANSOMWARE_LIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
+export RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY="483ce60ba7c8a3d7358e3c8afd6e6d23a746eb2a5a42479f"
+export RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY="6c0cca08-3419-43e6-8014-0a4f87f353a3"
 python -m ransomeye_intelligence.threat_intel.ingestion.fetch_all_feeds
 ```
 

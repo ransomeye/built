@@ -49,8 +49,8 @@ def fetch_all_feeds(use_cache: bool = False):
             print(f"   ✓ Loaded {len(samples)} samples from cache")
         else:
             print("   Fetching recent samples...")
-            samples = mb_collector.fetch_recent_samples(limit=100)
-            if samples:
+            samples, success = mb_collector.fetch_recent_samples(limit=100)
+            if success and samples:
                 cache_path = mb_collector.cache_samples(samples)
                 print(f"   ✓ Cached {len(samples)} samples to {cache_path}")
             else:
@@ -74,8 +74,8 @@ def fetch_all_feeds(use_cache: bool = False):
             print(f"   ✓ Loaded {len(iocs)} IOCs from cache")
         else:
             print("   Fetching STIX feed...")
-            stix_data = wiz_collector.fetch_stix_feed()
-            if stix_data:
+            stix_data, success = wiz_collector.fetch_stix_feed()
+            if success and stix_data:
                 iocs = wiz_collector.parse_stix_objects(stix_data)
                 cache_path = wiz_collector.cache_feed(stix_data)
                 print(f"   ✓ Cached {len(iocs)} IOCs to {cache_path}")
@@ -98,11 +98,13 @@ def fetch_all_feeds(use_cache: bool = False):
         if use_cache:
             data = rl_collector.load_cached_data()
             print(f"   ✓ Loaded {len(data['groups'])} groups and {len(data['victims'])} victims from cache")
+            groups = data['groups']
+            victims = data['victims']
         else:
             print("   Fetching groups and victims...")
-            groups = rl_collector.fetch_groups()
-            victims = rl_collector.fetch_recent_victims(limit=100)
-            if groups or victims:
+            groups, groups_success = rl_collector.fetch_groups()
+            victims, victims_success = rl_collector.fetch_recent_victims(limit=100)
+            if (groups_success or victims_success) and (groups or victims):
                 cache_path = rl_collector.cache_data(groups, victims)
                 print(f"   ✓ Cached {len(groups)} groups and {len(victims)} victims to {cache_path}")
             else:
@@ -112,8 +114,8 @@ def fetch_all_feeds(use_cache: bool = False):
                 groups = data['groups']
                 victims = data['victims']
         
-        results['ransomware_live']['groups'] = len(groups) if not use_cache else len(data.get('groups', []))
-        results['ransomware_live']['victims'] = len(victims) if not use_cache else len(data.get('victims', []))
+        results['ransomware_live']['groups'] = len(groups)
+        results['ransomware_live']['victims'] = len(victims)
         results['ransomware_live']['cached'] = True
     except Exception as e:
         print(f"   ✗ Error: {e}")
@@ -142,17 +144,17 @@ def main():
     parser.add_argument('--cache-only', action='store_true',
                        help='Only load from cache, do not fetch new data')
     parser.add_argument('--malwarebazaar-key', default=None,
-                       help='MalwareBazaar API key (or use MALWARBAZAAR_AUTH_KEY env var)')
+                       help='MalwareBazaar API key (or use RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY env var)')
     parser.add_argument('--ransomware-live-key', default=None,
-                       help='Ransomware.live API key (or use RANSOMWARE_LIVE_API_KEY env var)')
+                       help='Ransomware.live API key (or use RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY env var)')
     
     args = parser.parse_args()
     
-    # Set environment variables if provided
+    # Set environment variables if provided (use correct env var names)
     if args.malwarebazaar_key:
-        os.environ['MALWARBAZAAR_AUTH_KEY'] = args.malwarebazaar_key
+        os.environ['RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY'] = args.malwarebazaar_key
     if args.ransomware_live_key:
-        os.environ['RANSOMWARE_LIVE_API_KEY'] = args.ransomware_live_key
+        os.environ['RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY'] = args.ransomware_live_key
     
     fetch_all_feeds(use_cache=args.cache_only)
 

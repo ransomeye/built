@@ -16,9 +16,9 @@ None - all variables have defaults, but validation will enforce constraints on v
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `RANSOMEYE_INGESTION_LISTEN_ADDR` | String | `0.0.0.0:8080` | Listen address for event ingestion |
+| `RANSOMEYE_INGESTION_LISTEN_ADDR` | String | `127.0.0.1:8080` | Listen address for event ingestion (defaults to localhost for local-first security) |
 | `RANSOMEYE_CONTROL_PLANE_ADDR` | String | `127.0.0.1:9090` | Control plane API endpoint address |
-| `RANSOMEYE_PUBLIC_HOSTNAME` | String | (optional) | Public hostname for external access (e.g., `api.ransomeye.example.com`) |
+| `RANSOMEYE_PUBLIC_HOSTNAME` | String | (optional) | Public hostname for external access (e.g., `api.ransomeye.example.com`). **WARNING: Does not affect network bind address - metadata only** |
 
 ### Buffer Configuration
 
@@ -69,7 +69,7 @@ All integer values must be:
 ## Example Configuration
 
 ```bash
-export RANSOMEYE_INGESTION_LISTEN_ADDR="0.0.0.0:8080"
+export RANSOMEYE_INGESTION_LISTEN_ADDR="127.0.0.1:8080"
 export RANSOMEYE_CONTROL_PLANE_ADDR="127.0.0.1:9090"
 export RANSOMEYE_PUBLIC_HOSTNAME="api.ransomeye.example.com"
 export RANSOMEYE_BUFFER_CAPACITY="10000"

@@ -65,8 +65,8 @@ sudo journalctl -u ransomeye-feed-fetcher.service --since "5 minutes ago"
 ### Environment Variables
 
 The service uses these environment variables (set in service file):
-- `MALWARBAZAAR_AUTH_KEY`: MalwareBazaar API key
-- `RANSOMWARE_LIVE_API_KEY`: Ransomware.live API key
+- `RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY`: MalwareBazaar API key
+- `RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY`: Ransomware.live API key
 - `OTX_KEY`: (Optional) AlienVault OTX API key
 - `VIRUSTOTAL_KEY`: (Optional) VirusTotal API key
 

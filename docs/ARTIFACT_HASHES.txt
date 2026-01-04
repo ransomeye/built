@@ -1,0 +1,43 @@
+# RansomEye Core Production Artifact Hashes
+# Generated: 2026-01-04 14:19:36 UTC
+# SHA-256 checksums for all production binaries and model artifacts
+# These hashes lock the artifacts for production shipment
+
+## Core Binaries
+
+/opt/ransomeye/modules/core/ingest/bin/ingest-http
+SHA256: 02f32bb01e9df23c78e8a3cdec043974dcc99c4f35fd5b61f2dca087a0dfb0dc
+
+## AI/ML Model Artifacts
+
+### ransomeye_intelligence/baseline_pack/models/
+
+ransomeye_intelligence/baseline_pack/models/anomaly_baseline.model
+SHA256: bff6a94eeb969050990edfa0a512dc8a59a8f56d88ad63e0d9eedf32e051f988
+
+ransomeye_intelligence/baseline_pack/models/confidence_calibration.model
+SHA256: c0e957580bb739bc85c0470d2c6c2032b659511afa9f36718664bdfab7233cb1
+
+ransomeye_intelligence/baseline_pack/models/ransomware_behavior.model
+SHA256: 01e394bf7b10eb8fe4a1d1d19dad9878dc0f23e55cc84fad51439edd5a3b6461
+
+### core/ai/models/
+
+core/ai/models/risk_model.model
+SHA256: e21b1bd9622c351c8d08513129287f1249d67138ee335f20200b2e9bc7c69ca9
+
+### core/ai/inference/models/
+
+core/ai/inference/models/anomaly_baseline.model
+SHA256: 602df025c4cb81cd32271e569b1e1cdaad3830c452930a62274e3f7ef910ec23
+
+core/ai/inference/models/confidence_calibration.model
+SHA256: 7b45c577b9b04303b7b6f2514c2c7db247d461de9dfe440d016e8be98352bd0c
+
+core/ai/inference/models/ransomware_behavior.model
+SHA256: 72989a660e1761a05c46dbd538de7e44d04d92db282b40baeb7648ae57f94cec
+
+---
+# End of artifact hashes
+# These hashes are immutable and lock the Core for production shipment
+

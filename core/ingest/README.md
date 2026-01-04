@@ -184,7 +184,7 @@ cargo test
 ## Configuration
 
 Environment Variables:
-- `RANSOMEYE_INGESTION_LISTEN_ADDR` - Listen address (default: 0.0.0.0:8080)
+- `RANSOMEYE_INGESTION_LISTEN_ADDR` - Listen address (default: 127.0.0.1:8080)
 - `RANSOMEYE_CONTROL_PLANE_ADDR` - Control Plane address (default: 127.0.0.1:9090)
 - `RANSOMEYE_BUFFER_CAPACITY` - Buffer capacity (default: 10000)
 - `RANSOMEYE_PRODUCER_RATE_LIMIT` - Per-producer limit (default: 1000)
