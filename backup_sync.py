@@ -15,6 +15,8 @@ import subprocess
 import signal
 import logging
 import shutil
+import select
+import fcntl
 from pathlib import Path
 from datetime import datetime
 
@@ -125,6 +127,10 @@ def build_rsync_command():
         "--safe-links",  # Ignore symlinks that point outside the tree
         "--iconv=utf-8,utf-8",  # Handle character encoding
         "--modify-window=2",  # Allow 2 second time difference (FAT32 precision)
+        "--timeout=300",  # 5 minute timeout per file operation
+        "--contimeout=60",  # 1 minute connection timeout
+        "--bwlimit=0",  # No bandwidth limit (use full speed)
+        "--whole-file",  # Transfer whole files (faster for local USB)
     ] + exclude_args + [
         f"{SOURCE_DIR}/",
         f"{BACKUP_DIR}/"
@@ -147,6 +153,7 @@ def perform_sync():
     try:
         start_time = time.time()
         last_progress_log = start_time
+        MAX_SYNC_DURATION = 7200  # 2 hours maximum sync time
         
         # Log initial sync start
         logger.info("Calculating directory sizes...")
@@ -177,53 +184,127 @@ def perform_sync():
             bufsize=1
         )
         
-        output_lines = []
+        # Set stdout to non-blocking
+        fd = process.stdout.fileno()
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
         
-        # Monitor progress - log every 30 seconds
+        output_lines = []
+        last_progress_bytes = 0
+        last_progress_time = start_time
+        stuck_threshold = 300  # 5 minutes without progress = stuck
+        
+        # Monitor progress - parse rsync output in real-time
         while True:
             return_code = process.poll()
             if return_code is not None:
                 # Process finished, read remaining output
-                remaining = process.stdout.read()
-                if remaining:
-                    output_lines.append(remaining)
+                try:
+                    remaining = process.stdout.read()
+                    if remaining:
+                        output_lines.append(remaining)
+                except:
+                    pass
                 break
             
-            # Log progress every 30 seconds
             current_time = time.time()
+            elapsed_so_far = current_time - start_time
+            
+            # Try to read rsync output (non-blocking)
+            try:
+                # Use select to check if data is available (with timeout)
+                ready, _, _ = select.select([process.stdout], [], [], 1.0)
+                if ready:
+                    chunk = process.stdout.read(4096)
+                    if chunk:
+                        output_lines.append(chunk)
+                        
+                        # Parse progress from rsync output
+                        # rsync --info=progress2 outputs lines like:
+                        # "  7,234,567  73%  123.45M/s    0:00:45  (xfr#1234, to-chk=567/890)"
+                        for line in chunk.split('\n'):
+                            line = line.strip()
+                            if '%' in line and ('xfr#' in line or 'to-chk=' in line):
+                                # Extract percentage
+                                try:
+                                    parts = line.split()
+                                    for part in parts:
+                                        if '%' in part:
+                                            pct = float(part.replace('%', ''))
+                                            # Extract bytes transferred
+                                            if len(parts) > 0:
+                                                bytes_str = parts[0].replace(',', '')
+                                                if bytes_str.isdigit():
+                                                    last_progress_bytes = int(bytes_str)
+                                                    last_progress_time = current_time
+                                            break
+                                except:
+                                    pass
+            except (OSError, ValueError):
+                # No data available or parsing error, continue
+                pass
+            
+            # Check for maximum sync duration timeout
+            if elapsed_so_far > MAX_SYNC_DURATION:
+                logger.error(f"Sync exceeded maximum duration ({MAX_SYNC_DURATION // 60} minutes). Terminating...")
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    logger.warning("Process did not terminate gracefully, killing...")
+                    process.kill()
+                    process.wait()
+                return False
+            
+            # Log progress every 30 seconds
             if current_time - last_progress_log >= 30:
-                elapsed_so_far = current_time - start_time
                 elapsed_min = int(elapsed_so_far // 60)
                 elapsed_sec = int(elapsed_so_far % 60)
                 
-                # Check current backup size (quick check every 30s, full check every 2 min)
-                try:
-                    if int(elapsed_so_far) % 120 < 30:  # Full check every 2 minutes
-                        dest_result = subprocess.run(
-                            ["du", "-sb", str(BACKUP_DIR)],
-                            capture_output=True,
-                            text=True,
-                            timeout=30
-                        )
-                        if dest_result.returncode == 0:
-                            current_dest_size = int(dest_result.stdout.split()[0])
-                            progress_pct = (current_dest_size / source_size * 100) if source_size > 0 else 0
-                            logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed, ~{progress_pct:.1f}% complete, {current_dest_size / (1024**3):.2f} GB synced)")
-                        else:
-                            logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
-                    else:
-                        logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
-                except Exception as e:
+                # Check if stuck (no progress for 5+ minutes)
+                time_since_progress = current_time - last_progress_time
+                if time_since_progress > stuck_threshold and elapsed_so_far > stuck_threshold:
+                    logger.warning(f"Sync appears stuck! No progress for {int(time_since_progress // 60)}m {int(time_since_progress % 60)}s")
+                    logger.warning(f"Last progress: {last_progress_bytes / (1024**3):.2f} GB at {int((current_time - last_progress_time) // 60)}m ago")
+                    logger.warning("This may indicate:")
+                    logger.warning("  - Slow USB pendrive I/O")
+                    logger.warning("  - Large file transfer in progress")
+                    logger.warning("  - Filesystem issues on destination")
+                    logger.warning("  - Network issues (if using network path)")
+                    logger.warning("Consider checking:")
+                    logger.warning(f"  - Disk I/O: iostat -x 1")
+                    logger.warning(f"  - rsync process: ps aux | grep rsync")
+                    logger.warning(f"  - Destination mount: df -h {BACKUP_DIR}")
+                    # If stuck for more than 10 minutes, consider terminating
+                    if time_since_progress > 600:  # 10 minutes
+                        logger.error("Sync stuck for over 10 minutes. Terminating rsync process...")
+                        process.terminate()
+                        try:
+                            process.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            logger.warning("Process did not terminate gracefully, killing...")
+                            process.kill()
+                            process.wait()
+                        return False
+                
+                # Calculate progress if we have source size
+                if source_size > 0 and last_progress_bytes > 0:
+                    progress_pct = (last_progress_bytes / source_size * 100)
+                    logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed, ~{progress_pct:.1f}% complete, {last_progress_bytes / (1024**3):.2f} GB synced)")
+                else:
                     logger.info(f"Sync in progress... ({elapsed_min}m {elapsed_sec}s elapsed)")
                 
                 last_progress_log = current_time
             
-            time.sleep(5)  # Check every 5 seconds
+            time.sleep(1)  # Check every 1 second (more responsive)
         
         # Read any remaining output
-        remaining = process.stdout.read()
-        if remaining:
-            output_lines.append(remaining)
+        try:
+            remaining = process.stdout.read()
+            if remaining:
+                output_lines.append(remaining)
+        except:
+            pass
         
         elapsed = time.time() - start_time
         result_stdout = ''.join(output_lines)
