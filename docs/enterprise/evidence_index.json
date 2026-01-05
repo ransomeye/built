@@ -1,0 +1,373 @@
+{
+  "version": "v1.0.0-enterprise-ship",
+  "date": "2026-01-28",
+  "status": "COMPLETE",
+  "evidence_categories": [
+    {
+      "category": "ship_seal_enforcement",
+      "artifacts": [
+        {
+          "id": "ship_seal_enforcer",
+          "artifact_path": "/home/ransomeye/rebuild/core/assurance/ship_seal_enforcer.py",
+          "hash_source": "ARTIFACT_HASHES.txt",
+          "verification_method": {
+            "type": "runtime_binary_self_hash_check",
+            "description": "Runtime binary self-hash check, loads ARTIFACT_HASHES.txt and verifies all binaries, self-verification of enforcer and verifier",
+            "command": "python3 core/assurance/ship_seal_enforcer.py"
+          },
+          "failure_behavior": {
+            "on_violation": [
+              "Writes SYSTEM_INTEGRITY_VIOLATION audit entry",
+              "Exits with non-zero code",
+              "Blocks service startup"
+            ]
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Run python3 core/assurance/ship_seal_enforcer.py",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify hash matches ARTIFACT_HASHES.txt",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review code and verify enforcement logic",
+              "verifiable": true
+            }
+          }
+        },
+        {
+          "id": "ship_seal_hash_list",
+          "artifact_path": "/home/ransomeye/rebuild/docs/ARTIFACT_HASHES.txt",
+          "hash_source": "file_contains_hashes",
+          "verification_method": {
+            "type": "read_only_file",
+            "description": "Read-only file (444 permissions), contains SHA-256 hashes of all production binaries, parsed by ship seal enforcer at runtime",
+            "command": "cat docs/ARTIFACT_HASHES.txt"
+          },
+          "failure_behavior": {
+            "if_missing": "Enforcer fails to load, system fails to start",
+            "if_modified": "Hash mismatch detected, violation logged"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Verify file exists and is read-only",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify hashes match actual binaries",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Verify hash list integrity and completeness",
+              "verifiable": true
+            }
+          }
+        },
+        {
+          "id": "ship_seal_integration",
+          "artifact_path": "/home/ransomeye/rebuild/core/verifier/verifier.py",
+          "hash_source": "ARTIFACT_HASHES.txt",
+          "verification_method": {
+            "type": "verifier_integration",
+            "description": "Contains check_ship_seal() function, calls ShipSealEnforcer in verification loop, runs every 5 minutes",
+            "command": "python3 core/verifier/verifier.py"
+          },
+          "failure_behavior": {
+            "on_violation": [
+              "Writes audit entry",
+              "Exits non-zero",
+              "Continuous verifier stops, system enters fail-closed state"
+            ]
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Run python3 core/verifier/verifier.py",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Review code integration",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Verify enforcement is fail-closed",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "category": "verifier_enforcement",
+      "artifacts": [
+        {
+          "id": "continuous_verifier",
+          "artifact_path": "/home/ransomeye/rebuild/core/verifier/verifier.py",
+          "hash_source": "ARTIFACT_HASHES.txt",
+          "verification_method": {
+            "type": "systemd_timer",
+            "description": "Runs every 5 minutes, checks all locked invariants: systemd services, DB tables, audit actions, model registry, threat intel, ship seal, drift detection",
+            "command": "systemctl status ransomeye-verifier.timer"
+          },
+          "failure_behavior": {
+            "on_failure": [
+              "Writes SYSTEM_INTEGRITY_VIOLATION audit entry",
+              "Exits with non-zero code",
+              "System enters fail-closed state"
+            ]
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Check systemd timer status",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Review verification logic",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Verify fail-closed enforcement",
+              "verifiable": true
+            }
+          }
+        },
+        {
+          "id": "verifier_audit_log",
+          "artifact_path": "/var/log/ransomeye/verifier_audit.log",
+          "hash_source": "append_only_log",
+          "verification_method": {
+            "type": "append_only_log",
+            "description": "Append-only log file, contains all verification results, timestamped entries",
+            "command": "tail -f /var/log/ransomeye/verifier_audit.log"
+          },
+          "failure_behavior": {
+            "if_log_unwritable": "Verification continues but no audit trail"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Read log file",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify log integrity",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review verification history",
+              "verifiable": true
+            }
+          }
+        },
+        {
+          "id": "verifier_results",
+          "artifact_path": "/var/log/ransomeye/verifier_results.json",
+          "hash_source": "updated_every_5_minutes",
+          "verification_method": {
+            "type": "json_results",
+            "description": "JSON file with latest verification results, contains check status, failures, warnings, timestamped",
+            "command": "cat /var/log/ransomeye/verifier_results.json"
+          },
+          "failure_behavior": {
+            "on_failure": "overall_healthy: false, contains detailed failure information"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Read JSON file",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify results match audit log",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review verification outcomes",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "category": "audit_chain_invariants",
+      "artifacts": [
+        {
+          "id": "immutable_audit_log",
+          "artifact_path": "PostgreSQL table ransomeye.immutable_audit_log",
+          "hash_source": "chain_hash_sha256_column",
+          "verification_method": {
+            "type": "hash_chained_entries",
+            "description": "Hash-chained entries, each entry includes previous entry's hash, cryptographic chain integrity",
+            "command": "SELECT * FROM ransomeye.immutable_audit_log ORDER BY created_at DESC LIMIT 100;"
+          },
+          "failure_behavior": {
+            "if_chain_breaks": "Integrity violation detected, cannot insert entries with invalid chain hash"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Export audit chain, verify hashes",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify chain integrity",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review audit chain samples",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "category": "model_governance",
+      "artifacts": [
+        {
+          "id": "model_registry",
+          "artifact_path": "PostgreSQL table ransomeye.model_registry",
+          "hash_source": "model_hashes_stored_in_registry",
+          "verification_method": {
+            "type": "registry_verification",
+            "description": "Registry contains model metadata, model versions tracked, SHAP explanations required",
+            "command": "SELECT * FROM ransomeye.model_registry;"
+          },
+          "failure_behavior": {
+            "if_model_missing": "Warning logged",
+            "if_shap_missing": "Warning logged"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Export model registry",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify model governance",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review model registry",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "category": "customer_verifier",
+      "artifacts": [
+        {
+          "id": "customer_verifier",
+          "artifact_path": "/home/ransomeye/rebuild/core/customer_verifier/customer_verify.py",
+          "hash_source": "ARTIFACT_HASHES.txt",
+          "verification_method": {
+            "type": "standalone_verifier",
+            "description": "Standalone verifier (no DB credentials required), verifies binary hashes, model hashes, audit chain, ship finality, produces cryptographically signed result",
+            "command": "python3 core/customer_verifier/customer_verify.py"
+          },
+          "failure_behavior": {
+            "on_failure": "overall_verified: false, SHIP_FINALITY_VERIFIED flag set to false"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Run verifier independently",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify verifier logic",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review customer verification process",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "category": "vendor_non_repudiation",
+      "artifacts": [
+        {
+          "id": "vendor_non_repudiation_scanner",
+          "artifact_path": "/home/ransomeye/rebuild/core/governance/vendor_non_repudiation.py",
+          "hash_source": "ARTIFACT_HASHES.txt",
+          "verification_method": {
+            "type": "static_code_scan",
+            "description": "Static code scan for backdoor patterns, scans for override flags, recovery mechanisms, checks for bypass code",
+            "command": "python3 core/governance/vendor_non_repudiation.py"
+          },
+          "failure_behavior": {
+            "if_critical_findings": "Exit with non-zero code, findings logged to evidence report"
+          },
+          "independent_verification": {
+            "customer": {
+              "method": "Run scanner independently",
+              "verifiable": true
+            },
+            "auditor": {
+              "method": "Verify scan results",
+              "verifiable": true
+            },
+            "regulator": {
+              "method": "Review vendor non-repudiation proof",
+              "verifiable": true
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "verification_methods_summary": {
+    "customer": [
+      "Ship seal enforcement (run enforcer)",
+      "Binary integrity (verify hashes)",
+      "Audit chain integrity (export and verify)",
+      "Ship finality (run customer verifier)",
+      "Vendor non-repudiation (run scanner)"
+    ],
+    "auditor": [
+      "All customer verification methods",
+      "Code review of enforcement logic",
+      "Audit chain integrity",
+      "Model governance",
+      "Vendor non-repudiation scan results"
+    ],
+    "regulator": [
+      "All auditor verification methods",
+      "Evidence bundle integrity",
+      "Legal non-claims declaration",
+      "Regulator walkthrough compliance",
+      "Court-defensible evidence"
+    ]
+  },
+  "failure_behavior_summary": {
+    "ship_seal_violation": {
+      "detection": "Immediate (service startup) or ≤5 minutes (verifier)",
+      "response": [
+        "SYSTEM_INTEGRITY_VIOLATION audit entry",
+        "Service fails to start or stops",
+        "Verifier exits non-zero"
+      ],
+      "evidence": ["Audit log", "Verifier results", "Violation details"]
+    },
+    "verifier_failure": {
+      "detection": "Every 5 minutes",
+      "response": [
+        "SYSTEM_INTEGRITY_VIOLATION audit entry",
+        "Verifier exits non-zero",
+        "System enters fail-closed state"
+      ],
+      "evidence": ["Audit log", "Verifier results", "Diagnostic snapshot"]
+    },
+    "audit_chain_break": {
+      "detection": "On chain hash verification",
+      "response": [
+        "Chain integrity violation detected",
+        "Cannot insert entries with invalid chain hash"
+      ],
+      "evidence": ["Audit chain export", "Chain hash verification"]
+    }
+  }
+}
+
