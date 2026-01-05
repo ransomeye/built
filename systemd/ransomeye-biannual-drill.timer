@@ -1,0 +1,17 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-biannual-drill.timer
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Biannual Incident Drill Timer
+
+[Unit]
+Description=RansomEye Biannual Incident Drill Timer
+Requires=ransomeye-biannual-drill.service
+
+[Timer]
+OnCalendar=*-01-01,*-07-01 00:00:00
+# Run biannually on Jan 1 and Jul 1 at 00:00 UTC
+Persistent=true
+RandomizedDelaySec=0
+
+[Install]
+WantedBy=timers.target
+

@@ -1,11 +1,11 @@
 # Enterprise Compliance Snapshot
 
-**Generated:** 2026-01-05T10:21:53.322696+00:00
+**Generated:** 2026-01-05T11:00:55.144496+00:00
 **Version:** v1.0.0-enterprise-ship
 
 ## Asset Inventory
 
-- **Agents:** 409
+- **Agents:** 442
 - **Components:** 1
 - **Models:** 4
 
@@ -26,9 +26,9 @@ Ingestion → Normalization → Detection → Threat Intel → Audit
 ## Audit Retention
 
 - **Retention Period:** 7 years
-- **Total Entries:** 4972
+- **Total Entries:** 7294
 - **Oldest Entry:** 2026-01-03T11:46:26.693897+00:00
-- **Newest Entry:** 2026-01-05T10:21:53.189237+00:00
+- **Newest Entry:** 2026-01-05T11:00:54.726876+00:00
 
 ## AI Explainability
 
@@ -40,10 +40,10 @@ Ingestion → Normalization → Detection → Threat Intel → Audit
 ```json
 {
   "asset_inventory": {
-    "agents": 409,
+    "agents": 442,
     "components": 1,
     "models": 4,
-    "timestamp": "2026-01-05T10:21:53.319802+00:00"
+    "timestamp": "2026-01-05T11:00:55.142058+00:00"
   },
   "data_flow": {
     "ingestion": "raw_events",
@@ -61,8 +61,8 @@ Ingestion → Normalization → Detection → Threat Intel → Audit
   },
   "audit_retention": {
     "oldest_entry": "2026-01-03T11:46:26.693897+00:00",
-    "newest_entry": "2026-01-05T10:21:53.189237+00:00",
-    "total_entries": 4972,
+    "newest_entry": "2026-01-05T11:00:54.726876+00:00",
+    "total_entries": 7294,
     "retention_years": 7
   },
   "ai_explainability": {

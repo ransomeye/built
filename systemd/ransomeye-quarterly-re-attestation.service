@@ -1,0 +1,26 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-quarterly-re-attestation.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Quarterly Executive Re-Attestation Service
+
+[Unit]
+Description=RansomEye Quarterly Executive Re-Attestation
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+Environment="DB_NAME=${DB_NAME:-ransomeye}"
+Environment="DB_USER=${DB_USER:-gagan}"
+Environment="DB_HOST=${DB_HOST:-localhost}"
+Environment="DB_PASS=${DB_PASS:-gagan}"
+Environment="DB_PORT=${DB_PORT:-5432}"
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/core/attestation/quarterly_re_attestation.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
