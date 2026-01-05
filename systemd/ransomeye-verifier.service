@@ -3,9 +3,11 @@
 # Details of functionality of this file: Systemd service unit for RansomEye Continuous Verification Engine
 
 [Unit]
-Description=RansomEye Continuous Verification Engine - Verifies all services, DB, models, UI every 5 minutes
-After=network.target
+Description=RansomEye Continuous Verification Engine - Verifies all services, DB, models, UI every 5 minutes (PROMPT-56 Hardened)
+After=network.target postgresql.service
 Requires=network.target
+# Run on boot, service restart, and package upgrade
+OnFailure=ransomeye-verifier-failure.service
 
 [Service]
 Type=oneshot
@@ -15,6 +17,10 @@ WorkingDirectory=/home/ransomeye/rebuild
 ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/core/verifier/verifier.py
 StandardOutput=journal
 StandardError=journal
+# Immutability: Read-only paths
+ReadOnlyPaths=/home/ransomeye/rebuild/core/verifier/verifier.py
+ReadWritePaths=/var/log/ransomeye /var/lib/ransomeye/verifier
+# Environment variables
 Environment="DB_NAME=ransomeye"
 Environment="DB_USER=gagan"
 Environment="DB_PASS=gagan"
@@ -22,7 +28,16 @@ Environment="DB_HOST=localhost"
 Environment="DB_PORT=5432"
 Environment="RANSOMEYE_UI_HOST=127.0.0.1"
 Environment="RANSOMEYE_UI_PORT=8080"
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Restart policy: Always restart on failure (no masking)
+Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
+Also=ransomeye-verifier.timer
 

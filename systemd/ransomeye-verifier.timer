@@ -3,13 +3,20 @@
 # Details of functionality of this file: Systemd timer for RansomEye Continuous Verification (runs every 5 minutes)
 
 [Unit]
-Description=RansomEye Continuous Verification Timer - Runs every 5 minutes
+Description=RansomEye Continuous Verification Timer - Runs every 5 minutes (PROMPT-56 Hardened)
 Requires=ransomeye-verifier.service
 
 [Timer]
+# Run on boot (after 1 minute)
 OnBootSec=1min
+# Run every 5 minutes
 OnUnitActiveSec=5min
+# Also run on service restart
+OnStartupSec=1min
+# Accuracy: 1 second
 AccuracySec=1s
+# Persistent: Run missed timers on boot
+Persistent=true
 
 [Install]
 WantedBy=timers.target

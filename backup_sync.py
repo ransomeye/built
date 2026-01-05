@@ -434,22 +434,108 @@ def perform_sync():
         logger.error(f"Exception during sync: {e}")
         return False
 
+def check_existing_process():
+    """Check if another backup_sync process is already running."""
+    # Check PID file
+    if PID_FILE.exists():
+        try:
+            with open(PID_FILE, 'r') as f:
+                old_pid = int(f.read().strip())
+            # Check if process is still running
+            try:
+                os.kill(old_pid, 0)  # Signal 0 just checks if process exists
+                # Process exists, check if it's actually backup_sync
+                try:
+                    with open(f"/proc/{old_pid}/cmdline", 'r') as f:
+                        cmdline = f.read()
+                    if 'backup_sync.py' in cmdline:
+                        logger.warning(f"Another backup_sync process is already running (PID: {old_pid})")
+                        return old_pid
+                except:
+                    pass
+            except OSError:
+                # Process doesn't exist, remove stale PID file
+                PID_FILE.unlink()
+        except (ValueError, IOError):
+            # Invalid PID file, remove it
+            PID_FILE.unlink()
+    
+    # Also check for any running backup_sync processes
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "backup_sync.py"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            pids = [int(p) for p in result.stdout.strip().split('\n') if p and int(p) != os.getpid()]
+            if pids:
+                logger.warning(f"Found {len(pids)} existing backup_sync process(es): {pids}")
+                return pids[0]
+    except Exception:
+        pass
+    
+    return None
+
 def write_pid_file():
-    """Write PID file for process management."""
+    """Write PID file for process management with file locking."""
     try:
         PID_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(PID_FILE, 'w') as f:
-            f.write(str(os.getpid()))
-        logger.info(f"PID file written: {PID_FILE}")
+        
+        # Use file locking to prevent multiple instances
+        lock_file = PID_FILE.parent / (PID_FILE.name + ".lock")
+        try:
+            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError:
+                os.close(lock_fd)
+                logger.error("Another backup_sync process is holding the lock file")
+                sys.exit(1)
+            
+            # Check for existing processes
+            existing_pid = check_existing_process()
+            if existing_pid:
+                os.close(lock_fd)
+                logger.error(f"Another backup_sync process is already running (PID: {existing_pid})")
+                logger.error("Please stop it first or wait for it to complete")
+                sys.exit(1)
+            
+            # Write PID file
+            with open(PID_FILE, 'w') as f:
+                f.write(str(os.getpid()))
+            logger.info(f"PID file written: {PID_FILE}")
+            
+            # Keep lock file open (will be released when process exits)
+            # Store lock_fd as module-level variable so it stays open
+            write_pid_file._lock_fd = lock_fd
+        except Exception as e:
+            if 'lock_fd' in locals():
+                os.close(lock_fd)
+            raise
     except Exception as e:
         logger.error(f"Failed to write PID file: {e}")
+        sys.exit(1)
 
 def remove_pid_file():
-    """Remove PID file on shutdown."""
+    """Remove PID file and lock file on shutdown."""
     try:
         if PID_FILE.exists():
             PID_FILE.unlink()
             logger.info("PID file removed")
+        # Release lock file if it exists
+        lock_file = PID_FILE.parent / (PID_FILE.name + ".lock")
+        if lock_file.exists():
+            try:
+                if hasattr(write_pid_file, '_lock_fd'):
+                    os.close(write_pid_file._lock_fd)
+                    delattr(write_pid_file, '_lock_fd')
+            except:
+                pass
+            try:
+                lock_file.unlink()
+            except:
+                pass
     except Exception as e:
         logger.error(f"Failed to remove PID file: {e}")
 
@@ -547,11 +633,18 @@ def main():
     """Main sync loop."""
     global shutdown_flag
     
+    # Check for existing processes before starting
+    existing_pid = check_existing_process()
+    if existing_pid:
+        logger.error(f"Another backup_sync process is already running (PID: {existing_pid})")
+        logger.error("Please stop it first: /home/ransomeye/rebuild/backup_sync.sh stop")
+        sys.exit(1)
+    
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Write PID file
+    # Write PID file with locking
     write_pid_file()
     
     logger.info("=" * 60)
