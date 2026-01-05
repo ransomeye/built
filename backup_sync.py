@@ -271,30 +271,77 @@ def perform_sync():
                 elapsed_sec = int(elapsed_so_far % 60)
                 
                 # Check if stuck (no progress for 5+ minutes)
+                # But first verify actual destination size to confirm if sync is really stuck
                 time_since_progress = current_time - last_progress_time
                 if time_since_progress > stuck_threshold and elapsed_so_far > stuck_threshold:
-                    logger.warning(f"Sync appears stuck! No progress for {int(time_since_progress // 60)}m {int(time_since_progress % 60)}s")
-                    logger.warning(f"Last progress: {last_progress_bytes / (1024**3):.2f} GB at {int((current_time - last_progress_time) // 60)}m ago")
-                    logger.warning("This may indicate:")
-                    logger.warning("  - Slow USB pendrive I/O")
-                    logger.warning("  - Large file transfer in progress")
-                    logger.warning("  - Filesystem issues on destination")
-                    logger.warning("  - Network issues (if using network path)")
-                    logger.warning("Consider checking:")
-                    logger.warning(f"  - Disk I/O: iostat -x 1")
-                    logger.warning(f"  - rsync process: ps aux | grep rsync")
-                    logger.warning(f"  - Destination mount: df -h {BACKUP_DIR}")
-                    # If stuck for more than 10 minutes, consider terminating
-                    if time_since_progress > 600:  # 10 minutes
-                        logger.error("Sync stuck for over 10 minutes. Terminating rsync process...")
-                        process.terminate()
-                        try:
-                            process.wait(timeout=10)
-                        except subprocess.TimeoutExpired:
-                            logger.warning("Process did not terminate gracefully, killing...")
-                            process.kill()
-                            process.wait()
-                        return False
+                    # Check actual destination size to verify if sync is really stuck
+                    try:
+                        dest_check = subprocess.run(
+                            ["du", "-sb", str(BACKUP_DIR)],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        if dest_check.returncode == 0:
+                            current_dest_size = int(dest_check.stdout.split()[0])
+                            # If destination is still growing (within last 2 minutes), sync is not stuck
+                            # Store last checked size for comparison
+                            if not hasattr(perform_sync, '_last_dest_size'):
+                                perform_sync._last_dest_size = current_dest_size
+                                perform_sync._last_dest_check_time = current_time
+                            
+                            # Check if size increased in last 2 minutes
+                            if current_time - perform_sync._last_dest_check_time < 120:
+                                if current_dest_size > perform_sync._last_dest_size:
+                                    # Size is increasing, sync is working
+                                    perform_sync._last_dest_size = current_dest_size
+                                    perform_sync._last_dest_check_time = current_time
+                                    logger.info(f"Sync is progressing (destination size: {current_dest_size / (1024**3):.2f} GB, increasing)")
+                                    # Reset progress time since we confirmed it's working
+                                    last_progress_time = current_time
+                                else:
+                                    # Size not increasing, might be stuck
+                                    logger.warning(f"Sync appears stuck! No progress for {int(time_since_progress // 60)}m {int(time_since_progress % 60)}s")
+                                    logger.warning(f"Last progress: {last_progress_bytes / (1024**3):.2f} GB at {int((current_time - last_progress_time) // 60)}m ago")
+                                    logger.warning(f"Destination size: {current_dest_size / (1024**3):.2f} GB (not increasing)")
+                                    # Only terminate if stuck for 20+ minutes (more lenient for large backups)
+                                    if time_since_progress > 1200:  # 20 minutes
+                                        logger.error("Sync stuck for over 20 minutes. Terminating rsync process...")
+                                        process.terminate()
+                                        try:
+                                            process.wait(timeout=10)
+                                        except subprocess.TimeoutExpired:
+                                            logger.warning("Process did not terminate gracefully, killing...")
+                                            process.kill()
+                                            process.wait()
+                                        return False
+                            else:
+                                # First check, just store the size
+                                perform_sync._last_dest_size = current_dest_size
+                                perform_sync._last_dest_check_time = current_time
+                    except Exception as e:
+                        logger.debug(f"Destination size check failed: {e}")
+                        # Fall back to original warning
+                        logger.warning(f"Sync appears stuck! No progress for {int(time_since_progress // 60)}m {int(time_since_progress % 60)}s")
+                        logger.warning("This may indicate:")
+                        logger.warning("  - Slow USB pendrive I/O")
+                        logger.warning("  - Large file transfer in progress")
+                        logger.warning("  - Filesystem issues on destination")
+                        logger.warning("Consider checking:")
+                        logger.warning(f"  - Disk I/O: iostat -x 1")
+                        logger.warning(f"  - rsync process: ps aux | grep rsync")
+                        logger.warning(f"  - Destination mount: df -h {BACKUP_DIR}")
+                        # Only terminate if stuck for 20+ minutes
+                        if time_since_progress > 1200:  # 20 minutes
+                            logger.error("Sync stuck for over 20 minutes. Terminating rsync process...")
+                            process.terminate()
+                            try:
+                                process.wait(timeout=10)
+                            except subprocess.TimeoutExpired:
+                                logger.warning("Process did not terminate gracefully, killing...")
+                                process.kill()
+                                process.wait()
+                            return False
                 
                 # Calculate progress if we have source size
                 if source_size > 0 and last_progress_bytes > 0:
