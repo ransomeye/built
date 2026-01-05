@@ -14,6 +14,7 @@ use tokio::runtime::Runtime;
 pub mod errors;
 pub mod capture;
 pub mod parser;
+pub mod l7_parser;
 pub mod flow;
 pub mod extraction;
 pub mod envelope;
@@ -195,7 +196,7 @@ fn main() -> Result<(), ProbeError> {
                     .unwrap()
                     .as_secs();
                 
-                let parsed = match parser.parse(&packet_data, timestamp) {
+                let mut parsed = match parser.parse(&packet_data, timestamp) {
                     Ok(p) => p,
                     Err(e) => {
                         error!("Parse error: {}", e);
@@ -203,6 +204,21 @@ fn main() -> Result<(), ProbeError> {
                         continue;
                     }
                 };
+                
+                // Parse L7 protocol if we have TCP/UDP payload
+                if matches!(parsed.protocol, parser::Protocol::TCP | parser::Protocol::UDP) && parsed.payload_len > 0 {
+                    // Extract payload from packet_data
+                    let payload_start = 14 + 20 + (if matches!(parsed.protocol, parser::Protocol::TCP) { 20 } else { 8 });
+                    if packet_data.len() > payload_start {
+                        let payload = &packet_data[payload_start..];
+                        if !payload.is_empty() {
+                            let l7_parser = l7_parser::L7Parser::new();
+                            if let Ok(l7_meta) = l7_parser.parse(payload, parsed.src_port, parsed.dst_port) {
+                                parsed.l7_metadata = Some(l7_meta);
+                            }
+                        }
+                    }
+                }
                 
                 // Update flow tracking
                 if let Err(e) = flow_tracker.update_flow(&parsed) {
