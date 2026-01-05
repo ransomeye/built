@@ -1,11 +1,13 @@
 # Path and File Name : /home/ransomeye/rebuild/backup_sync.py
 # Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
-# Details of functionality of this file: Continuous backup sync script that syncs rebuild folder to external pendrive, excluding venv files
+# Details of functionality of this file: Complete disaster recovery backup sync script that syncs entire rebuild folder to external pendrive for full server restoration capability
 
 """
-Continuous Backup Sync Script
-Syncs /home/ransomeye/rebuild to external pendrive at /mnt/pendrive/rebuild
-Excludes venv files and directories for efficient backup.
+Complete Disaster Recovery Backup Sync Script
+Syncs entire /home/ransomeye/rebuild to external pendrive at /mnt/pendrive/rebuild
+This is a complete blind copy for disaster recovery - everything is backed up
+so the server can be fully restored from the pendrive if the main server crashes.
+Only excludes backup log files to avoid recursion.
 """
 
 import os
@@ -28,28 +30,11 @@ SYNC_INTERVAL = 3600  # 1 hour between syncs
 PID_FILE = Path("/home/ransomeye/rebuild/logs/backup_sync.pid")
 
 # Exclude patterns for rsync
+# Minimal exclusions for disaster recovery backup - only exclude backup log files to avoid recursion
 EXCLUDE_PATTERNS = [
-    "venv/",
-    "**/venv/",
-    ".venv/",
-    "**/.venv/",
-    ".venv-*/",
-    "**/.venv-*/",
-    "**/__pycache__/",
-    "**/*.pyc",
-    "**/*.pyo",
-    "**/.git/",
-    "**/target/",
-    "**/node_modules/",
-    "**/.pytest_cache/",
-    "**/.mypy_cache/",
-    "**/.ruff_cache/",
-    "**/*.swp",
-    "**/*.swo",
-    "**/.DS_Store",
-    "**/Thumbs.db",
     "logs/backup_sync.log",
     "logs/backup_sync.pid",
+    ".rsync-partial/",  # Exclude rsync partial files directory
 ]
 
 # Setup logging
@@ -130,6 +115,9 @@ def build_rsync_command():
         "--timeout=300",  # 5 minute timeout per file operation
         "--bwlimit=0",  # No bandwidth limit (use full speed)
         "--whole-file",  # Transfer whole files (faster for local USB)
+        "--no-owner",  # Don't preserve ownership (FAT32 doesn't support it)
+        "--no-group",  # Don't preserve group (FAT32 doesn't support it)
+        "--no-perms",  # Don't preserve permissions (FAT32 doesn't support it)
     ] + exclude_args + [
         f"{SOURCE_DIR}/",
         f"{BACKUP_DIR}/"

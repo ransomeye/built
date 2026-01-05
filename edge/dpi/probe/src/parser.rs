@@ -9,8 +9,10 @@ use pnet::packet::tcp::TcpPacket;
 use pnet::packet::udp::UdpPacket;
 use pnet::packet::Packet;
 use tracing::debug;
+use std::collections::HashMap;
 
 use super::errors::ProbeError;
+use super::l7_parser::{L7Parser, L7Metadata};
 
 /// Protocol parser for L3-L7
 /// 
@@ -29,6 +31,7 @@ pub struct ParsedPacket {
     pub protocol: Protocol,
     pub payload_len: usize,
     pub is_fragment: bool,
+    pub l7_metadata: Option<L7Metadata>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,11 +45,15 @@ pub enum Protocol {
     Unknown,
 }
 
-pub struct ProtocolParser;
+pub struct ProtocolParser {
+    l7_parser: L7Parser,
+}
 
 impl ProtocolParser {
     pub fn new() -> Self {
-        Self
+        Self {
+            l7_parser: L7Parser::new(),
+        }
     }
     
     /// Parse packet (zero allocation in hot path)
@@ -156,6 +163,10 @@ impl ProtocolParser {
             dst_ip.as_ref().unwrap_or(&"unknown".to_string()),
             protocol);
         
+        // L7 parsing will be done in flow tracker after payload assembly
+        // For now, return None (will be populated during flow processing)
+        let l7_metadata = None;
+        
         Ok(ParsedPacket {
             timestamp,
             src_mac,
@@ -167,6 +178,7 @@ impl ProtocolParser {
             protocol,
             payload_len,
             is_fragment,
+            l7_metadata,
         })
     }
 }

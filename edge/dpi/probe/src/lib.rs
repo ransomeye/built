@@ -18,6 +18,7 @@
 pub mod errors;
 pub mod capture;
 pub mod parser;
+pub mod l7_parser;
 pub mod flow;
 pub mod extraction;
 pub mod envelope;
@@ -30,6 +31,7 @@ pub mod health;
 pub use errors::ProbeError;
 pub use capture::PacketCapture;
 pub use parser::ProtocolParser;
+pub use l7_parser::L7Parser;
 pub use flow::FlowTracker;
 pub use extraction::FeatureExtractor;
 pub use envelope::EventEnvelope;

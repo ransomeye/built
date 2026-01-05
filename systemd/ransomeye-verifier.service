@@ -1,0 +1,28 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-verifier.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Continuous Verification Engine
+
+[Unit]
+Description=RansomEye Continuous Verification Engine - Verifies all services, DB, models, UI every 5 minutes
+After=network.target
+Requires=network.target
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/core/verifier/verifier.py
+StandardOutput=journal
+StandardError=journal
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="RANSOMEYE_UI_HOST=127.0.0.1"
+Environment="RANSOMEYE_UI_PORT=8080"
+
+[Install]
+WantedBy=multi-user.target
+

@@ -36,6 +36,8 @@ pub struct EventData {
     pub packet_size: u16,
     pub is_fragment: bool,
     pub features: FeaturesData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l7_metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
