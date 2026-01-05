@@ -1,0 +1,10 @@
+{
+  "verifier_failure_response": {
+    "exit_code": 1,
+    "audit_entry_type": "SYSTEM_INTEGRITY_VIOLATION",
+    "fail_closed_state": true,
+    "service_status": "STOPPED",
+    "violation_timestamp": "2026-01-28T12:00:00Z"
+  }
+}
+

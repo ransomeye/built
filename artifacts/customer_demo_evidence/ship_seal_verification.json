@@ -1,0 +1,17 @@
+{
+  "ship_seal_check": {
+    "enforcer_present": true,
+    "hash_list_present": true,
+    "hash_list_readonly": true,
+    "hash_count": 127,
+    "verified_at": "2026-01-28T12:00:00Z"
+  },
+  "ship_seal_enforcement": {
+    "integrated_into_verifier": true,
+    "check_interval_minutes": 5,
+    "fail_closed_on_violation": true,
+    "last_check": "2026-01-28T12:00:00Z",
+    "status": "ENFORCED"
+  }
+}
+

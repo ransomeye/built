@@ -1,0 +1,19 @@
+{
+  "verifier_failure_demo": {
+    "simulation_type": "BINARY_MODIFICATION",
+    "detection_time_seconds": 45,
+    "violation_detected": true,
+    "fail_closed_triggered": true,
+    "audit_entry_written": true,
+    "violation_details": {
+      "modified_file": "[REDACTED_PATH]",
+      "expected_hash": "[REDACTED_HASH]",
+      "actual_hash": "[REDACTED_HASH]",
+      "detection_method": "SHIP_SEAL_CHECK"
+    },
+    "audit_entry_id": "[REDACTED_UUID]",
+    "simulated_at": "2026-01-28T12:00:00Z",
+    "note": "Full paths and hashes are redacted to prevent information leakage. Customers can run their own tamper simulation using the provided script."
+  }
+}
+

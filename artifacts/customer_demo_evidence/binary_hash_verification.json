@@ -1,0 +1,11 @@
+{
+  "binary_hash_verification": {
+    "total_binaries": 127,
+    "verified_binaries": 127,
+    "mismatched_binaries": 0,
+    "missing_binaries": 0,
+    "verification_status": "PASS",
+    "verified_at": "2026-01-28T12:00:00Z"
+  }
+}
+

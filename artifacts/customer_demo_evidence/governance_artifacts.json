@@ -1,0 +1,33 @@
+{
+  "governance_artifacts": {
+    "policies": [
+      {
+        "name": "Ship Seal Enforcement",
+        "document": "docs/enterprise/ship_seal_enforcement.md",
+        "enforcement": "RUNTIME_CHECK",
+        "customer_verifiable": true
+      },
+      {
+        "name": "Vendor Non-Repudiation",
+        "document": "docs/enterprise/vendor_non_repudiation.md",
+        "enforcement": "STATIC_SCAN",
+        "customer_verifiable": true
+      },
+      {
+        "name": "Customer Finality",
+        "document": "docs/enterprise/customer_ship_finality.md",
+        "enforcement": "CUSTOMER_VERIFIER",
+        "customer_verifiable": true
+      },
+      {
+        "name": "Production Change Prohibitions",
+        "document": "docs/enterprise/production_change_prohibitions.md",
+        "enforcement": "TECHNICAL_AND_PROCEDURAL",
+        "customer_verifiable": true
+      }
+    ],
+    "total_policies": 4,
+    "all_customer_verifiable": true
+  }
+}
+

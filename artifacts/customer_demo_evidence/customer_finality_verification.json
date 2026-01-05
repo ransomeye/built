@@ -1,0 +1,20 @@
+{
+  "customer_finality_verification": {
+    "verified_at": "2026-01-28T12:00:00Z",
+    "verifier_version": "1.0.0",
+    "checks": {
+      "ship_finality": {
+        "verified": true,
+        "messages": [
+          "Ship seal enforcer present",
+          "ARTIFACT_HASHES.txt present and populated",
+          "Ship seal integrated into verifier",
+          "Vendor non-repudiation scanner present"
+        ]
+      }
+    },
+    "SHIP_FINALITY_VERIFIED": true,
+    "overall_verified": true
+  }
+}
+

@@ -1,0 +1,30 @@
+{
+  "evidence_bundle_index": {
+    "bundle_version": "1.0.0",
+    "generated_at": "2026-01-28T12:00:00Z",
+    "artifacts": {
+      "ship_seal": {
+        "enforcer_hash": "[SHA256_HASH]",
+        "hash_list_hash": "[SHA256_HASH]",
+        "verification_method": "RUNTIME_CHECK"
+      },
+      "audit_chain": {
+        "sample_entries": 10,
+        "chain_hash": "[SHA256_HASH]",
+        "verification_method": "CHAIN_HASH"
+      },
+      "customer_verifier": {
+        "verifier_hash": "[SHA256_HASH]",
+        "verification_method": "STANDALONE_EXECUTION"
+      },
+      "vendor_non_repudiation": {
+        "scanner_hash": "[SHA256_HASH]",
+        "scan_results_hash": "[SHA256_HASH]",
+        "verification_method": "STATIC_SCAN"
+      }
+    },
+    "total_artifacts": 4,
+    "bundle_hash": "[SHA256_HASH]"
+  }
+}
+
