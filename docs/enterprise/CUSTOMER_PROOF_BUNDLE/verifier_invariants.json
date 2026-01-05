@@ -1,0 +1,18 @@
+{
+  "assurance_mode": "ACTIVE",
+  "enforcement": "FAIL-CLOSED",
+  "invariants_checked": [
+    "Systemd services active (no restart loops)",
+    "Database tables increasing",
+    "Audit actions present",
+    "Model registry active versions",
+    "Threat intel IOC count > 0",
+    "DPI Probe L7 protocol detection",
+    "Linux Agent heartbeat",
+    "UI reachable",
+    "Artifact hashes match",
+    "Drift detection (no unauthorized changes)"
+  ],
+  "timestamp": "2026-01-05T10:55:04.128060+00:00",
+  "verification_frequency": "Every 5 minutes"
+}

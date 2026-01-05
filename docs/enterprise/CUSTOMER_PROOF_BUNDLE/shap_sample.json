@@ -1,0 +1,3 @@
+{
+  "error": "column \"model_id\" does not exist\nLINE 4:                 COUNT(DISTINCT model_id) as model_count,\n                                       ^\n"
+}

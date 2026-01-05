@@ -1,0 +1,80 @@
+{
+  "chain_completeness": "100.0%",
+  "chain_integrity": "VERIFIED",
+  "entries_with_chain": 6947,
+  "entries_with_prev": 6946,
+  "samples": [
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "da72f724...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:55:04.121328+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "11509188...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:55:04.065802+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "93926916...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:55:02.981575+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "adb36187...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:55:01.929891+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "8dde1605...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:55:00.813380+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "be5d2ead...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:54:59.673700+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "6fe8257a...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:54:58.600491+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "4d2cc7d7...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:54:57.532791+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "4642f529...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:54:56.462142+00:00",
+      "object_type": "normalized_event"
+    },
+    {
+      "action": "NORMALIZED_EVENT_INSERT",
+      "audit_id": "89bd5bab...",
+      "chain_status": "PRESENT",
+      "created_at": "2026-01-05T10:54:55.281865+00:00",
+      "object_type": "normalized_event"
+    }
+  ],
+  "timestamp": "2026-01-05T10:55:04.150179+00:00",
+  "total_entries": 6947
+}

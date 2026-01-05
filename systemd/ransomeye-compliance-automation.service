@@ -1,0 +1,27 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-compliance-automation.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Monthly compliance evidence generation service
+
+[Unit]
+Description=RansomEye Compliance Automation - Monthly Evidence Generation
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+Environment="DB_NAME=${DB_NAME:-ransomeye}"
+Environment="DB_USER=${DB_USER:-gagan}"
+Environment="DB_HOST=${DB_HOST:-localhost}"
+Environment="DB_PASS=${DB_PASS:-gagan}"
+Environment="DB_PORT=${DB_PORT:-5432}"
+Environment="RETENTION_YEARS=${RETENTION_YEARS:-7}"
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/core/compliance/compliance_automation.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

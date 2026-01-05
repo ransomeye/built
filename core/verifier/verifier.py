@@ -603,10 +603,20 @@ def write_audit_entry(message: str, level: str = "INFO"):
         pass
 
 
+def check_assurance_mode() -> bool:
+    """Check if assurance mode lock exists."""
+    assurance_lock_path = Path("/etc/ransomeye/ASSURANCE_MODE_LOCK")
+    return assurance_lock_path.exists()
+
+
 def main():
     """Main verification loop."""
+    # Check for assurance mode lock
+    assurance_mode = check_assurance_mode()
+    
     results = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "assurance_mode": assurance_mode,
         "checks": {},
         "overall_healthy": True,
         "failures": [],
@@ -653,37 +663,41 @@ def main():
         # Check model registry
         model_healthy, model_error = check_model_registry(conn)
         results["checks"]["model_registry"] = {"healthy": model_healthy, "error": model_error}
-        if model_error and "WARNING" not in model_error:
+        # In assurance mode, all warnings become failures
+        if model_error and ("WARNING" not in model_error or assurance_mode):
             results["failures"].append(f"Model registry: {model_error}")
             results["overall_healthy"] = False
-        elif model_error:
+        elif model_error and not assurance_mode:
             results["warnings"].append(f"Model registry: {model_error}")
         
         # Check threat intel
         ti_healthy, ti_error = check_threat_intel(conn)
         results["checks"]["threat_intel"] = {"healthy": ti_healthy, "error": ti_error}
-        if ti_error and "WARNING" not in ti_error:
+        # In assurance mode, all warnings become failures
+        if ti_error and ("WARNING" not in ti_error or assurance_mode):
             results["failures"].append(f"Threat intel: {ti_error}")
             results["overall_healthy"] = False
-        elif ti_error:
+        elif ti_error and not assurance_mode:
             results["warnings"].append(f"Threat intel: {ti_error}")
         
         # Check DPI L7 protocols
         dpi_healthy, dpi_error = check_dpi_l7_protocols(conn)
         results["checks"]["dpi_l7_protocols"] = {"healthy": dpi_healthy, "error": dpi_error}
-        if dpi_error and "WARNING" not in dpi_error:
+        # In assurance mode, all warnings become failures
+        if dpi_error and ("WARNING" not in dpi_error or assurance_mode):
             results["failures"].append(f"DPI L7 protocols: {dpi_error}")
             results["overall_healthy"] = False
-        elif dpi_error:
+        elif dpi_error and not assurance_mode:
             results["warnings"].append(f"DPI L7 protocols: {dpi_error}")
         
         # Check Linux agent heartbeat
         agent_healthy, agent_error = check_linux_agent_heartbeat(conn)
         results["checks"]["linux_agent_heartbeat"] = {"healthy": agent_healthy, "error": agent_error}
-        if agent_error and "WARNING" not in agent_error:
+        # In assurance mode, all warnings become failures
+        if agent_error and ("WARNING" not in agent_error or assurance_mode):
             results["failures"].append(f"Linux agent: {agent_error}")
             results["overall_healthy"] = False
-        elif agent_error:
+        elif agent_error and not assurance_mode:
             results["warnings"].append(f"Linux agent: {agent_error}")
         
         # Check drift
@@ -704,10 +718,11 @@ def main():
     # Check artifact hashes
     hash_healthy, hash_error = check_artifact_hashes()
     results["checks"]["artifact_hashes"] = {"healthy": hash_healthy, "error": hash_error}
-    if hash_error and "WARNING" not in hash_error:
+    # In assurance mode, all warnings become failures
+    if hash_error and ("WARNING" not in hash_error or assurance_mode):
         results["failures"].append(f"Artifact hashes: {hash_error}")
         results["overall_healthy"] = False
-    elif hash_error:
+    elif hash_error and not assurance_mode:
         results["warnings"].append(f"Artifact hashes: {hash_error}")
     
     # Determine overall health
@@ -736,8 +751,11 @@ def main():
         sys.exit(1)
     else:
         write_audit_entry("Verification passed", "INFO")
-        if results["warnings"]:
+        if results["warnings"] and not assurance_mode:
             write_audit_entry(f"Warnings: {', '.join(results['warnings'])}", "WARNING")
+        if assurance_mode and results["warnings"]:
+            # In assurance mode, warnings should have been converted to failures
+            write_audit_entry("Assurance mode: All checks mandatory", "INFO")
         sys.exit(0)
 
 
