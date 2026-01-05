@@ -17,10 +17,12 @@ import os
 import sys
 import time
 import hashlib
+import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 import logging
+import traceback
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +67,9 @@ def get_or_create_normalization_component(conn):
         row = cursor.fetchone()
         if row:
             component_id = row[0]
+            # Convert UUID to string if needed
+            if isinstance(component_id, uuid.UUID):
+                component_id = str(component_id)
             # Update last_heartbeat_at
             cursor.execute("""
                 UPDATE ransomeye.components 
@@ -75,74 +80,103 @@ def get_or_create_normalization_component(conn):
             return component_id
         
         # Create new component
-        import uuid
         component_id = uuid.uuid4()
+        component_id_str = str(component_id)
         cursor.execute("""
             INSERT INTO ransomeye.components 
                 (component_id, component_type, component_name, instance_id, started_at, last_heartbeat_at)
             VALUES (%s, 'core_engine'::component_type, %s, %s, NOW(), NOW())
-        """, (component_id, component_name, instance_id))
+        """, (component_id_str, component_name, instance_id))
         conn.commit()
         return component_id
     finally:
         cursor.close()
 
-def insert_immutable_audit_log(conn, actor_component_id, actor_agent_id, action, object_type, 
+def insert_immutable_audit_log(cursor, actor_component_id, actor_agent_id, action, object_type, 
                                object_id, event_time, payload_json, payload_sha256):
-    """Insert into immutable_audit_log (fail-closed)."""
-    cursor = conn.cursor()
-    try:
-        # Get previous audit chain entry for hash chaining
-        cursor.execute("""
-            SELECT audit_id, chain_hash_sha256, payload_sha256
-            FROM ransomeye.immutable_audit_log
-            ORDER BY created_at DESC
-            LIMIT 1
-        """)
-        
-        row = cursor.fetchone()
-        if row:
+    """Insert into immutable_audit_log (fail-closed, must be in same transaction as normalization)."""
+    # Get previous audit chain entry for hash chaining
+    # Use regular cursor (not RealDictCursor) for this query to ensure tuple access works
+    cursor.execute("""
+        SELECT audit_id, chain_hash_sha256, payload_sha256
+        FROM ransomeye.immutable_audit_log
+        ORDER BY created_at DESC
+        LIMIT 1
+    """)
+    
+    row = cursor.fetchone()
+    if row:
+        # Handle both tuple and dict-like results
+        if isinstance(row, dict):
+            prev_audit_id = row.get('audit_id')
+            prev_chain_hash = row.get('chain_hash_sha256')
+            prev_payload_sha256 = row.get('payload_sha256')
+        else:
             prev_audit_id = row[0]
             prev_chain_hash = row[1]
             prev_payload_sha256 = row[2]
+    else:
+        prev_audit_id = None
+        prev_chain_hash = bytes(32)  # 32 zero bytes
+        prev_payload_sha256 = None
+    
+    # Convert UUID to string if needed
+    if isinstance(prev_audit_id, uuid.UUID):
+        prev_audit_id = str(prev_audit_id)
+    
+    # Ensure prev_chain_hash is bytes (handle NULL from database)
+    if prev_chain_hash is None:
+        prev_chain_hash = bytes(32)  # 32 zero bytes
+    elif not isinstance(prev_chain_hash, bytes):
+        prev_chain_hash = bytes(32)  # Fallback to zero bytes
+    
+    # Ensure payload_sha256 is bytes
+    if not isinstance(payload_sha256, bytes):
+        raise TypeError(f"payload_sha256 must be bytes, got {type(payload_sha256)}")
+    
+    # Compute chain hash: SHA256(prev_chain_hash || payload_sha256)
+    chain_input = prev_chain_hash + payload_sha256
+    chain_hash_sha256 = hashlib.sha256(chain_input).digest()
+    
+    # Insert audit log entry
+    audit_id = uuid.uuid4()
+    audit_id_str = str(audit_id)
+    
+    # Convert all UUID parameters to strings
+    actor_component_id_str = str(actor_component_id) if actor_component_id and isinstance(actor_component_id, uuid.UUID) else actor_component_id
+    actor_agent_id_str = str(actor_agent_id) if actor_agent_id and isinstance(actor_agent_id, uuid.UUID) else actor_agent_id
+    object_id_str = str(object_id) if object_id and isinstance(object_id, uuid.UUID) else object_id
+    
+    cursor.execute("""
+        INSERT INTO ransomeye.immutable_audit_log (
+            audit_id, actor_component_id, actor_agent_id, action, object_type, object_id, event_time,
+            payload_json, payload_sha256, prev_audit_id, prev_payload_sha256, chain_hash_sha256, signature_status
+        )
+        VALUES (%s, %s, %s, %s, %s::text::trust_object_type, %s, %s, %s, %s, %s, %s, %s, 'unknown')
+        RETURNING audit_id
+    """, (
+        audit_id_str,
+        actor_component_id_str,
+        actor_agent_id_str,
+        action,
+        object_type,
+        object_id_str,
+        event_time,
+        json.dumps(payload_json),
+        payload_sha256,
+        prev_audit_id,
+        prev_payload_sha256,
+        chain_hash_sha256,
+    ))
+    
+    result = cursor.fetchone()
+    # Handle RealDictCursor result (dict-like) or regular cursor (tuple)
+    if result:
+        if isinstance(result, dict):
+            return result.get('audit_id', audit_id)
         else:
-            prev_audit_id = None
-            prev_chain_hash = bytes(32)  # 32 zero bytes
-            prev_payload_sha256 = None
-        
-        # Compute chain hash: SHA256(prev_chain_hash || payload_sha256)
-        chain_input = prev_chain_hash + payload_sha256
-        chain_hash_sha256 = hashlib.sha256(chain_input).digest()
-        
-        # Insert audit log entry
-        import uuid
-        audit_id = uuid.uuid4()
-        cursor.execute("""
-            INSERT INTO ransomeye.immutable_audit_log (
-                audit_id, actor_component_id, actor_agent_id, action, object_type, object_id, event_time,
-                payload_json, payload_sha256, prev_audit_id, prev_payload_sha256, chain_hash_sha256, signature_status
-            )
-            VALUES (%s, %s, %s, %s, %s::text::trust_object_type, %s, %s, %s, %s, %s, %s, %s, 'unknown')
-            RETURNING audit_id
-        """, (
-            audit_id,
-            actor_component_id,
-            actor_agent_id,
-            action,
-            object_type,
-            object_id,
-            event_time,
-            json.dumps(payload_json),
-            payload_sha256,
-            prev_audit_id,
-            prev_payload_sha256,
-            chain_hash_sha256,
-        ))
-        
-        result = cursor.fetchone()
-        return result[0] if result else audit_id
-    finally:
-        cursor.close()
+            return result[0]
+    return audit_id
 
 def compute_deterministic_key(raw_event_id, source_type, event_kind, observed_at_str):
     """Compute deterministic key from normalized fields (SHA-256, 32 bytes)."""
@@ -260,7 +294,12 @@ def process_batch(conn, batch_size=100):
             try:
                 normalized = normalize_event(raw_event)
                 
-                # Insert into normalized_events
+                # Convert UUID parameters to strings before INSERT
+                raw_event_id_str = str(normalized['raw_event_id']) if isinstance(normalized['raw_event_id'], uuid.UUID) else normalized['raw_event_id']
+                source_agent_id_str = str(normalized['source_agent_id']) if normalized['source_agent_id'] and isinstance(normalized['source_agent_id'], uuid.UUID) else normalized['source_agent_id']
+                source_component_id_str = str(normalized['source_component_id']) if normalized['source_component_id'] and isinstance(normalized['source_component_id'], uuid.UUID) else normalized['source_component_id']
+                
+                # Insert into normalized_events (atomic with audit insert below)
                 cursor.execute("""
                     INSERT INTO ransomeye.normalized_events (
                         raw_event_id, observed_at, source_type, source_agent_id, source_component_id,
@@ -269,11 +308,11 @@ def process_batch(conn, batch_size=100):
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING normalized_event_id
                 """, (
-                    normalized['raw_event_id'],
+                    raw_event_id_str,
                     normalized['observed_at'],
                     normalized['source_type'],
-                    normalized['source_agent_id'],
-                    normalized['source_component_id'],
+                    source_agent_id_str,
+                    source_component_id_str,
                     normalized['event_kind'],
                     normalized['event_subkind'],
                     normalized['severity'],
@@ -281,14 +320,22 @@ def process_batch(conn, batch_size=100):
                     normalized['deterministic_key'],
                 ))
                 
-                normalized_event_id = cursor.fetchone()[0]
+                # Handle RealDictCursor result (dict-like) or regular cursor (tuple)
+                result_row = cursor.fetchone()
+                if isinstance(result_row, dict):
+                    normalized_event_id = result_row['normalized_event_id']
+                else:
+                    normalized_event_id = result_row[0]
                 
-                # PROMPT-40A: Audit NORMALIZED_EVENT_INSERT (after successful normalized_events INSERT)
+                # Convert normalized_event_id to string if UUID
+                normalized_event_id_str = str(normalized_event_id) if isinstance(normalized_event_id, uuid.UUID) else normalized_event_id
+                
+                # PROMPT-51: Audit NORMALIZED_EVENT_INSERT (atomic with normalized_events INSERT, same cursor/transaction)
                 normalized_payload = {
-                    "normalized_event_id": str(normalized_event_id),
-                    "raw_event_id": str(normalized['raw_event_id']),
+                    "normalized_event_id": normalized_event_id_str,
+                    "raw_event_id": raw_event_id_str,
                     "source_type": normalized['source_type'],
-                    "agent_id": str(normalized['source_agent_id']) if normalized['source_agent_id'] else None,
+                    "agent_id": source_agent_id_str if source_agent_id_str else None,
                     "event_kind": normalized['event_kind'],
                     "event_subkind": normalized['event_subkind'],
                     "severity": normalized['severity'],
@@ -298,13 +345,17 @@ def process_batch(conn, batch_size=100):
                 normalized_payload_str = json.dumps(normalized_payload, sort_keys=True)
                 normalized_payload_sha256 = hashlib.sha256(normalized_payload_str.encode()).digest()
                 
+                # Convert UUID parameters for audit log
+                normalization_component_id_str = str(normalization_component_id) if isinstance(normalization_component_id, uuid.UUID) else normalization_component_id
+                
+                # FAIL-CLOSED: If audit insert fails, exception propagates and causes rollback
                 insert_immutable_audit_log(
-                    conn,
-                    normalization_component_id,
-                    normalized['source_agent_id'],
+                    cursor,
+                    normalization_component_id_str,
+                    source_agent_id_str,
                     "NORMALIZED_EVENT_INSERT",
                     "normalized_event",
-                    normalized_event_id,
+                    normalized_event_id_str,
                     normalized['observed_at'],
                     normalized_payload,
                     normalized_payload_sha256,
@@ -315,7 +366,9 @@ def process_batch(conn, batch_size=100):
             except Exception as e:
                 error_count += 1
                 logger.error(f"FAIL-CLOSED: Failed to normalize raw_event_id={raw_event['raw_event_id']}: {e}")
-                # Continue processing other events, but log the error
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                # Re-raise to trigger batch rollback (fail-closed)
+                raise
         
         # Commit batch
         conn.commit()
