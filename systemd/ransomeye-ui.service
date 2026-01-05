@@ -1,0 +1,40 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-ui.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye UI Server (PROMPT-48)
+
+[Unit]
+Description=RansomEye UI Server - Production-ready Day-1 dashboards
+After=network.target postgresql.service
+Requires=network.target postgresql.service
+ConditionPathExists=/home/ransomeye/rebuild/ui/server.py
+
+[Service]
+Type=simple
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/ui/server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables (localhost-first, env-driven)
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+Environment="RANSOMEYE_UI_HOST=127.0.0.1"
+Environment="RANSOMEYE_UI_PORT=8081"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ransomeye/rebuild
+
+[Install]
+WantedBy=multi-user.target
+

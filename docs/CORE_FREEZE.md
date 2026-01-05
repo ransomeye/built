@@ -98,5 +98,25 @@ After this freeze, **Core development stops**. Only the following standalone mod
 
 ---
 
+## UI & Threat Intelligence
+
+UI dashboards, branding, and threat-intelligence ingestion are complete, enabled by default, env-driven, localhost-first, audited, and production-ready.
+
+**UI Configuration:**
+- Default binding: `127.0.0.1` (localhost-first)
+- Configurable via `RANSOMEYE_UI_HOST` environment variable
+- All database connections use environment variables
+- No hardcoded URLs, IPs, or secrets
+
+**Threat Intelligence:**
+- Feed ingestion via environment-driven API keys
+- Fail-closed behavior when internet available but keys missing
+- Air-gap compatible (graceful degradation)
+- All feeds use environment variables: `RANSOMEYE_FEED_MALWAREBAZAAR_API_KEY`, `RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY`
+
+**Status:** ✅ **PRODUCTION-READY**
+
+---
+
 *This document is immutable and marks the formal freeze of RansomEye Core.*
 
