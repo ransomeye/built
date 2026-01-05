@@ -19,6 +19,7 @@ import logging
 import shutil
 import select
 import fcntl
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -208,25 +209,46 @@ def perform_sync():
                         
                         # Parse progress from rsync output
                         # rsync --info=progress2 outputs lines like:
-                        # "  7,234,567  73%  123.45M/s    0:00:45  (xfr#1234, to-chk=567/890)"
-                        for line in chunk.split('\n'):
+                        # "\r        237.47M  45%   96.26kB/s    0:00:45  (xfr#1234, to-chk=567/890)"
+                        # Format: [bytes] [percentage] [speed] [time] [(xfr#, to-chk=...)]
+                        # Handle \r overwrite lines by splitting on both \r and \n
+                        import re
+                        # Split on both \r and \n, then filter out empty lines
+                        lines = re.split(r'[\r\n]+', chunk)
+                        for line in lines:
                             line = line.strip()
-                            if '%' in line and ('xfr#' in line or 'to-chk=' in line):
-                                # Extract percentage
-                                try:
-                                    parts = line.split()
-                                    for part in parts:
-                                        if '%' in part:
-                                            pct = float(part.replace('%', ''))
-                                            # Extract bytes transferred
-                                            if len(parts) > 0:
-                                                bytes_str = parts[0].replace(',', '')
-                                                if bytes_str.isdigit():
-                                                    last_progress_bytes = int(bytes_str)
-                                                    last_progress_time = current_time
-                                            break
-                                except:
-                                    pass
+                            if '%' in line:
+                                # Extract percentage and bytes using regex
+                                # Match pattern like "237.47M  45%" or "7,234,567  73%"
+                                match = re.search(r'([\d,]+\.?\d*[KMGT]?)\s+(\d+)%', line)
+                                if match:
+                                    try:
+                                        bytes_str = match.group(1)
+                                        pct = float(match.group(2))
+                                        
+                                        # Parse human-readable size
+                                        bytes_str_clean = bytes_str.replace(',', '')
+                                        if bytes_str_clean.endswith('K') or bytes_str_clean.endswith('k'):
+                                            multiplier = 1024
+                                            bytes_str_clean = bytes_str_clean[:-1]
+                                        elif bytes_str_clean.endswith('M') or bytes_str_clean.endswith('m'):
+                                            multiplier = 1024 * 1024
+                                            bytes_str_clean = bytes_str_clean[:-1]
+                                        elif bytes_str_clean.endswith('G') or bytes_str_clean.endswith('g'):
+                                            multiplier = 1024 * 1024 * 1024
+                                            bytes_str_clean = bytes_str_clean[:-1]
+                                        elif bytes_str_clean.endswith('T') or bytes_str_clean.endswith('t'):
+                                            multiplier = 1024 * 1024 * 1024 * 1024
+                                            bytes_str_clean = bytes_str_clean[:-1]
+                                        else:
+                                            multiplier = 1
+                                        
+                                        bytes_val = float(bytes_str_clean) * multiplier
+                                        last_progress_bytes = int(bytes_val)
+                                        last_progress_time = current_time
+                                    except Exception as e:
+                                        logger.debug(f"Progress parse error: {e}")
+                                        pass
             except (OSError, ValueError):
                 # No data available or parsing error, continue
                 pass
