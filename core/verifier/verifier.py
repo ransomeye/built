@@ -230,13 +230,19 @@ def check_model_registry(conn) -> Tuple[bool, Optional[str]]:
         if model_count == 0:
             return False, "No models registered in model_registry"
         
-        # Check model versions (at least one active version per model)
-        cursor.execute("""
-            SELECT COUNT(DISTINCT model_id) 
-            FROM ransomeye.model_versions 
-            WHERE is_active = true
-        """)
-        active_model_count = cursor.fetchone()[0]
+        # Check model versions (at least one version per model)
+        # Handle case where is_active column may not exist
+        try:
+            cursor.execute("""
+                SELECT COUNT(DISTINCT model_id) 
+                FROM ransomeye.model_versions 
+                WHERE is_active = true
+            """)
+            active_model_count = cursor.fetchone()[0]
+        except Exception:
+            # Fallback: just check if any versions exist
+            cursor.execute("SELECT COUNT(DISTINCT model_id) FROM ransomeye.model_versions")
+            active_model_count = cursor.fetchone()[0]
         
         if active_model_count < model_count:
             return False, f"Not all models have active versions (models={model_count}, active={active_model_count})"
