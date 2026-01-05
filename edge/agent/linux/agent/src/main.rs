@@ -5,6 +5,7 @@
 use std::sync::Arc;
 use tracing::{info, error};
 use tokio::runtime::Runtime;
+use libsystemd::daemon::{notify, NotifyState};
 
 mod errors;
 mod process;
@@ -46,15 +47,19 @@ fn main() -> Result<(), AgentError> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
     
-    info!("RansomEye Linux Agent starting...");
+    info!("[INIT-1] RansomEye Linux Agent starting...");
+    let _ = notify(false, &[NotifyState::Status("Initializing...")]);
     
     // Get binary path for integrity verification
+    info!("[INIT-2] Getting binary path for integrity verification");
     let binary_path = std::env::current_exe()
         .map_err(|e| AgentError::ConfigurationError(format!("Failed to get binary path: {}", e)))?
         .to_string_lossy()
         .to_string();
     
     // Initialize runtime hardening (FAIL-CLOSED on integrity failure)
+    info!("[INIT-3] Initializing runtime hardening");
+    let _ = notify(false, &[NotifyState::Status("Initializing runtime hardening...")]);
     let config_path = std::env::var("AGENT_CONFIG_PATH").ok();
     let hardening = hardening::RuntimeHardening::new(
         binary_path.clone(),
@@ -63,39 +68,57 @@ fn main() -> Result<(), AgentError> {
     ).map_err(|e| AgentError::ConfigurationError(format!("Hardening initialization failed: {}", e)))?;
     
     // Verify binary integrity at startup (FAIL-CLOSED)
+    info!("[INIT-4] Verifying binary integrity");
+    let _ = notify(false, &[NotifyState::Status("Verifying binary integrity...")]);
     hardening.verify_binary_integrity()
         .map_err(|e| AgentError::ConfigurationError(format!("Binary integrity check failed: {}", e)))?;
+    info!("[INIT-4] Binary integrity verified");
     
     // Verify config integrity at startup (FAIL-CLOSED)
+    info!("[INIT-5] Verifying config integrity");
+    let _ = notify(false, &[NotifyState::Status("Verifying config integrity...")]);
     hardening.verify_config_integrity()
         .map_err(|e| AgentError::ConfigurationError(format!("Config integrity check failed: {}", e)))?;
+    info!("[INIT-5] Config integrity verified");
     
     // Perform runtime tamper checks (FAIL-CLOSED)
+    info!("[INIT-6] Performing runtime tamper checks");
+    let _ = notify(false, &[NotifyState::Status("Performing runtime checks...")]);
     hardening.perform_runtime_checks()
         .map_err(|e| AgentError::ConfigurationError(format!("Runtime check failed: {}", e)))?;
+    info!("[INIT-6] Runtime checks passed");
     
     // Start watchdog timer
+    info!("[INIT-7] Starting watchdog timer");
+    let _ = notify(false, &[NotifyState::Status("Starting watchdog...")]);
     hardening.start_watchdog()
         .map_err(|e| AgentError::ConfigurationError(format!("Watchdog start failed: {}", e)))?;
+    info!("[INIT-7] Watchdog started");
     
     // Load configuration (ENV-only, fail-closed)
+    info!("[INIT-8] Loading configuration from environment");
+    let _ = notify(false, &[NotifyState::Status("Loading configuration...")]);
     let config = AgentConfig::from_env()
         .map_err(|e| AgentError::ConfigurationError(e))?;
     
     config.validate()
         .map_err(|e| AgentError::ConfigurationError(e))?;
     
-    info!("Configuration loaded: max_processes={}, max_connections={}", 
+    info!("[INIT-8] Configuration loaded: max_processes={}, max_connections={}", 
         config.max_processes, config.max_connections);
     
     // Initialize identity (fail-closed on failure)
+    info!("[INIT-9] Loading component identity");
+    let _ = notify(false, &[NotifyState::Status("Loading identity...")]);
     let identity_path = config.identity_path.as_ref().map(|p| std::path::Path::new(p));
     let identity = IdentityManager::load_or_create(identity_path)
         .map_err(|e| AgentError::IdentityVerificationFailed(format!("{}", e)))?;
     
-    info!("Component identity: {}", identity.component_id());
+    info!("[INIT-9] Component identity: {}", identity.component_id());
     
     // Initialize event signer (fail-closed on failure) - Ed25519
+    info!("[INIT-10] Loading signing key");
+    let _ = notify(false, &[NotifyState::Status("Loading signing key...")]);
     let component_id = identity.component_id().to_string();
     let security_signer = if let Some(ref key_path) = config.signing_key_path {
         info!("Loading signing key from: {}", key_path);
@@ -109,7 +132,7 @@ fn main() -> Result<(), AgentError> {
     };
     
     // Test signer BEFORE wrapping in Arc to catch any issues
-    info!("Testing signer before Arc wrapping...");
+    info!("[INIT-10] Testing signer");
     let test_data = b"test";
     match security_signer.sign(test_data) {
         Ok(sig) => {
@@ -122,16 +145,18 @@ fn main() -> Result<(), AgentError> {
     }
     
     let security_signer = Arc::new(security_signer);
-    info!("Event signer created with Ed25519 key");
+    info!("[INIT-10] Event signer created with Ed25519 key");
     
     // Initialize reqwest HTTP client for direct telemetry delivery
+    info!("[INIT-11] Initializing HTTP client");
+    let _ = notify(false, &[NotifyState::Status("Initializing HTTP client...")]);
     let http_client = ReqwestClient::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| AgentError::ConfigurationError(format!("Failed to create HTTP client: {}", e)))?;
     
     let core_api_url = config.core_api_url.clone();
-    info!("HTTP client initialized for direct delivery to {}", core_api_url);
+    info!("[INIT-11] HTTP client initialized for direct delivery to {}", core_api_url);
     info!("Core API URL: {}", core_api_url);
     
     // CRITICAL: TLS/identity initialization MUST only occur for HTTPS URLs
@@ -142,7 +167,8 @@ fn main() -> Result<(), AgentError> {
     //     // HTTP mode - no TLS initialization
     // }
     
-    info!("About to initialize components...");
+    info!("[INIT-12] Initializing monitoring components");
+    let _ = notify(false, &[NotifyState::Status("Initializing components...")]);
     
     // Initialize components
     let process_monitor = Arc::new(ProcessMonitor::new(config.max_processes));
@@ -159,6 +185,8 @@ fn main() -> Result<(), AgentError> {
     let health_monitor = Arc::new(HealthMonitor::new(300)); // 5 minute max idle
     
     // Initialize syscall monitoring
+    info!("[INIT-13] Initializing syscall monitoring");
+    let _ = notify(false, &[NotifyState::Status("Initializing syscall monitoring...")]);
     if config.enable_ebpf {
         if let Err(e) = syscall_monitor.init_ebpf() {
             error!("eBPF initialization failed: {}", e);
@@ -177,11 +205,20 @@ fn main() -> Result<(), AgentError> {
     }
     
     // Start monitoring
-    info!("About to start syscall monitoring...");
+    info!("[INIT-14] Starting syscall monitoring");
+    let _ = notify(false, &[NotifyState::Status("Starting monitoring...")]);
     syscall_monitor.start()?;
-    info!("Syscall monitoring started");
+    info!("[INIT-14] Syscall monitoring started");
     
-    info!("Linux Agent started successfully");
+    // Create tokio runtime for async transport calls
+    info!("[INIT-15] Creating tokio runtime");
+    let rt = Runtime::new()
+        .map_err(|e| AgentError::ConfigurationError(format!("Failed to create runtime: {}", e)))?;
+    
+    // All initialization complete - notify systemd we're ready
+    info!("[INIT-16] Linux Agent initialization complete - notifying systemd");
+    let _ = notify(true, &[NotifyState::Ready, NotifyState::Status("Running")]);
+    info!("Linux Agent started successfully and ready");
     
     // Create tokio runtime for async transport calls
     let rt = Runtime::new()

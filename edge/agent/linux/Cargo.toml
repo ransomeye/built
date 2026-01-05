@@ -40,6 +40,7 @@ pkcs8 = "0.10"
 der = "0.7"
 spki = "0.7"
 tokio = { version = "1", features = ["full"] }
+libsystemd = "0.5"
 
 [dev-dependencies]
 tempfile = "3"

@@ -80,8 +80,8 @@ EnvironmentFile=/etc/ransomeye/agent.env
 KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=30
-# Send alert on unexpected termination
-TimeoutStartSec=60
+# Hard upper bound on startup (≤30s) - fail-closed on timeout
+TimeoutStartSec=30
 
 # Privilege downgrade is handled by the binary itself
 # Binary starts as root (SetUID) and drops to unprivileged user
