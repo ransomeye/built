@@ -128,7 +128,6 @@ def build_rsync_command():
         "--iconv=utf-8,utf-8",  # Handle character encoding
         "--modify-window=2",  # Allow 2 second time difference (FAT32 precision)
         "--timeout=300",  # 5 minute timeout per file operation
-        "--contimeout=60",  # 1 minute connection timeout
         "--bwlimit=0",  # No bandwidth limit (use full speed)
         "--whole-file",  # Transfer whole files (faster for local USB)
     ] + exclude_args + [
@@ -317,6 +316,15 @@ def perform_sync():
                 self.stderr = stderr or ""
         
         result = Result(return_code, result_stdout, "")
+        
+        # Log any error output from rsync
+        if result.returncode != 0 and result.stdout:
+            # Try to extract error messages from stdout (rsync sends errors to stdout when stderr is combined)
+            error_lines = [line for line in result.stdout.split('\n') if line.strip() and ('error' in line.lower() or 'failed' in line.lower() or 'cannot' in line.lower())]
+            if error_lines:
+                logger.error("Rsync error messages:")
+                for line in error_lines[:5]:  # Show first 5 error lines
+                    logger.error(f"  {line.strip()}")
         
         if result.returncode == 0:
             elapsed_min = int(elapsed // 60)
