@@ -82,6 +82,18 @@ impl EnvelopeBuilder {
             super::parser::Protocol::Unknown => "Unknown",
         };
         
+        // Convert L7 metadata to JSON
+        let l7_metadata_json = if let Some(ref l7_meta) = packet.l7_metadata {
+            let mut meta_json = serde_json::Map::new();
+            meta_json.insert("protocol".to_string(), format!("{:?}", l7_meta.protocol).into());
+            for (k, v) in &l7_meta.metadata {
+                meta_json.insert(k.clone(), v.clone().into());
+            }
+            Some(serde_json::Value::Object(meta_json))
+        } else {
+            None
+        };
+        
         let envelope = EventEnvelope {
             event_id,
             timestamp,
@@ -103,6 +115,7 @@ impl EnvelopeBuilder {
                     flow_packet_count: features.flow_packet_count,
                     flow_byte_count: features.flow_byte_count,
                 },
+                l7_metadata: l7_metadata_json,
             },
         };
         
