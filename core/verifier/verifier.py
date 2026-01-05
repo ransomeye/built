@@ -32,6 +32,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+# Import ship seal enforcer
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+try:
+    from core.assurance.ship_seal_enforcer import ShipSealEnforcer
+except ImportError:
+    # Fallback if import fails
+    ShipSealEnforcer = None
+
 # Configuration from environment
 DB_NAME = os.environ.get("DB_NAME", "ransomeye")
 DB_USER = os.environ.get("DB_USER", "gagan")
@@ -449,6 +457,30 @@ def check_artifact_hashes() -> Tuple[bool, Optional[str]]:
         return True, f"WARNING: Artifact hash check failed: {str(e)}"
 
 
+def check_ship_seal() -> Tuple[bool, Optional[str]]:
+    """Check ship seal enforcement (PROMPT-64-A)."""
+    if ShipSealEnforcer is None:
+        return False, "Ship seal enforcer not available"
+    
+    try:
+        enforcer = ShipSealEnforcer()
+        if not enforcer.load_ship_seal():
+            return False, "Failed to load ship seal"
+        
+        is_valid, violations = enforcer.verify_binary_integrity()
+        if not is_valid:
+            return False, f"Ship seal violation: {len(violations)} binary hash mismatches"
+        
+        # Verify self-hash
+        self_ok, self_msg = enforcer.verify_self_hash()
+        if not self_ok:
+            return False, f"Ship seal self-verification failed: {self_msg}"
+        
+        return True, None
+    except Exception as e:
+        return False, f"Ship seal check failed: {str(e)}"
+
+
 def check_drift(conn) -> Tuple[bool, Optional[str], Dict]:
     """Check for drift (new files, modified binaries, changed systemd units, changed DB schema)."""
     drift_detected = []
@@ -724,6 +756,20 @@ def main():
         results["overall_healthy"] = False
     elif hash_error and not assurance_mode:
         results["warnings"].append(f"Artifact hashes: {hash_error}")
+    
+    # Check ship seal enforcement (PROMPT-64-A) - CRITICAL: Fail-closed on violation
+    seal_healthy, seal_error = check_ship_seal()
+    results["checks"]["ship_seal"] = {"healthy": seal_healthy, "error": seal_error}
+    if not seal_healthy:
+        results["failures"].append(f"Ship seal: {seal_error}")
+        results["overall_healthy"] = False
+        # Ship seal violation is critical - write audit immediately
+        if conn:
+            write_system_integrity_violation_audit(
+                conn,
+                f"SHIP_SEAL_VIOLATION: {seal_error}",
+                {"check": "ship_seal", "error": seal_error}
+            )
     
     # Determine overall health
     if not services_healthy or results["failures"]:

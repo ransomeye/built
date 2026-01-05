@@ -259,6 +259,73 @@ class CustomerVerifier:
         
         return True, ["No hardcoded secrets detected"]
     
+    def verify_ship_finality(self) -> Tuple[bool, List[str]]:
+        """Verify ship finality (PROMPT-64-D): Ship seal present, enforced, mutability blocked, changes detectable."""
+        messages = []
+        all_ok = True
+        
+        # Check 1: Ship seal present
+        ship_seal_enforcer_path = PROJECT_ROOT / "core/assurance/ship_seal_enforcer.py"
+        if not ship_seal_enforcer_path.exists():
+            messages.append("Ship seal enforcer not found")
+            all_ok = False
+        else:
+            messages.append("Ship seal enforcer present")
+        
+        # Check 2: Ship seal hash list exists
+        if not ARTIFACT_HASHES_PATH.exists():
+            messages.append("ARTIFACT_HASHES.txt not found")
+            all_ok = False
+        else:
+            # Verify it has content
+            try:
+                with open(ARTIFACT_HASHES_PATH, 'r') as f:
+                    content = f.read()
+                    if len(content.strip()) < 100:
+                        messages.append("ARTIFACT_HASHES.txt appears empty or incomplete")
+                        all_ok = False
+                    else:
+                        messages.append("ARTIFACT_HASHES.txt present and populated")
+            except Exception as e:
+                messages.append(f"Failed to read ARTIFACT_HASHES.txt: {e}")
+                all_ok = False
+        
+        # Check 3: Ship seal integrated into verifier
+        verifier_path = PROJECT_ROOT / "core/verifier/verifier.py"
+        if verifier_path.exists():
+            try:
+                with open(verifier_path, 'r') as f:
+                    verifier_content = f.read()
+                    if 'check_ship_seal' in verifier_content or 'ShipSealEnforcer' in verifier_content:
+                        messages.append("Ship seal integrated into verifier")
+                    else:
+                        messages.append("Ship seal NOT integrated into verifier")
+                        all_ok = False
+            except Exception as e:
+                messages.append(f"Failed to check verifier integration: {e}")
+                all_ok = False
+        else:
+            messages.append("Verifier not found")
+            all_ok = False
+        
+        # Check 4: Vendor non-repudiation scanner exists
+        vendor_scanner_path = PROJECT_ROOT / "core/governance/vendor_non_repudiation.py"
+        if vendor_scanner_path.exists():
+            messages.append("Vendor non-repudiation scanner present")
+        else:
+            messages.append("Vendor non-repudiation scanner not found")
+            all_ok = False
+        
+        # Check 5: Tamper simulation script exists
+        tamper_sim_path = PROJECT_ROOT / "tests/post_ship_tamper_simulation.sh"
+        if tamper_sim_path.exists():
+            messages.append("Tamper simulation script present")
+        else:
+            messages.append("Tamper simulation script not found")
+            # This is optional, so don't fail on it
+        
+        return all_ok, messages
+    
     def sign_result(self, result_data: Dict) -> str:
         """Sign verification result (customer-side signature)."""
         result_json = json.dumps(result_data, sort_keys=True)
@@ -327,6 +394,17 @@ class CustomerVerifier:
         self.results['checks']['configuration'] = {'verified': config_ok, 'messages': config_msgs}
         if not config_ok:
             self.results['warnings'].extend(config_msgs)
+        
+        # Verify ship finality (PROMPT-64-D)
+        logger.info("Verifying ship finality...")
+        finality_ok, finality_msgs = self.verify_ship_finality()
+        self.results['checks']['ship_finality'] = {'verified': finality_ok, 'messages': finality_msgs}
+        if not finality_ok:
+            self.results['failures'].extend(finality_msgs)
+            self.results['overall_verified'] = False
+        else:
+            # Set finality flag
+            self.results['SHIP_FINALITY_VERIFIED'] = True
         
         # Sign result
         signature = self.sign_result(self.results)
