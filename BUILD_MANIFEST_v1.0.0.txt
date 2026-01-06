@@ -1,0 +1,57 @@
+# Path and File Name : /home/ransomeye/rebuild/BUILD_MANIFEST_v1.0.0.txt
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Build manifest for RansomEye v1.0.0
+
+RansomEye v1.0.0 Build Manifest
+==============================
+
+Release Tag: v1.0.0
+Build Date: 2026-01-06
+Build System: Linux 6.14.0-37-generic
+
+Core Binaries
+-------------
+- ingest-http: /opt/ransomeye/modules/core/ingest/bin/ingest-http
+- ransomeye_linux_agent: /opt/ransomeye-linux-agent/bin/ransomeye_linux_agent
+- ransomeye_dpi_probe: /opt/ransomeye/dpi_probe/bin/ransomeye_dpi_probe
+
+Systemd Services
+-----------------
+Location: /home/ransomeye/rebuild/systemd/
+Installed: /etc/systemd/system/
+
+Active Services:
+- ransomeye-ingestion.service
+- ransomeye-linux-agent.service
+- ransomeye-dpi-probe.service
+- ransomeye-db-core.service
+- ransomeye-intelligence.service
+- ransomeye-posture-engine.service
+
+Configuration Files
+------------------
+- /etc/ransomeye/ingestion.env
+- /opt/ransomeye/dpi_probe/config/environment.conf
+- /opt/ransomeye-linux-agent/config/environment.conf
+
+Database
+--------
+- Type: PostgreSQL
+- Database: ransomeye
+- User: gagan
+- Host: localhost
+- Port: 5432
+
+Key Features Validated
+----------------------
+- UUID v4 event ID generation (RFC 4122)
+- Ed25519 signature verification (Linux Agent)
+- RSA-4096-PSS-SHA256 signature verification (DPI Probe)
+- Live network packet capture
+- End-to-end telemetry ingestion
+- Database persistence
+- Agent registration
+- Audit logging
+
+Build Hash: 6bcaed1bcdc80e627d3cab3b5494ff26cc38f352
+Tag: v1.0.0

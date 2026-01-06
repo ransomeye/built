@@ -5,6 +5,7 @@
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use tracing::debug;
+use uuid::Uuid;
 
 use super::errors::ProbeError;
 use super::parser::ParsedPacket;
@@ -69,7 +70,8 @@ impl EnvelopeBuilder {
     pub fn build(&mut self, packet: &ParsedPacket, features: &Features, signature: String) -> Result<EventEnvelope, ProbeError> {
         self.sequence += 1;
         
-        let event_id = format!("dpi-{}-{}", self.component_id, self.sequence);
+        // Generate UUID v4 for event_id (required by ingestion server)
+        let event_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now().to_rfc3339();
         
         let protocol_str = match packet.protocol {
