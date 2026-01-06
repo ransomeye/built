@@ -18,7 +18,7 @@ use tracing::{info, error, warn};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
 use base64::{Engine as _, engine::general_purpose};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDateTime};
 use hostname;
 use ring::rand::{SecureRandom, SystemRandom};
 use hex;
@@ -680,7 +680,8 @@ async fn handle_dpi_ingest(
 
     // Materialize all parameters as named variables to ensure proper lifetimes
     let dpi_nonce = Uuid::new_v4().to_string();
-    let dpi_signature_alg = Some("RSA-PSS-SHA256".to_string());
+    // Match Linux agent path: use String, not Option<String>
+    let dpi_signature_alg = "RSA-PSS-SHA256".to_string();
     let src_ip_param_str: Option<&str> = src_ip_str.as_deref();
     let src_port_param: Option<i32> = src_port.map(|v| v as i32);
     let dst_ip_param_str: Option<&str> = dst_ip_str.as_deref();
@@ -759,6 +760,57 @@ async fn handle_dpi_ingest(
     })?;
 
     // Insert into dpi_probe_telemetry
+    // DIAGNOSTIC: Log parameter 8 (timestamp) type and value before binding
+    error!("DPI INSERT DIAGNOSTIC: parameter 8 (observed_at) | type={} | value={} | rfc3339={}", 
+        std::any::type_name::<DateTime<Utc>>(), 
+        timestamp, 
+        timestamp.to_rfc3339()
+    );
+    
+    // FIX: Convert DateTime<Utc> to NaiveDateTime for tokio-postgres serialization
+    // The with-chrono-0_4 feature supports both, but NaiveDateTime may serialize more reliably
+    // This matches the internal representation PostgreSQL expects for TIMESTAMPTZ
+    let observed_at_naive = timestamp.naive_utc();
+    
+    // Materialize string parameters to ensure proper lifetimes for parameter array
+    let component_id_str: &str = component_id;
+    let signature_owned: String = payload.signature.clone();
+    
+    // FIX: Parameter 7 (source_data_hash_hex) is TEXT column - must be owned String for Vec lifetime
+    // Clone to ensure owned value with stable lifetime in Vec<&dyn ToSql>
+    let payload_hash_owned: String = payload.payload_hash.clone();
+    
+    // FIX: Explicitly typed parameter array to avoid tokio-postgres inference failure
+    // Use Vec with explicit type annotation to remove all type inference ambiguity
+    // This is required when Option<T>, JSONB, INET, UUID, and timestamps coexist
+    let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![
+        &agent_id,
+        &message_id_uuid,
+        &dpi_nonce,
+        &component_id_str,
+        &signature_owned,
+        &dpi_signature_alg,
+        &payload_hash_owned,
+        &observed_at_naive,
+        &src_ip_param_str,
+        &src_port_param,
+        &dst_ip_param_str,
+        &dst_port_param,
+        &protocol_param,
+        &bytes_in,
+        &bytes_out,
+        &packets_in,
+        &packets_out,
+        &tls_sni_param,
+        &http_host_param,
+        &http_method_param,
+        &http_path_param,
+        &iface_name_param,
+        &flow_id_param,
+        &dpi_payload_json,
+        &dpi_payload_sha256,
+    ];
+    
     let result = db.execute(
         r#"
         INSERT INTO dpi_probe_telemetry (
@@ -769,37 +821,11 @@ async fn handle_dpi_ingest(
             http_host, http_method, http_path, iface_name, flow_id, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
+            $1, $2, $3, $4, $5, $6, $7::text, $8, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
             $18, $19, $20, $21, $22, $23, $24::jsonb, $25
         )
         "#,
-        &[
-            &agent_id,
-            &message_id_uuid,
-            &dpi_nonce,
-            &component_id,
-            &payload.signature,
-            &dpi_signature_alg,
-            &payload.payload_hash,
-            &timestamp,
-            &src_ip_param_str,
-            &src_port_param,
-            &dst_ip_param_str,
-            &dst_port_param,
-            &protocol_param,
-            &bytes_in,
-            &bytes_out,
-            &packets_in,
-            &packets_out,
-            &tls_sni_param,
-            &http_host_param,
-            &http_method_param,
-            &http_path_param,
-            &iface_name_param,
-            &flow_id_param,
-            &dpi_payload_json,
-            &dpi_payload_sha256,
-        ],
+        &params,
     ).await;
 
     match result {
