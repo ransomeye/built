@@ -15,9 +15,17 @@ import sys
 import json
 import psycopg2
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory, render_template_string, request
+from flask import Flask, jsonify, send_from_directory, render_template, request
 from flask_cors import CORS
 from datetime import datetime
+
+# Resolve paths relative to this file location (runtime-safe, portable)
+BASE_DIR = Path(__file__).parent.resolve()
+TEMPLATE_DIR = BASE_DIR / 'templates'
+STATIC_DIR = BASE_DIR / 'static'
+# Logo path: resolve from ui/ to rebuild/ then to core/
+REBUILD_ROOT = BASE_DIR.parent.resolve()
+LOGO_PATH = REBUILD_ROOT / 'core' / 'logo-removebg-preview.png'
 
 # PROMPT-46: All configuration via environment variables
 DB_NAME = os.environ.get("DB_NAME", "ransomeye")
@@ -30,10 +38,9 @@ DB_PORT = os.environ.get("DB_PORT", "5432")
 UI_HOST = os.environ.get("RANSOMEYE_UI_HOST", "127.0.0.1")
 UI_PORT = int(os.environ.get("RANSOMEYE_UI_PORT", "8080"))
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
+# Flask app with explicit absolute paths (__file__-based resolution)
+app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATE_DIR))
 CORS(app)  # Enable CORS for API access
-
-LOGO_PATH = Path("/home/ransomeye/rebuild/core/logo-removebg-preview.png")
 
 
 def get_db_connection():
@@ -51,7 +58,7 @@ def get_db_connection():
 @app.route('/')
 def index():
     """Serve main dashboard page."""
-    return render_template_string(open('templates/index.html').read())
+    return render_template('index.html')
 
 
 @app.route('/api/health')

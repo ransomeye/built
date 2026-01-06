@@ -769,7 +769,7 @@ async fn handle_dpi_ingest(
             http_host, http_method, http_path, iface_name, flow_id, payload, payload_sha256
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
+            $1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
             $18, $19, $20, $21, $22, $23, $24::jsonb, $25
         )
         "#,
