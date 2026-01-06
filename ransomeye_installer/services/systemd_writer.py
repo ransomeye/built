@@ -230,7 +230,187 @@ PrivateUsers=false
 [Install]
 WantedBy=multi-user.target
 """
+        # CRITICAL: Validate generated unit contains NO legacy paths (fail-closed)
+        self._validate_no_legacy_paths(unit_content, f"{service_name}.service")
+        
         return unit_content
+    
+    def _generate_orchestrator_unit(self) -> str:
+        """
+        Generate systemd service unit content for RansomEye Core Orchestrator.
+        
+        CRITICAL: Orchestrator is a Rust binary, not a Python module.
+        Uses /opt/ransomeye/bin/ransomeye_orchestrator as ExecStart.
+        
+        Returns:
+            Service unit content for orchestrator
+        """
+        service_name = "ransomeye-orchestrator"
+        orchestrator_binary = self.RUNTIME_BIN / "ransomeye_orchestrator"
+        installed_unit_path = f"/etc/systemd/system/{service_name}.service"
+        
+        # Build condition lines (same as other services but with orchestrator-specific paths)
+        condition_lines = [
+            f"ConditionPathExists={self.INSTALL_STATE_FILE}",
+            "# DB ENFORCEMENT: Require database environment file (DB is mandatory for Core)",
+            "ConditionPathExists=/etc/ransomeye/db.env",
+            "# Pre-start validation: fail-closed if runtime layout invalid",
+            f"ConditionPathExists={self.RUNTIME_ROOT}",
+            f"ConditionPathExists={orchestrator_binary}",
+            "ConditionPathExists=/etc/ransomeye/ransomeye.runtime.env",
+            "ConditionPathExists=/usr/share/ransomeye/schema/ransomeye_schema.sql",
+        ]
+        
+        conditions_block = '\n'.join(condition_lines)
+        
+        # Build environment lines
+        env_lines = [
+            '# Environment',
+            f'Environment="RANSOMEYE_ROOT={self.RUNTIME_ROOT}"',
+            'Environment="PYTHONUNBUFFERED=1"',
+            '# Authoritative DB schema source (single source of truth)',
+            'Environment="RANSOMEYE_SCHEMA_SQL_PATH=/usr/share/ransomeye/schema/ransomeye_schema.sql"',
+            '# Explicit environment files (runtime first, then secrets)',
+            '# SECURITY: runtime.env (0640) contains non-secret runtime variables readable by ransomeye user',
+            '# SECURITY: ransomeye.env (0600) contains secrets and is root-only',
+            '# ORDER: runtime.env loaded first, then ransomeye.env (secrets override if needed)',
+            'EnvironmentFile=/etc/ransomeye/ransomeye.runtime.env',
+            '# DB ENVIRONMENT (MANDATORY): systemd reads as root and injects DB_* into the service',
+            'EnvironmentFile=/etc/ransomeye/db.env',
+            'EnvironmentFile=/etc/ransomeye/ransomeye.env',
+        ]
+        
+        environment_block = '\n'.join(env_lines)
+        
+        unit_content = f"""# Path and File Name : {installed_unit_path}
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service unit for RansomEye Core Orchestrator with enterprise-grade hardening and fail-closed behavior
+# CRITICAL: Rootless runtime enforcement - MUST NOT run as root (UID 0)
+# RUNTIME: Uses /opt/ransomeye runtime paths only (no build-time paths)
+# FAIL-CLOSED: Restart=no ensures service fails loudly on non-zero exit
+
+[Unit]
+Description=RansomEye Core Orchestrator
+After=network.target
+Wants=network.target
+{conditions_block}
+
+[Service]
+Type=simple
+# CRITICAL: Fail-closed behavior - no automatic restarts
+# Service MUST fail loudly if orchestrator exits non-zero
+Restart=no
+# Rootless execution - no privilege escalation
+User=ransomeye
+Group=ransomeye
+WorkingDirectory={self.RUNTIME_ROOT}
+RuntimeDirectory=ransomeye/orchestrator ransomeye/policy
+StateDirectory=ransomeye/orchestrator ransomeye/policy
+# Pre-start validation: verify runtime layout ownership and binary exists
+ExecStartPre=/bin/sh -c 'test -d {self.RUNTIME_ROOT} && test -x {orchestrator_binary} || exit 1'
+ExecStartPre=/bin/sh -c 'test -f /etc/ransomeye/ransomeye.runtime.env || exit 1'
+ExecStart={orchestrator_binary}
+StandardOutput=journal
+StandardError=journal
+
+# ============================================================================
+# ENTERPRISE-GRADE SECURITY HARDENING (MANDATORY)
+# ============================================================================
+# NoNewPrivileges: Prevents privilege escalation via setuid/setgid
+NoNewPrivileges=true
+
+# ProtectSystem: Makes /usr, /boot, /etc read-only (strict = all except /dev, /proc, /sys, /run, /tmp)
+ProtectSystem=strict
+
+# ProtectHome: Makes /home, /root, /run/user read-only
+ProtectHome=true
+
+# PrivateTmp: Uses private /tmp and /var/tmp (isolated from other services)
+PrivateTmp=true
+
+# PrivateDevices: Removes access to physical devices (/dev/* except /dev/null, /dev/zero, /dev/random, /dev/urandom)
+PrivateDevices=true
+
+# ProtectKernelTunables: Prevents modification of kernel parameters via /proc/sys, /sys
+ProtectKernelTunables=true
+
+# ProtectKernelModules: Prevents loading/unloading kernel modules
+ProtectKernelModules=true
+
+# ProtectControlGroups: Prevents modification of control group settings
+ProtectControlGroups=true
+
+# RestrictAddressFamilies: Limits socket address families (AF_UNIX, AF_INET, AF_INET6 only)
+# This prevents use of other address families (e.g., AF_NETLINK, AF_PACKET)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# LockPersonality: Prevents changing Linux personality (prevents ABI emulation)
+LockPersonality=true
+
+# MemoryDenyWriteExecute: Prevents creating writable and executable memory mappings
+# This prevents code injection attacks
+MemoryDenyWriteExecute=true
+
+# RestrictRealtime: Prevents real-time scheduling (prevents DoS via CPU starvation)
+RestrictRealtime=true
+
+# RestrictNamespaces: Prevents creating new namespaces (prevents container escape)
+RestrictNamespaces=true
+
+# SystemCallArchitectures: Limits system calls to native architecture only
+SystemCallArchitectures=native
+
+# Runtime paths: /opt/ransomeye and state directories (read-write access required)
+# NOTE: Policy engine persists version state under /var/lib/ransomeye/policy (mandatory)
+ReadWritePaths={self.RUNTIME_ROOT} /var/lib/ransomeye/orchestrator /var/lib/ransomeye/policy /var/log/ransomeye /run/ransomeye/orchestrator /run/ransomeye/policy /etc/ransomeye
+
+# Capability-based privileges (minimal set - no root required)
+# Orchestrator does not require elevated capabilities
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateUsers=false
+
+{environment_block}
+
+[Install]
+WantedBy=multi-user.target
+"""
+        # CRITICAL: Validate generated unit contains NO legacy paths (fail-closed)
+        self._validate_no_legacy_paths(unit_content, "ransomeye-orchestrator.service")
+        
+        return unit_content
+    
+    def _validate_no_legacy_paths(self, unit_content: str, unit_name: str) -> None:
+        """
+        Validate that generated unit contains NO legacy /home/ paths.
+        
+        FAIL-CLOSED: If any /home/ reference is found, generation aborts immediately.
+        
+        Args:
+            unit_content: Generated unit file content
+            unit_name: Name of the unit being validated (for error reporting)
+        
+        Raises:
+            SystemExit: If any /home/ reference is found (fail-closed)
+        """
+        # Check for any /home/ references (case-insensitive to catch variations)
+        if '/home/' in unit_content.lower():
+            # Find the specific line(s) containing /home/
+            lines = unit_content.split('\n')
+            offending_lines = []
+            for i, line in enumerate(lines, 1):
+                if '/home/' in line.lower():
+                    offending_lines.append(f"  Line {i}: {line.strip()}")
+            
+            error_msg = (
+                f"FATAL: Generated unit '{unit_name}' contains legacy /home/ path references (fail-closed)\n"
+                f"  All paths MUST use runtime locations (/opt/ransomeye, /var/lib/ransomeye, /etc/ransomeye, etc.)\n"
+                f"  Legacy paths found in:\n"
+                + '\n'.join(offending_lines) + '\n'
+                f"  Generation aborted. Fix generator to use runtime paths only."
+            )
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            sys.exit(1)
     
     def write_service_units(self) -> List[Path]:
         """
@@ -261,6 +441,17 @@ WantedBy=multi-user.target
             
             os.chmod(unit_file, 0o644)
             written_files.append(unit_file)
+        
+        # CRITICAL: Generate orchestrator unit (Rust binary, not Python module)
+        # Orchestrator is handled separately because it's not a Python service module
+        orchestrator_unit_file = self.output_dir / "ransomeye-orchestrator.service"
+        orchestrator_content = self._generate_orchestrator_unit()
+        
+        with open(orchestrator_unit_file, 'w') as f:
+            f.write(orchestrator_content)
+        
+        os.chmod(orchestrator_unit_file, 0o644)
+        written_files.append(orchestrator_unit_file)
         
         return written_files
     
@@ -302,13 +493,15 @@ WantedBy=multi-user.target
             import subprocess
             
             # STEP 1: Remove ALL existing RansomEye units (clean slate)
-            # Build explicit list of expected unit names from CORE_MODULES (no glob scanning)
+            # Build explicit list of expected unit names from CORE_MODULES + orchestrator (no glob scanning)
             print("[INSTALL] Removing ALL existing ransomeye units (clean slate)")
             systemd_dir = Path("/etc/systemd/system")
             expected_unit_names = [
                 f"ransomeye-{module.replace('ransomeye_', '')}.service"
                 for module in self.CORE_MODULES
             ]
+            # CRITICAL: Include orchestrator (Rust binary, not Python module)
+            expected_unit_names.append("ransomeye-orchestrator.service")
             
             removed_count = 0
             for unit_name in expected_unit_names:

@@ -244,53 +244,170 @@ if [[ $EUID -ne 0 ]]; then
 fi
 success "Root privileges confirmed"
 
-# 3. Pre-install sanitation: Detect and remediate stale systemd units from previous installations
-log "Checking for stale systemd units from previous installations"
-STALE_UNITS_DETECTED=false
-STALE_UNITS_LIST=()
+# ============================================================================
+# EXHAUSTIVE LEGACY SYSTEMD UNIT CLEANUP (MANDATORY - BEFORE INSTALLATION)
+# ============================================================================
+# CRITICAL: Remove ALL legacy RansomEye systemd units from ALL systemd directories
+# This ensures generator-installed units are the ONLY units present.
+# 
+# Systemd unit search paths (in priority order):
+#   1. /etc/systemd/system (runtime overrides - highest priority)
+#   2. /run/systemd/system (runtime units - second priority)
+#   3. /usr/lib/systemd/system (vendor/system units - third priority)
+#   4. /lib/systemd/system (vendor/system units - lowest priority)
+#
+# FAIL-CLOSED: If ANY legacy units remain after cleanup, installation aborts.
+# ============================================================================
+log "Performing exhaustive legacy systemd unit cleanup"
 
-if [[ -d "/etc/systemd/system" ]]; then
-    EXISTING_UNITS=$(find /etc/systemd/system -name "ransomeye-*.service" -type f 2>/dev/null || true)
+echo ""
+echo "==========================================================================="
+echo "LEGACY SYSTEMD UNIT CLEANUP (EXHAUSTIVE)"
+echo "==========================================================================="
+echo ""
+
+# Define all systemd unit directories to search
+SYSTEMD_DIRS=(
+    "/etc/systemd/system"
+    "/run/systemd/system"
+    "/usr/lib/systemd/system"
+    "/lib/systemd/system"
+)
+
+# Collect ALL ransomeye*.service files from ALL directories
+ALL_LEGACY_UNITS=()
+for systemd_dir in "${SYSTEMD_DIRS[@]}"; do
+    if [[ -d "$systemd_dir" ]]; then
+        # Find ALL ransomeye*.service files (not just ransomeye-*.service)
+        # This catches: ransomeye-*.service, ransomeye*.service, etc.
+        FOUND_UNITS=$(find "$systemd_dir" -name "ransomeye*.service" -type f 2>/dev/null || true)
+        if [[ -n "$FOUND_UNITS" ]]; then
+            while IFS= read -r unit_file; do
+                [[ -n "$unit_file" ]] && ALL_LEGACY_UNITS+=("$unit_file")
+            done <<< "$FOUND_UNITS"
+        fi
+    fi
+done
+
+if [[ ${#ALL_LEGACY_UNITS[@]} -eq 0 ]]; then
+    success "No legacy systemd units found (clean installation)"
+    log "Legacy unit cleanup: 0 units found, skipping cleanup"
+else
+    log "Found ${#ALL_LEGACY_UNITS[@]} legacy systemd unit(s) to remove"
+    echo "The following legacy units will be removed:"
+    echo ""
     
-    if [[ -n "$EXISTING_UNITS" ]]; then
-        log "Found existing RansomEye systemd units - will remove ALL before fresh installation"
-        
-        for unit_file in $EXISTING_UNITS; do
-            SERVICE_NAME=$(basename "$unit_file")
-            STALE_UNITS_DETECTED=true
-            STALE_UNITS_LIST+=("$SERVICE_NAME")
-        done
-        
-        if [[ "$STALE_UNITS_DETECTED" == "true" ]]; then
-            echo ""
-            echo "==========================================================================="
-            echo "EXISTING SYSTEMD UNITS DETECTED"
-            echo "==========================================================================="
-            echo ""
-            echo "The following systemd units from a previous installation will be removed:"
-            echo ""
-            for stale_unit in "${STALE_UNITS_LIST[@]}"; do
-                echo "  • $stale_unit"
-            done
-            echo ""
-            echo "This installer will:"
-            echo "  1. Stop and disable all existing services"
-            echo "  2. Remove all existing unit files"
-            echo "  3. Install only units generated for currently existing modules"
-            echo "  4. Reload systemd daemon"
-            echo ""
-            echo "This is normal for re-installation and ensures generator-as-source-of-truth."
-            echo "==========================================================================="
-            echo ""
-            
-            log "Preparing to remove ${#STALE_UNITS_LIST[@]} existing systemd unit(s)"
+    # Extract service names for stopping/disabling
+    LEGACY_SERVICE_NAMES=()
+    for unit_file in "${ALL_LEGACY_UNITS[@]}"; do
+        SERVICE_NAME=$(basename "$unit_file")
+        LEGACY_SERVICE_NAMES+=("$SERVICE_NAME")
+        echo "  • $SERVICE_NAME ($unit_file)"
+    done
+    echo ""
+    
+    # STEP 1: Stop all legacy services if running
+    log "Stopping legacy services (if running)"
+    STOPPED_COUNT=0
+    for service_name in "${LEGACY_SERVICE_NAMES[@]}"; do
+        if systemctl is-active --quiet "$service_name" 2>/dev/null; then
+            log "Stopping service: $service_name"
+            if systemctl stop "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
+                STOPPED_COUNT=$((STOPPED_COUNT + 1))
+                log "Stopped: $service_name"
+            else
+                warning "Failed to stop service: $service_name (continuing with cleanup)"
+            fi
+        fi
+    done
+    if [[ $STOPPED_COUNT -gt 0 ]]; then
+        log "Stopped $STOPPED_COUNT legacy service(s)"
+    fi
+    
+    # STEP 2: Disable all legacy services if enabled
+    log "Disabling legacy services (if enabled)"
+    DISABLED_COUNT=0
+    for service_name in "${LEGACY_SERVICE_NAMES[@]}"; do
+        if systemctl is-enabled --quiet "$service_name" 2>/dev/null; then
+            log "Disabling service: $service_name"
+            if systemctl disable "$service_name" 2>&1 | tee -a "$LOG_FILE"; then
+                DISABLED_COUNT=$((DISABLED_COUNT + 1))
+                log "Disabled: $service_name"
+            else
+                warning "Failed to disable service: $service_name (continuing with cleanup)"
+            fi
+        fi
+    done
+    if [[ $DISABLED_COUNT -gt 0 ]]; then
+        log "Disabled $DISABLED_COUNT legacy service(s)"
+    fi
+    
+    # STEP 3: Remove ALL legacy unit files from disk
+    log "Removing legacy unit files from disk"
+    REMOVED_COUNT=0
+    for unit_file in "${ALL_LEGACY_UNITS[@]}"; do
+        if [[ -f "$unit_file" ]]; then
+            log "Removing unit file: $unit_file"
+            if rm -f "$unit_file" 2>&1 | tee -a "$LOG_FILE"; then
+                REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                log "Removed: $unit_file"
+            else
+                error "FATAL: Failed to remove legacy unit file: $unit_file (fail-closed)"
+            fi
+        fi
+    done
+    if [[ $REMOVED_COUNT -ne ${#ALL_LEGACY_UNITS[@]} ]]; then
+        error "FATAL: Expected to remove ${#ALL_LEGACY_UNITS[@]} unit file(s) but only removed $REMOVED_COUNT (fail-closed)"
+    fi
+    log "Removed $REMOVED_COUNT legacy unit file(s)"
+    
+    # STEP 4: Reload systemd daemon to recognize removals
+    log "Reloading systemd daemon to recognize unit removals"
+    if command -v systemctl &> /dev/null; then
+        if systemctl daemon-reload 2>&1 | tee -a "$LOG_FILE"; then
+            success "Systemd daemon reloaded"
+        else
+            error "FATAL: systemctl daemon-reload failed after unit removal (fail-closed)"
         fi
     else
-        log "No existing RansomEye systemd units found (clean installation)"
+        warning "systemctl not found - cannot reload systemd daemon"
     fi
-else
-    warning "/etc/systemd/system directory not found - systemd may not be available"
+    
+    # STEP 5: Verify zero legacy units remain (FAIL-CLOSED)
+    log "Verifying zero legacy units remain (fail-closed verification)"
+    REMAINING_UNITS=()
+    for systemd_dir in "${SYSTEMD_DIRS[@]}"; do
+        if [[ -d "$systemd_dir" ]]; then
+            FOUND_UNITS=$(find "$systemd_dir" -name "ransomeye*.service" -type f 2>/dev/null || true)
+            if [[ -n "$FOUND_UNITS" ]]; then
+                while IFS= read -r unit_file; do
+                    [[ -n "$unit_file" ]] && REMAINING_UNITS+=("$unit_file")
+                done <<< "$FOUND_UNITS"
+            fi
+        fi
+    done
+    
+    if [[ ${#REMAINING_UNITS[@]} -gt 0 ]]; then
+        echo ""
+        echo "FATAL ERROR: Legacy unit cleanup FAILED - ${#REMAINING_UNITS[@]} unit(s) still remain:"
+        echo ""
+        for unit_file in "${REMAINING_UNITS[@]}"; do
+            echo "  ✗ $unit_file"
+        done
+        echo ""
+        echo "All legacy units MUST be removed before installation (fail-closed)."
+        echo ""
+        log "FATAL: Legacy unit cleanup verification FAILED - ${#REMAINING_UNITS[@]} unit(s) remain"
+        error "Legacy unit cleanup incomplete - installation aborted (fail-closed)"
+    fi
+    
+    success "Legacy unit cleanup completed: ${#ALL_LEGACY_UNITS[@]} unit(s) removed, 0 remain"
+    log "Legacy unit cleanup: ${#ALL_LEGACY_UNITS[@]} removed, ${#REMAINING_UNITS[@]} remain (verified zero)"
 fi
+
+echo ""
+echo "==========================================================================="
+echo ""
 
 # 3. Verify global validator exists (but don't run yet - must wait for unit generation)
 log "Verifying Global Forensic Consistency Validator exists"
@@ -1136,36 +1253,6 @@ else
 fi
 
 # ============================================================================
-# INSTALL ORCHESTRATOR SYSTEMD UNIT (EXPLICIT - FAIL-CLOSED)
-# ============================================================================
-log "Installing orchestrator systemd unit explicitly"
-
-ORCHESTRATOR_SERVICE_SOURCE="$PROJECT_ROOT/systemd/ransomeye-orchestrator.service"
-ORCHESTRATOR_SERVICE_TARGET="/etc/systemd/system/ransomeye-orchestrator.service"
-
-if [[ ! -f "$ORCHESTRATOR_SERVICE_SOURCE" ]]; then
-    error "FATAL: Orchestrator service file not found at $ORCHESTRATOR_SERVICE_SOURCE"
-fi
-
-log "Copying orchestrator service file to systemd directory"
-if cp "$ORCHESTRATOR_SERVICE_SOURCE" "$ORCHESTRATOR_SERVICE_TARGET" 2>&1 | tee -a "$LOG_FILE"; then
-    success "Orchestrator service file installed: $ORCHESTRATOR_SERVICE_TARGET"
-else
-    error "FATAL: Failed to copy orchestrator service file to $ORCHESTRATOR_SERVICE_TARGET"
-fi
-
-# Set ownership and permissions
-chown root:root "$ORCHESTRATOR_SERVICE_TARGET" 2>&1 | tee -a "$LOG_FILE" || error "Failed to set service file ownership"
-chmod 644 "$ORCHESTRATOR_SERVICE_TARGET" 2>&1 | tee -a "$LOG_FILE" || error "Failed to set service file permissions"
-
-# Verify service file exists
-if [[ ! -f "$ORCHESTRATOR_SERVICE_TARGET" ]]; then
-    error "FATAL: Orchestrator service file installation reported success but file not found at $ORCHESTRATOR_SERVICE_TARGET"
-fi
-
-success "Orchestrator systemd unit installed and verified"
-
-# ============================================================================
 # VERIFY NO LEGACY PATH REFERENCES (FAIL-CLOSED)
 # ============================================================================
 log "Verifying installed systemd units contain no /home path references"
@@ -1463,6 +1550,228 @@ if ! systemctl daemon-reload 2>&1 | tee -a "$LOG_FILE"; then
 fi
 success "Systemd daemon reloaded"
 
+# ============================================================================
+# CREATE MINIMAL INSTALL_STATE.JSON (MANDATORY - BEFORE SERVICE START)
+# ============================================================================
+# CRITICAL ORDER REQUIREMENT: install_state.json MUST exist before services start
+# All core services include ConditionPathExists=/var/lib/ransomeye/install_state.json
+# Systemd evaluates this condition at service start time, so the file MUST exist
+# before any service enable/start operations.
+#
+# This creates a minimal valid JSON file that satisfies the condition.
+# The full install_state.json will be created later by finalize_install_state(),
+# which will overwrite this minimal file with the complete state.
+#
+# FAIL-CLOSED: If file creation fails, installation aborts immediately.
+# ============================================================================
+log "Creating minimal install_state.json (MANDATORY - before service start)"
+
+INSTALL_STATE_PATH="/var/lib/ransomeye/install_state.json"
+
+# Ensure directory exists (NON-NEGOTIABLE - NO CONDITIONALS)
+log "Ensuring /var/lib/ransomeye directory exists"
+mkdir -p /var/lib/ransomeye || error "FATAL: Failed to create /var/lib/ransomeye directory"
+
+# Create minimal install_state.json using direct bash (AUTHORITATIVE - NO PYTHON HEREDOC)
+# This MUST execute and MUST succeed - any failure aborts installation
+log "Creating minimal install_state.json with required fields"
+TIMESTAMP_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%S 2>/dev/null || echo "$(date -u +%Y-%m-%dT%H:%M:%S)")
+
+# Create file using cat heredoc (direct, no Python dependency)
+cat > "$INSTALL_STATE_PATH" <<EOF
+{
+  "install_phase": "ready_for_service_start",
+  "timestamp_utc": "$TIMESTAMP_UTC",
+  "version": "1.0.0"
+}
+EOF
+
+# FAIL-CLOSED: Verify file was created (immediate abort on failure)
+if [[ ! -f "$INSTALL_STATE_PATH" ]]; then
+    error "FATAL: install_state.json creation failed - file not found at $INSTALL_STATE_PATH (fail-closed)"
+fi
+
+# FAIL-CLOSED: Verify file is not empty
+if [[ ! -s "$INSTALL_STATE_PATH" ]]; then
+    error "FATAL: install_state.json is empty (fail-closed)"
+fi
+
+# Set ownership: root:ransomeye (NON-NEGOTIABLE)
+log "Setting install_state.json ownership to root:ransomeye"
+chown root:ransomeye "$INSTALL_STATE_PATH" || error "FATAL: Failed to set install_state.json ownership to root:ransomeye (fail-closed)"
+
+# Verify ownership was set correctly (FAIL-CLOSED)
+ACTUAL_OWNER=$(stat -c '%U:%G' "$INSTALL_STATE_PATH" 2>/dev/null || echo "unknown:unknown")
+if [[ "$ACTUAL_OWNER" != "root:ransomeye" ]]; then
+    error "FATAL: install_state.json ownership verification failed (expected root:ransomeye, got $ACTUAL_OWNER) (fail-closed)"
+fi
+
+# Set permissions: 0640 (NON-NEGOTIABLE)
+log "Setting install_state.json permissions to 0640"
+chmod 0640 "$INSTALL_STATE_PATH" || error "FATAL: Failed to set install_state.json permissions to 0640 (fail-closed)"
+
+# Verify permissions were set correctly (FAIL-CLOSED)
+ACTUAL_PERMS=$(stat -c '%a' "$INSTALL_STATE_PATH" 2>/dev/null || echo "000")
+if [[ "$ACTUAL_PERMS" != "640" ]]; then
+    error "FATAL: install_state.json permissions verification failed (expected 640, got $ACTUAL_PERMS) (fail-closed)"
+fi
+
+# Verify JSON is valid using jq (FAIL-CLOSED)
+log "Verifying install_state.json contains valid JSON"
+if ! command -v jq &> /dev/null; then
+    # Fallback to Python if jq not available
+    if ! python3 -c "import json; json.load(open('$INSTALL_STATE_PATH'))" >/dev/null 2>&1; then
+        error "FATAL: install_state.json contains invalid JSON (fail-closed)"
+    fi
+else
+    if ! jq . "$INSTALL_STATE_PATH" >/dev/null 2>&1; then
+        error "FATAL: install_state.json contains invalid JSON (fail-closed)"
+    fi
+fi
+
+success "Minimal install_state.json created and verified: $INSTALL_STATE_PATH"
+log "  Ownership: root:ransomeye (verified)"
+log "  Permissions: 0640 (verified)"
+log "  JSON: valid (verified)"
+log "  CRITICAL: File exists before service enable/start operations"
+
+# ============================================================================
+# CREATE MINIMAL install_state.sig (MANDATORY - BEFORE SERVICE START)
+# ============================================================================
+# CRITICAL ORDER REQUIREMENT: install_state.sig MUST exist before services start
+# All core services include ConditionPathExists=/var/lib/ransomeye/install_state.sig
+# Systemd evaluates this condition at service start time, so the file MUST exist
+# before any service enable/start operations.
+#
+# This creates a minimal valid signature file that satisfies the condition.
+# The full install_state.sig will be created later by finalize_install_state(),
+# which will overwrite this minimal signature with the complete cryptographic signature.
+#
+# FAIL-CLOSED: If signature creation fails, installation aborts immediately.
+# ============================================================================
+log "Creating minimal install_state.sig (MANDATORY - before service start)"
+
+INSTALL_STATE_SIG="/var/lib/ransomeye/install_state.sig"
+
+# Ensure manifest signing keys exist (required for signing)
+log "Ensuring manifest signing keys exist"
+python3 << 'PYTHON_ENSURE_KEYS'
+import sys
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path.cwd()))
+
+try:
+    from ransomeye_installer.crypto.manifest_signer import ManifestSigner
+    
+    signer = ManifestSigner()
+    signer.ensure_keypair_exists()
+    
+    print("✓ Manifest signing keys verified/created")
+    sys.exit(0)
+except Exception as e:
+    print(f"FATAL: Failed to ensure manifest signing keys: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+PYTHON_ENSURE_KEYS
+2>&1 | tee -a "$LOG_FILE"
+
+KEY_ENSURE_EXIT_CODE=${PIPESTATUS[0]}
+if [[ $KEY_ENSURE_EXIT_CODE -ne 0 ]]; then
+    error "FATAL: Failed to ensure manifest signing keys (exit code: $KEY_ENSURE_EXIT_CODE). Installation aborted (fail-closed)."
+fi
+
+# Create minimal signature using existing signing mechanism
+log "Creating minimal install_state.sig using Ed25519 signing"
+python3 << 'PYTHON_CREATE_MINIMAL_SIG'
+import sys
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path.cwd()))
+
+try:
+    from core.install_state.state_signer import sign_state_file
+    
+    state_file = "/var/lib/ransomeye/install_state.json"
+    sig_file = "/var/lib/ransomeye/install_state.sig"
+    private_key = "/var/lib/ransomeye/keys/manifest_signing.key"
+    
+    # Verify state file exists
+    if not Path(state_file).exists():
+        print(f"FATAL: install_state.json not found: {state_file}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Verify private key exists
+    if not Path(private_key).exists():
+        print(f"FATAL: Manifest signing key not found: {private_key}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Sign state file
+    sign_state_file(state_file, sig_file, private_key)
+    
+    # Verify signature file was created
+    if not Path(sig_file).exists():
+        print(f"FATAL: install_state.sig creation reported success but file not found", file=sys.stderr)
+        sys.exit(1)
+    
+    print(f"✓ Minimal install_state.sig created: {sig_file}")
+    sys.exit(0)
+    
+except Exception as e:
+    print(f"FATAL: Failed to create minimal install_state.sig: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+PYTHON_CREATE_MINIMAL_SIG
+2>&1 | tee -a "$LOG_FILE"
+
+MINIMAL_SIG_EXIT_CODE=${PIPESTATUS[0]}
+if [[ $MINIMAL_SIG_EXIT_CODE -ne 0 ]]; then
+    error "FATAL: Failed to create minimal install_state.sig (exit code: $MINIMAL_SIG_EXIT_CODE). Installation aborted (fail-closed)."
+fi
+
+# Verify signature file exists (fail-closed)
+if [[ ! -f "$INSTALL_STATE_SIG" ]]; then
+    error "FATAL: Minimal install_state.sig creation reported success but file not found at $INSTALL_STATE_SIG (fail-closed)"
+fi
+
+# Verify signature file is not empty (fail-closed)
+if [[ ! -s "$INSTALL_STATE_SIG" ]]; then
+    error "FATAL: install_state.sig is empty (fail-closed)"
+fi
+
+# Set ownership: root:ransomeye (NON-NEGOTIABLE)
+log "Setting install_state.sig ownership to root:ransomeye"
+chown root:ransomeye "$INSTALL_STATE_SIG" || error "FATAL: Failed to set install_state.sig ownership to root:ransomeye (fail-closed)"
+
+# Verify ownership was set correctly (FAIL-CLOSED)
+ACTUAL_SIG_OWNER=$(stat -c '%U:%G' "$INSTALL_STATE_SIG" 2>/dev/null || echo "unknown:unknown")
+if [[ "$ACTUAL_SIG_OWNER" != "root:ransomeye" ]]; then
+    error "FATAL: install_state.sig ownership verification failed (expected root:ransomeye, got $ACTUAL_SIG_OWNER) (fail-closed)"
+fi
+
+# Set permissions: 0640 (NON-NEGOTIABLE)
+log "Setting install_state.sig permissions to 0640"
+chmod 0640 "$INSTALL_STATE_SIG" || error "FATAL: Failed to set install_state.sig permissions to 0640 (fail-closed)"
+
+# Verify permissions were set correctly (FAIL-CLOSED)
+ACTUAL_SIG_PERMS=$(stat -c '%a' "$INSTALL_STATE_SIG" 2>/dev/null || echo "000")
+if [[ "$ACTUAL_SIG_PERMS" != "640" ]]; then
+    error "FATAL: install_state.sig permissions verification failed (expected 640, got $ACTUAL_SIG_PERMS) (fail-closed)"
+fi
+
+success "Minimal install_state.sig created and verified: $INSTALL_STATE_SIG"
+log "  Ownership: root:ransomeye (verified)"
+log "  Permissions: 0640 (verified)"
+log "  CRITICAL: Signature file exists before service enable/start operations"
+
+echo ""
+echo "==========================================================================="
+echo ""
+
 # STEP 2: Get list of RansomEye service units from manifest
 log "Reading service list from manifest"
 CORE_SERVICES=$(python3 << 'PYTHON_GET_SERVICES'
@@ -1506,6 +1815,44 @@ readarray -t SERVICE_ARRAY <<< "$CORE_SERVICES"
 SERVICE_COUNT=${#SERVICE_ARRAY[@]}
 
 log "Found $SERVICE_COUNT Core service(s) to enable and start"
+
+# ============================================================================
+# GUARDRAIL: VERIFY install_state.json AND install_state.sig EXIST BEFORE SERVICE OPERATIONS
+# ============================================================================
+# CRITICAL: This guardrail is UNSKIPPABLE and NON-NEGOTIABLE
+# Services will fail to start if install_state.json or install_state.sig is missing or invalid
+# This check MUST execute BEFORE any systemctl enable/start operations
+# ============================================================================
+log "Guardrail: Verifying install_state.json and install_state.sig exist and are valid (MANDATORY)"
+
+# Check 1: install_state.json exists and is not empty (FAIL-CLOSED)
+if [[ ! -s "$INSTALL_STATE_PATH" ]]; then
+    error "FATAL: install_state.json missing or empty at $INSTALL_STATE_PATH (fail-closed guardrail)"
+fi
+
+# Check 2: install_state.json JSON is valid (FAIL-CLOSED)
+if command -v jq &> /dev/null; then
+    if ! jq . "$INSTALL_STATE_PATH" >/dev/null 2>&1; then
+        error "FATAL: install_state.json contains invalid JSON (fail-closed guardrail)"
+    fi
+else
+    # Fallback to Python if jq not available
+    if ! python3 -c "import json; json.load(open('$INSTALL_STATE_PATH'))" >/dev/null 2>&1; then
+        error "FATAL: install_state.json contains invalid JSON (fail-closed guardrail)"
+    fi
+fi
+
+# Check 3: install_state.sig exists and is not empty (FAIL-CLOSED)
+if [[ ! -s "$INSTALL_STATE_SIG" ]]; then
+    error "FATAL: install_state.sig missing or empty at $INSTALL_STATE_SIG (fail-closed guardrail)"
+fi
+
+success "Guardrail passed: install_state.json and install_state.sig exist and are valid"
+log "  JSON file: $INSTALL_STATE_PATH"
+log "  JSON size: $(stat -c '%s' "$INSTALL_STATE_PATH" 2>/dev/null || echo 'unknown') bytes"
+log "  SIG file: $INSTALL_STATE_SIG"
+log "  SIG size: $(stat -c '%s' "$INSTALL_STATE_SIG" 2>/dev/null || echo 'unknown') bytes"
+log "  CRITICAL: Proceeding to service enable/start operations"
 
 # STEP 3: Enable all services
 echo ""
