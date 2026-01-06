@@ -4,10 +4,11 @@
 
 """
 RansomEye UI Server (PROMPT-46):
-- Binds to localhost by default (127.0.0.1)
+- Network-agnostic binding (0.0.0.0 by default)
 - All configuration via environment variables
 - No hardcoded URLs, IPs, or secrets
 - Air-gap compatible
+- Works across dynamic IPs, DHCP, cloud, on-prem, and air-gapped systems
 """
 
 import os

@@ -13,7 +13,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Client, NoTls, SimpleQueryMessage};
+use tokio_postgres::types::Type;
 use tracing::{info, error, warn};
 use uuid::Uuid;
 use sha2::{Sha256, Digest};
@@ -635,7 +636,7 @@ async fn handle_dpi_ingest(
     let envelope_payload_sha256 = envelope_hasher.finalize().to_vec();
 
     // PROMPT-40A: Start transaction for atomic operations
-    db.execute("BEGIN", &[]).await
+    db.simple_query("BEGIN").await
         .map_err(|e| {
             error!("Failed to start transaction: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -679,7 +680,15 @@ async fn handle_dpi_ingest(
     let dst_ip_str: Option<String> = dst_ip_param.as_ref().map(|ip| ip.to_string());
 
     // Materialize all parameters as named variables to ensure proper lifetimes
-    let dpi_nonce = Uuid::new_v4().to_string();
+    // Generate 64-character hex nonce (32 bytes = 64 hex chars) to match schema CHECK constraint
+    let rng = SystemRandom::new();
+    let mut dpi_nonce_bytes = vec![0u8; 32];
+    rng.fill(&mut dpi_nonce_bytes)
+        .map_err(|e| {
+            error!("Failed to generate DPI nonce: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let dpi_nonce = hex::encode(dpi_nonce_bytes);
     // Match Linux agent path: use String, not Option<String>
     let dpi_signature_alg = "RSA-PSS-SHA256".to_string();
     let src_ip_param_str: Option<&str> = src_ip_str.as_deref();
@@ -721,7 +730,7 @@ async fn handle_dpi_ingest(
         }
         Err(e) => {
             error!("FAIL-CLOSED: Failed to insert raw_events for DPI: {}", e);
-            let _ = db.execute("ROLLBACK", &[]).await;
+            let _ = db.simple_query("ROLLBACK").await;
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
@@ -759,81 +768,142 @@ async fn handle_dpi_ingest(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Insert into dpi_probe_telemetry
-    // DIAGNOSTIC: Log parameter 8 (timestamp) type and value before binding
-    error!("DPI INSERT DIAGNOSTIC: parameter 8 (observed_at) | type={} | value={} | rfc3339={}", 
-        std::any::type_name::<DateTime<Utc>>(), 
-        timestamp, 
-        timestamp.to_rfc3339()
-    );
+    // Insert into dpi_probe_telemetry using SIMPLE QUERY PROTOCOL
+    // FIX: Switch to simple_query() to avoid tokio-postgres extended-protocol serialization limitation
+    // All values are already validated, so we can safely construct SQL string
     
-    // FIX: Convert DateTime<Utc> to NaiveDateTime for tokio-postgres serialization
-    // The with-chrono-0_4 feature supports both, but NaiveDateTime may serialize more reliably
-    // This matches the internal representation PostgreSQL expects for TIMESTAMPTZ
-    let observed_at_naive = timestamp.naive_utc();
+    // Helper function to escape SQL strings (escape single quotes by doubling them)
+    fn sql_escape_string(s: &str) -> String {
+        s.replace('\'', "''")
+    }
     
-    // Materialize string parameters to ensure proper lifetimes for parameter array
-    let component_id_str: &str = component_id;
-    let signature_owned: String = payload.signature.clone();
+    // Helper function to format optional text value
+    fn format_optional_text(val: Option<&str>) -> String {
+        match val {
+            Some(s) => format!("'{}'", sql_escape_string(s)),
+            None => "NULL".to_string(),
+        }
+    }
     
-    // FIX: Parameter 7 (source_data_hash_hex) is TEXT column - must be owned String for Vec lifetime
-    // Clone to ensure owned value with stable lifetime in Vec<&dyn ToSql>
-    let payload_hash_owned: String = payload.payload_hash.clone();
+    // Helper function to format optional integer
+    fn format_optional_int<T: std::fmt::Display>(val: Option<T>) -> String {
+        match val {
+            Some(v) => v.to_string(),
+            None => "NULL".to_string(),
+        }
+    }
     
-    // FIX: Explicitly typed parameter array to avoid tokio-postgres inference failure
-    // Use Vec with explicit type annotation to remove all type inference ambiguity
-    // This is required when Option<T>, JSONB, INET, UUID, and timestamps coexist
-    let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![
-        &agent_id,
-        &message_id_uuid,
-        &dpi_nonce,
-        &component_id_str,
-        &signature_owned,
-        &dpi_signature_alg,
-        &payload_hash_owned,
-        &observed_at_naive,
-        &src_ip_param_str,
-        &src_port_param,
-        &dst_ip_param_str,
-        &dst_port_param,
-        &protocol_param,
-        &bytes_in,
-        &bytes_out,
-        &packets_in,
-        &packets_out,
-        &tls_sni_param,
-        &http_host_param,
-        &http_method_param,
-        &http_path_param,
-        &iface_name_param,
-        &flow_id_param,
-        &dpi_payload_json,
-        &dpi_payload_sha256,
-    ];
+    // Helper function to format optional INET
+    fn format_optional_inet(val: Option<&str>) -> String {
+        match val {
+            Some(ip) => format!("'{}'::inet", sql_escape_string(ip)),
+            None => "NULL".to_string(),
+        }
+    }
     
-    let result = db.execute(
-        r#"
-        INSERT INTO dpi_probe_telemetry (
+    // Helper function to format BYTEA (hex format)
+    fn format_optional_bytea(val: Option<&Vec<u8>>) -> String {
+        match val {
+            Some(bytes) => {
+                let hex_str = hex::encode(bytes);
+                format!("'\\x{}'::bytea", hex_str)
+            },
+            None => "NULL".to_string(),
+        }
+    }
+    
+    // Format timestamp as PostgreSQL timestamptz
+    let timestamp_sql = format!("'{}'::timestamptz", timestamp.to_rfc3339());
+    
+    // Build SQL string with all values properly escaped and formatted
+    let sql = format!(
+        r#"INSERT INTO dpi_probe_telemetry (
             agent_id, source_message_id, source_nonce, source_component_identity,
             source_signature_b64, source_signature_alg, source_data_hash_hex,
             observed_at, src_ip, src_port, dst_ip, dst_port, protocol,
             bytes_in, bytes_out, packets_in, packets_out, tls_sni,
             http_host, http_method, http_path, iface_name, flow_id, payload, payload_sha256
-        )
-        VALUES (
-            $1, $2, $3, $4, $5, $6, $7::text, $8, $9::inet, $10, $11::inet, $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, $23, $24::jsonb, $25
-        )
-        "#,
-        &params,
-    ).await;
+        ) VALUES (
+            '{}'::uuid,
+            '{}'::uuid,
+            '{}',
+            '{}',
+            '{}',
+            '{}',
+            '{}',
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            '{}'::jsonb,
+            {}
+        )"#,
+        agent_id,
+        message_id_uuid,
+        sql_escape_string(&dpi_nonce),
+        sql_escape_string(component_id),
+        sql_escape_string(&payload.signature),
+        sql_escape_string(&dpi_signature_alg),
+        sql_escape_string(&payload.payload_hash),
+        timestamp_sql,
+        format_optional_inet(src_ip_param_str),
+        format_optional_int(src_port_param),
+        format_optional_inet(dst_ip_param_str),
+        format_optional_int(dst_port_param),
+        format_optional_text(protocol_param),
+        format_optional_int(bytes_in),
+        format_optional_int(bytes_out),
+        format_optional_int(packets_in),
+        format_optional_int(packets_out),
+        format_optional_text(tls_sni_param),
+        format_optional_text(http_host_param),
+        format_optional_text(http_method_param),
+        format_optional_text(http_path_param),
+        format_optional_text(iface_name_param),
+        format_optional_text(flow_id_param),
+        sql_escape_string(&dpi_payload_json),
+        format_optional_bytea(dpi_payload_sha256.as_ref()),
+    );
+    
+    info!("DPI INSERT using simple_query protocol | message_id={}", message_id_uuid);
+    
+    // Execute using simple_query (simple query protocol, no parameter binding)
+    let result = db.simple_query(&sql).await;
 
     match result {
-        Ok(_) => {
+        Ok(messages) => {
+            // simple_query returns Vec<SimpleQueryMessage>
+            // For INSERT, we expect CommandComplete message
+            let mut success = false;
+            for msg in messages {
+                if let tokio_postgres::SimpleQueryMessage::CommandComplete(_) = msg {
+                    success = true;
+                    break;
+                }
+            }
+            
+            if !success {
+                error!("DPI INSERT did not return CommandComplete message");
+                let _ = db.simple_query("ROLLBACK").await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+            
             info!("Ingested dpi event {} | Persisted raw_event_id={}", message_id, message_id_uuid);
             
             // Commit transaction (raw_events + telemetry + audit persisted atomically)
-            db.execute("COMMIT", &[]).await
+            db.simple_query("COMMIT").await
                 .map_err(|e| {
                     error!("FAIL-CLOSED: Failed to commit transaction: {}", e);
                     StatusCode::INTERNAL_SERVER_ERROR
@@ -845,7 +915,8 @@ async fn handle_dpi_ingest(
             }))
         }
         Err(e) => {
-            error!("Failed to insert dpi_probe_telemetry: {}", e);
+            error!("Failed to insert dpi_probe_telemetry: {} | SQL error details: {:?}", e, e);
+            let _ = db.simple_query("ROLLBACK").await;
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
