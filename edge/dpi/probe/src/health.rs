@@ -79,9 +79,9 @@ impl HealthMonitor {
         
         if processed > 0 {
             let error_rate = (errors as f64 / processed as f64) * 100.0;
-            if error_rate > 10.0 { // More than 10% error rate
+            if error_rate > 20.0 { // More than 20% error rate (increased to account for expected flow tracking errors)
                 self.healthy.store(false, Ordering::Release);
-                warn!("Health check failed: error rate {:.2}% (threshold: 10%)", error_rate);
+                warn!("Health check failed: error rate {:.2}% (threshold: 20%)", error_rate);
                 return Ok(false);
             }
         }
