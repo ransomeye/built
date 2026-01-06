@@ -414,7 +414,9 @@ fi
 
 # Run bootstrap script
 log "Running config signing key bootstrap"
-BOOTSTRAP_OUTPUT=$(python3 "$BOOTSTRAP_SCRIPT" --trust-dir "$TRUST_DIR" --installer-version "1.0.0" 2>&1 | tee -a "$LOG_FILE")
+# CRITICAL FIX: Execute Python script directly (not in command substitution with tee)
+# Command substitution with tee can cause premature termination with set -e/pipefail
+python3 "$BOOTSTRAP_SCRIPT" --trust-dir "$TRUST_DIR" --installer-version "1.0.0" 2>&1 | tee -a "$LOG_FILE"
 BOOTSTRAP_EXIT_CODE=${PIPESTATUS[0]}
 
 if [[ $BOOTSTRAP_EXIT_CODE -eq 0 ]]; then
@@ -438,17 +440,28 @@ if [[ $BOOTSTRAP_EXIT_CODE -eq 0 ]]; then
         # Key existed before, just verified
         success "Config signing key found"
     fi
+    # Explicit continuation: bootstrap succeeded, continuing to permission verification
+    log "Bootstrap script completed successfully - continuing to permission verification"
 else
     error "Config signing trust enforcement failed (exit code: $BOOTSTRAP_EXIT_CODE)"
 fi
 
 # Verify permissions are correct (fail-closed)
 log "Verifying config signing key permissions"
-if python3 "$BOOTSTRAP_SCRIPT" --trust-dir "$TRUST_DIR" --check-only 2>&1 | grep -q "found and verified"; then
+# CRITICAL FIX: Execute Python script directly (not in command substitution with tee)
+# Command substitution with tee can cause premature termination with set -e/pipefail
+python3 "$BOOTSTRAP_SCRIPT" --trust-dir "$TRUST_DIR" --check-only 2>&1 | tee -a "$LOG_FILE"
+PERM_CHECK_EXIT_CODE=${PIPESTATUS[0]}
+
+if [[ $PERM_CHECK_EXIT_CODE -eq 0 ]] && tail -n 5 "$LOG_FILE" | grep -q "found and verified"; then
     success "Config signing key permissions verified"
 else
     error "Config signing key permissions verification failed (fail-closed)"
 fi
+
+# Explicit phase completion logging
+success "Config signing trust bootstrap completed"
+log "Config signing trust bootstrap phase finished - continuing to database configuration phase"
 
 echo ""
 echo "==========================================================================="
@@ -458,6 +471,7 @@ echo ""
 # DATABASE MODE SELECTION (HA OPTIONAL)
 # ============================================================================
 log "Configuring database deployment mode"
+log "Transitioning from config signing trust bootstrap to database configuration"
 
 echo ""
 echo "==========================================================================="
