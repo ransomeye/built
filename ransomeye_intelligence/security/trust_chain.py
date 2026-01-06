@@ -24,18 +24,29 @@ class IntelligenceTrustChain:
         self.trust_dir = Path(trust_dir)
         self.verify_tool = VerifyTool(str(self.trust_dir))
     
-    def validate_trust_chain(self, artifact_path: Path, domain: str = "artifacts") -> Tuple[bool, List[str]]:
+    def validate_trust_chain(self, artifact_path: Path, domain: Optional[str] = None) -> Tuple[bool, List[str]]:
         """
         Validate trust chain for artifact.
         
         Args:
             artifact_path: Path to artifact
-            domain: Trust domain
+            domain: Trust domain (if None, read from manifest)
         
         Returns:
             Tuple of (is_valid: bool, errors: List[str])
         """
         errors = []
+        
+        # If domain not provided, read from manifest
+        if domain is None:
+            try:
+                import json
+                with open(artifact_path, 'r') as f:
+                    manifest = json.load(f)
+                domain = manifest.get('signer', 'artifacts')
+            except Exception as e:
+                errors.append(f"Error reading manifest to determine domain: {e}")
+                return False, errors
         
         # Verify certificate chain
         try:

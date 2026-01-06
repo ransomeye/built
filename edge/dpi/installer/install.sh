@@ -90,7 +90,9 @@ done
 # ============================================================================
 # 2. BINARY SIGNATURE VERIFICATION
 # ============================================================================
-BINARY_PATH="$MODULE_DIR/target/release/ransomeye_dpi_probe"
+# Binary is built in workspace target directory
+WORKSPACE_ROOT="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
+BINARY_PATH="$WORKSPACE_ROOT/target/release/dpi"
 if [[ ! -f "$BINARY_PATH" ]]; then
     error "Binary not found at $BINARY_PATH. Please build the project first: cargo build --release"
 fi
@@ -143,12 +145,14 @@ else
 fi
 
 # Kernel feature checks: AF_XDP / eBPF
-KERNEL_VERSION=$(uname -r | cut -d. -f1,2)
-REQUIRED_VERSION="4.18"
+KERNEL_MAJOR=$(uname -r | cut -d. -f1)
+KERNEL_MINOR=$(uname -r | cut -d. -f2)
+REQUIRED_MAJOR=4
+REQUIRED_MINOR=18
 
 # Check if kernel version is sufficient for AF_XDP (requires 4.18+)
-if ! awk "BEGIN {exit !($KERNEL_VERSION < $REQUIRED_VERSION)}"; then
-    error "Kernel version $KERNEL_VERSION is too old. AF_XDP requires kernel 4.18+. Please upgrade."
+if [[ $KERNEL_MAJOR -lt $REQUIRED_MAJOR ]] || [[ $KERNEL_MAJOR -eq $REQUIRED_MAJOR && $KERNEL_MINOR -lt $REQUIRED_MINOR ]]; then
+    error "Kernel version $(uname -r) is too old. AF_XDP requires kernel 4.18+. Please upgrade."
 fi
 success "Kernel version check passed: $(uname -r)"
 
@@ -165,7 +169,7 @@ else
 fi
 
 # Check for libpcap
-if ! ldconfig -p | grep -q libpcap; then
+if ! ldconfig -p 2>/dev/null | grep -q libpcap && ! pkg-config --exists libpcap 2>/dev/null; then
     error "libpcap not found. Please install: apt-get install libpcap-dev (Debian/Ubuntu) or yum install libpcap-devel (RHEL/CentOS)"
 fi
 success "libpcap library found"
@@ -259,8 +263,8 @@ fi
 mkdir -p "$INSTALL_DIR"/{bin,config,logs}
 success "Installation directory created: $INSTALL_DIR"
 
-# Copy binary
-cp "$BINARY_PATH" "$INSTALL_DIR/bin/"
+# Copy binary and rename to expected name
+cp "$BINARY_PATH" "$INSTALL_DIR/bin/ransomeye_dpi_probe"
 chmod +x "$INSTALL_DIR/bin/ransomeye_dpi_probe"
 success "Binary installed"
 

@@ -48,7 +48,7 @@ fn main() -> Result<(), AgentError> {
     tracing_subscriber::fmt::init();
     
     info!("[INIT-1] RansomEye Linux Agent starting...");
-    let _ = notify(false, &[NotifyState::Status("Initializing...")]);
+    let _ = notify(false, &[NotifyState::Status("Initializing...".to_string())]);
     
     // Get binary path for integrity verification
     info!("[INIT-2] Getting binary path for integrity verification");
@@ -59,7 +59,7 @@ fn main() -> Result<(), AgentError> {
     
     // Initialize runtime hardening (FAIL-CLOSED on integrity failure)
     info!("[INIT-3] Initializing runtime hardening");
-    let _ = notify(false, &[NotifyState::Status("Initializing runtime hardening...")]);
+    let _ = notify(false, &[NotifyState::Status("Initializing runtime hardening...".to_string())]);
     let config_path = std::env::var("AGENT_CONFIG_PATH").ok();
     let hardening = hardening::RuntimeHardening::new(
         binary_path.clone(),
@@ -69,35 +69,35 @@ fn main() -> Result<(), AgentError> {
     
     // Verify binary integrity at startup (FAIL-CLOSED)
     info!("[INIT-4] Verifying binary integrity");
-    let _ = notify(false, &[NotifyState::Status("Verifying binary integrity...")]);
+    let _ = notify(false, &[NotifyState::Status("Verifying binary integrity...".to_string())]);
     hardening.verify_binary_integrity()
         .map_err(|e| AgentError::ConfigurationError(format!("Binary integrity check failed: {}", e)))?;
     info!("[INIT-4] Binary integrity verified");
     
     // Verify config integrity at startup (FAIL-CLOSED)
     info!("[INIT-5] Verifying config integrity");
-    let _ = notify(false, &[NotifyState::Status("Verifying config integrity...")]);
+    let _ = notify(false, &[NotifyState::Status("Verifying config integrity...".to_string())]);
     hardening.verify_config_integrity()
         .map_err(|e| AgentError::ConfigurationError(format!("Config integrity check failed: {}", e)))?;
     info!("[INIT-5] Config integrity verified");
     
     // Perform runtime tamper checks (FAIL-CLOSED)
     info!("[INIT-6] Performing runtime tamper checks");
-    let _ = notify(false, &[NotifyState::Status("Performing runtime checks...")]);
+    let _ = notify(false, &[NotifyState::Status("Performing runtime checks...".to_string())]);
     hardening.perform_runtime_checks()
         .map_err(|e| AgentError::ConfigurationError(format!("Runtime check failed: {}", e)))?;
     info!("[INIT-6] Runtime checks passed");
     
     // Start watchdog timer
     info!("[INIT-7] Starting watchdog timer");
-    let _ = notify(false, &[NotifyState::Status("Starting watchdog...")]);
+    let _ = notify(false, &[NotifyState::Status("Starting watchdog...".to_string())]);
     hardening.start_watchdog()
         .map_err(|e| AgentError::ConfigurationError(format!("Watchdog start failed: {}", e)))?;
     info!("[INIT-7] Watchdog started");
     
     // Load configuration (ENV-only, fail-closed)
     info!("[INIT-8] Loading configuration from environment");
-    let _ = notify(false, &[NotifyState::Status("Loading configuration...")]);
+    let _ = notify(false, &[NotifyState::Status("Loading configuration...".to_string())]);
     let config = AgentConfig::from_env()
         .map_err(|e| AgentError::ConfigurationError(e))?;
     
@@ -109,7 +109,7 @@ fn main() -> Result<(), AgentError> {
     
     // Initialize identity (fail-closed on failure)
     info!("[INIT-9] Loading component identity");
-    let _ = notify(false, &[NotifyState::Status("Loading identity...")]);
+    let _ = notify(false, &[NotifyState::Status("Loading identity...".to_string())]);
     let identity_path = config.identity_path.as_ref().map(|p| std::path::Path::new(p));
     let identity = IdentityManager::load_or_create(identity_path)
         .map_err(|e| AgentError::IdentityVerificationFailed(format!("{}", e)))?;
@@ -118,7 +118,7 @@ fn main() -> Result<(), AgentError> {
     
     // Initialize event signer (fail-closed on failure) - Ed25519
     info!("[INIT-10] Loading signing key");
-    let _ = notify(false, &[NotifyState::Status("Loading signing key...")]);
+    let _ = notify(false, &[NotifyState::Status("Loading signing key...".to_string())]);
     let component_id = identity.component_id().to_string();
     let security_signer = if let Some(ref key_path) = config.signing_key_path {
         info!("Loading signing key from: {}", key_path);
@@ -149,7 +149,7 @@ fn main() -> Result<(), AgentError> {
     
     // Initialize reqwest HTTP client for direct telemetry delivery
     info!("[INIT-11] Initializing HTTP client");
-    let _ = notify(false, &[NotifyState::Status("Initializing HTTP client...")]);
+    let _ = notify(false, &[NotifyState::Status("Initializing HTTP client...".to_string())]);
     let http_client = ReqwestClient::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
@@ -168,7 +168,7 @@ fn main() -> Result<(), AgentError> {
     // }
     
     info!("[INIT-12] Initializing monitoring components");
-    let _ = notify(false, &[NotifyState::Status("Initializing components...")]);
+    let _ = notify(false, &[NotifyState::Status("Initializing components...".to_string())]);
     
     // Initialize components
     let process_monitor = Arc::new(ProcessMonitor::new(config.max_processes));
@@ -186,7 +186,7 @@ fn main() -> Result<(), AgentError> {
     
     // Initialize syscall monitoring
     info!("[INIT-13] Initializing syscall monitoring");
-    let _ = notify(false, &[NotifyState::Status("Initializing syscall monitoring...")]);
+    let _ = notify(false, &[NotifyState::Status("Initializing syscall monitoring...".to_string())]);
     if config.enable_ebpf {
         if let Err(e) = syscall_monitor.init_ebpf() {
             error!("eBPF initialization failed: {}", e);
@@ -206,7 +206,7 @@ fn main() -> Result<(), AgentError> {
     
     // Start monitoring
     info!("[INIT-14] Starting syscall monitoring");
-    let _ = notify(false, &[NotifyState::Status("Starting monitoring...")]);
+    let _ = notify(false, &[NotifyState::Status("Starting monitoring...".to_string())]);
     syscall_monitor.start()?;
     info!("[INIT-14] Syscall monitoring started");
     
@@ -217,7 +217,7 @@ fn main() -> Result<(), AgentError> {
     
     // All initialization complete - notify systemd we're ready
     info!("[INIT-16] Linux Agent initialization complete - notifying systemd");
-    let _ = notify(true, &[NotifyState::Ready, NotifyState::Status("Running")]);
+    let _ = notify(true, &[NotifyState::Ready, NotifyState::Status("Running".to_string())]);
     info!("Linux Agent started successfully and ready");
     
     // Create tokio runtime for async transport calls

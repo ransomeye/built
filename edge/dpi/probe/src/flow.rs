@@ -92,11 +92,6 @@ impl FlowTracker {
         }
         
         // Update or create flow
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|e| ProbeError::FlowTrackingFailed(format!("Time error: {}", e)))?
-            .as_secs();
-        
         match flows.get_mut(&key) {
             Some(flow) => {
                 // Update existing flow

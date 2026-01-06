@@ -3,8 +3,8 @@
 // Details of functionality of this file: Health monitoring for DPI Probe
 
 use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
-use tracing::{error, warn, info};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::warn;
 
 use super::errors::ProbeError;
 

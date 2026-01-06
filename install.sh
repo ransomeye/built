@@ -1050,6 +1050,59 @@ success "Runtime root validation passed: /opt/ransomeye exists with all required
 log "[INSTALL] Runtime root validated at /opt/ransomeye"
 
 # ============================================================================
+# INSTALL PYTHON DEPENDENCIES (MANDATORY - BEFORE SERVICES START)
+# ============================================================================
+log "Installing Python dependencies from requirements.txt"
+
+echo ""
+echo "==========================================================================="
+echo "PYTHON DEPENDENCIES INSTALLATION"
+echo "==========================================================================="
+echo ""
+
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
+
+if [[ ! -f "$REQUIREMENTS_FILE" ]]; then
+    error "FATAL: requirements.txt not found at $REQUIREMENTS_FILE (fail-closed)"
+fi
+
+log "Installing dependencies from: $REQUIREMENTS_FILE"
+
+# Check if pip3 is available
+if ! command -v pip3 &> /dev/null; then
+    error "FATAL: pip3 not found. Cannot install Python dependencies (fail-closed)"
+fi
+
+# Install requirements with pinned versions (fail-closed on error)
+# NOTE: --break-system-packages required for PEP 668 protected systems (Ubuntu 23.04+)
+log "Running: pip3 install --break-system-packages --no-cache-dir -r $REQUIREMENTS_FILE"
+if pip3 install --break-system-packages --no-cache-dir -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE"; then
+    PIP_EXIT_CODE=${PIPESTATUS[0]}
+    if [[ $PIP_EXIT_CODE -eq 0 ]]; then
+        success "Python dependencies installed successfully"
+        log "All dependencies from requirements.txt installed"
+    else
+        error "FATAL: pip3 install failed with exit code: $PIP_EXIT_CODE (fail-closed)"
+    fi
+else
+    error "FATAL: Failed to execute pip3 install (fail-closed)"
+fi
+
+# Verify scikit-learn is installed (critical for intelligence service)
+log "Verifying scikit-learn installation (required for intelligence service)"
+if python3 -c "import sklearn" 2>/dev/null; then
+    success "scikit-learn verified: import successful"
+    SKLEARN_VERSION=$(python3 -c "import sklearn; print(sklearn.__version__)" 2>/dev/null || echo "unknown")
+    log "  scikit-learn version: $SKLEARN_VERSION"
+else
+    error "FATAL: scikit-learn import failed after installation (fail-closed)"
+fi
+
+echo ""
+echo "==========================================================================="
+echo ""
+
+# ============================================================================
 # INSTALL ORCHESTRATOR BINARY (MANDATORY FOR CORE ORCHESTRATOR SERVICE)
 # ============================================================================
 log "Installing RansomEye Core Orchestrator binary"

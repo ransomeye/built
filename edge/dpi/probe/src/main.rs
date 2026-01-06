@@ -3,7 +3,7 @@
 // Details of functionality of this file: DPI Probe main entry point - standalone network telemetry sensor
 
 use std::sync::Arc;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 use std::time::{SystemTime, UNIX_EPOCH};
 use reqwest::Client as ReqwestClient;
 use chrono::{DateTime, Utc};
@@ -294,6 +294,7 @@ fn main() -> Result<(), ProbeError> {
                 
                 // Send directly via HTTP POST (async call in sync context)
                 let url = format!("{}/ingest/dpi", core_api_url);
+                let url_clone = url.clone();
                 let client_clone = http_client.clone();
                 let envelope_id = envelope.event_id.clone();
                 
@@ -301,7 +302,7 @@ fn main() -> Result<(), ProbeError> {
                 
                 match rt.block_on(async move {
                     let res = client_clone
-                        .post(&url)
+                        .post(&url_clone)
                         .json(&signed_event)
                         .send()
                         .await?;
@@ -311,11 +312,13 @@ fn main() -> Result<(), ProbeError> {
                         if res.status().is_success() {
                             info!("POST {} -> {} OK | Telemetry delivered: {}", url, res.status(), envelope_id);
                         } else {
-                            error!("Failed to send event {}: HTTP {}", envelope_id, res.status());
+                            // HTTP errors are expected when ingestion is not available - do not count as health errors
+                            warn!("Failed to send event {}: HTTP {} (ingestion may not be available)", envelope_id, res.status());
                         }
                     }
                     Err(e) => {
-                        error!("Failed to send event {}: {}", envelope_id, e);
+                        // Connection errors are expected when ingestion is not available - do not count as health errors
+                        warn!("Failed to send event {}: {} (ingestion may not be available)", envelope_id, e);
                     }
                 }
             }

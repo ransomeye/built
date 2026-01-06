@@ -67,13 +67,14 @@ def _db_health_bootstrap(db_env: Dict[str, str]) -> None:
     if r.returncode != 0:
         raise RuntimeError(f"FAIL-CLOSED: DB connectivity check failed: {r.stderr.strip() or r.stdout.strip()}")
 
+    # NOTE: Uses partial unique index components_name_uniq_null_idx (instance_id IS NULL)
     upsert_sql = """
     INSERT INTO ransomeye.components (
       component_type, component_name, instance_id, build_hash, version, started_at, last_heartbeat_at
     )
     VALUES ('other'::ransomeye.component_type, 'ransomeye_posture_engine', NULL, NULL, NULL, NOW(), NOW())
-    ON CONFLICT (component_type, component_name, (COALESCE(instance_id, '')))
-    DO UPDATE SET last_heartbeat_at = NOW()
+    ON CONFLICT (component_type, component_name) WHERE instance_id IS NULL
+    DO UPDATE SET last_heartbeat_at = NOW(), updated_at = NOW()
     RETURNING component_id;
     """
     r = _psql_cmd(db_env, upsert_sql)

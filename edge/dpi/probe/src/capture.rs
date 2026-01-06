@@ -56,7 +56,7 @@ impl PacketCapture {
                 format!("Interface not found: {}", self.interface)
             ))?;
         
-        let mut cap = Capture::from_device(device)
+        let cap = Capture::from_device(device)
             .map_err(|e| ProbeError::CaptureFailed(format!("Failed to open device: {}", e)))?
             .promisc(true)
             .snaplen(65535)

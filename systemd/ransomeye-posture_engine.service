@@ -44,6 +44,8 @@ PrivateUsers=false
 # Environment
 Environment="RANSOMEYE_ROOT=/opt/ransomeye"
 Environment="PYTHONUNBUFFERED=1"
+# DB ENVIRONMENT (MANDATORY): systemd reads as root and injects DB_* into the service
+EnvironmentFile=/etc/ransomeye/db.env
 
 [Install]
 WantedBy=multi-user.target

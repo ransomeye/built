@@ -84,12 +84,16 @@ success "Created runtime directory: $INSTALL_DIR"
 log "Installing agent binary"
 
 # Check if binary exists in module directory
-BINARY_SOURCE="$MODULE_DIR/target/release/ransomeye_linux_agent"
+BINARY_SOURCE="$MODULE_DIR/target/release/agent-linux"
 if [[ ! -f "$BINARY_SOURCE" ]]; then
     # Try alternative locations
-    BINARY_SOURCE="$MODULE_DIR/../target/release/ransomeye_linux_agent"
+    BINARY_SOURCE="$MODULE_DIR/../target/release/agent-linux"
     if [[ ! -f "$BINARY_SOURCE" ]]; then
-        error "Agent binary not found. Build the agent first: cd $MODULE_DIR && cargo build --release"
+        # Try root target directory
+        BINARY_SOURCE="/home/ransomeye/rebuild/target/release/agent-linux"
+        if [[ ! -f "$BINARY_SOURCE" ]]; then
+            error "Agent binary not found. Build the agent first: cd $MODULE_DIR && cargo build --release"
+        fi
     fi
 fi
 

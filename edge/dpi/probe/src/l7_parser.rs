@@ -373,8 +373,8 @@ impl L7Parser {
                     let code = payload[6]; // Connection code
                     
                     match code {
-                        0xE0 => metadata.insert("rdp_type".to_string(), "CONNECTION_REQUEST".to_string()),
-                        0xD0 => metadata.insert("rdp_type".to_string(), "CONNECTION_CONFIRM".to_string()),
+                        0xE0 => { let _ = metadata.insert("rdp_type".to_string(), "CONNECTION_REQUEST".to_string()); },
+                        0xD0 => { let _ = metadata.insert("rdp_type".to_string(), "CONNECTION_CONFIRM".to_string()); },
                         _ => {}
                     }
                 }

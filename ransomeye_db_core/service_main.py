@@ -83,13 +83,14 @@ def main() -> int:
         return 1
 
     # Upsert component and start heartbeat
+    # NOTE: Uses partial unique index components_name_uniq_null_idx (instance_id IS NULL)
     upsert_sql = """
     INSERT INTO ransomeye.components (
       component_type, component_name, instance_id, build_hash, version, started_at, last_heartbeat_at
     )
     VALUES ('db_core'::ransomeye.component_type, 'ransomeye_db_core', NULL, NULL, NULL, NOW(), NOW())
-    ON CONFLICT (component_type, component_name, (COALESCE(instance_id, '')))
-    DO UPDATE SET last_heartbeat_at = NOW()
+    ON CONFLICT (component_type, component_name) WHERE instance_id IS NULL
+    DO UPDATE SET last_heartbeat_at = NOW(), updated_at = NOW()
     RETURNING component_id;
     """
     r = _psql(db_env, upsert_sql)
