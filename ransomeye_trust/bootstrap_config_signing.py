@@ -188,7 +188,24 @@ class ConfigSigningBootstrap:
             if self.bootstrap_metadata_path.exists():
                 try:
                     with open(self.bootstrap_metadata_path, 'r') as f:
-                        metadata = json.load(f)
+                        bootstrap_data = json.load(f)
+                    # CRITICAL FIX: Normalize bootstrap_data format to match generate_keypair() format
+                    # bootstrap_data uses key_algorithm/public_key_fingerprint, but main() expects algorithm/fingerprint
+                    if 'key_algorithm' in bootstrap_data or 'public_key_fingerprint' in bootstrap_data:
+                        # Convert bootstrap_data format to generate_keypair() format for compatibility
+                        metadata = {
+                            'algorithm': bootstrap_data.get('key_algorithm', 'Ed25519'),
+                            'fingerprint': bootstrap_data.get('public_key_fingerprint', ''),
+                            'fingerprint_format': bootstrap_data.get('fingerprint_format', 'SHA-256'),
+                            'created_at': bootstrap_data.get('key_created_at', ''),
+                            'private_key_path': bootstrap_data.get('private_key_path', str(self.private_key_path)),
+                            'public_key_path': bootstrap_data.get('public_key_path', str(self.public_key_path)),
+                            'key_size': bootstrap_data.get('key_size_bits', 256),
+                            'bootstrap_version': bootstrap_data.get('bootstrap_version', '1.0.0')
+                        }
+                    else:
+                        # Already in generate_keypair() format (backward compatibility)
+                        metadata = bootstrap_data
                 except Exception:
                     pass
             

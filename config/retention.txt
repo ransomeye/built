@@ -5,8 +5,8 @@
 # RansomEye Data Retention Policy Configuration
 # All values are enforced at runtime and validated in CI/CD
 
-TELEMETRY_RETENTION_MONTHS=6
-FORENSIC_RETENTION_DAYS=10
+TELEMETRY_RETENTION_MONTHS=1
+FORENSIC_RETENTION_DAYS=30
 DISK_MAX_USAGE_PERCENT=80
 
 # Note: AI Training Artifacts have a mandatory minimum retention of 2 years
