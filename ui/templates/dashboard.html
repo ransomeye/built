@@ -131,6 +131,17 @@
                             <span class="sidebar-nav-link" style="color: var(--text-muted);">Loading...</span>
                         </li>
                     </ul>
+                    <div style="padding: var(--spacing-sm) var(--spacing-md);">
+                        <button 
+                            type="button" 
+                            id="create-dashboard-button" 
+                            class="create-dashboard-button"
+                            aria-label="Create dashboard"
+                            title="Create a new personal dashboard">
+                            <span class="create-dashboard-icon">+</span>
+                            <span class="create-dashboard-label">Create Dashboard</span>
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Divider -->
@@ -162,6 +173,9 @@
             <header class="main-content-header">
                 <div class="header-brand">
                     <h1>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</h1>
+                    <span class="dashboard-source-badge" id="dashboard-source-badge" role="status" aria-label="Dashboard source" title="Loading source information...">
+                        <span class="dashboard-source-badge-text">—</span>
+                    </span>
                 </div>
                 <div class="header-status-group">
                     <button 
@@ -176,6 +190,28 @@
                     </button>
                     <button 
                         type="button" 
+                        id="save-dashboard-button" 
+                        class="save-dashboard-button" 
+                        aria-label="Save dashboard"
+                        title="Save dashboard (Ctrl+S)"
+                        disabled
+                        style="display: none;">
+                        <span class="save-dashboard-icon">💾</span>
+                        <span class="save-dashboard-label">Save</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="save-dashboard-button" 
+                        class="save-dashboard-button" 
+                        aria-label="Save dashboard"
+                        title="Save dashboard (Ctrl+S)"
+                        disabled
+                        style="display: none;">
+                        <span class="save-dashboard-icon">💾</span>
+                        <span class="save-dashboard-label">Save</span>
+                    </button>
+                    <button 
+                        type="button" 
                         id="edit-mode-toggle" 
                         class="edit-mode-toggle" 
                         aria-label="Toggle edit mode"
@@ -183,6 +219,36 @@
                         title="Toggle edit mode (E)">
                         <span class="edit-mode-toggle-icon">✎</span>
                         <span class="edit-mode-toggle-label">Edit</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="create-personal-copy-button" 
+                        class="create-personal-copy-button"
+                        aria-label="Create personal copy"
+                        title="Create a personal copy of this dashboard"
+                        style="display: none;">
+                        <span class="create-personal-copy-icon">📋</span>
+                        <span class="create-personal-copy-label">Create Personal Copy</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="rename-dashboard-button" 
+                        class="rename-dashboard-button"
+                        aria-label="Rename dashboard"
+                        title="Rename this personal dashboard"
+                        style="display: none;">
+                        <span class="rename-dashboard-icon">✏️</span>
+                        <span class="rename-dashboard-label">Rename</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="duplicate-dashboard-button" 
+                        class="duplicate-dashboard-button"
+                        aria-label="Duplicate dashboard"
+                        title="Duplicate this personal dashboard"
+                        style="display: none;">
+                        <span class="duplicate-dashboard-icon">📄</span>
+                        <span class="duplicate-dashboard-label">Duplicate</span>
                     </button>
                     <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
                 </div>
@@ -218,6 +284,139 @@
                     </div>
                 </div>
                 
+                <!-- Create Dashboard Modal -->
+                <div class="create-dashboard-modal" id="create-dashboard-modal" role="dialog" aria-labelledby="create-dashboard-title" aria-hidden="true">
+                    <div class="create-dashboard-overlay"></div>
+                    <div class="create-dashboard-dialog">
+                        <div class="create-dashboard-header">
+                            <h2 id="create-dashboard-title">Create Personal Dashboard</h2>
+                            <button type="button" class="create-dashboard-close" id="create-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="create-dashboard-content">
+                            <form id="create-dashboard-form">
+                                <div class="form-group">
+                                    <label for="dashboard-name">Dashboard Name</label>
+                                    <input 
+                                        type="text" 
+                                        id="dashboard-name" 
+                                        name="name" 
+                                        required 
+                                        pattern="[a-zA-Z0-9_-]+"
+                                        placeholder="my-dashboard"
+                                        aria-describedby="name-help"
+                                    />
+                                    <small id="name-help" class="form-help">
+                                        Letters, numbers, hyphens, and underscores only (1-100 characters)
+                                    </small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="dashboard-title">Dashboard Title</label>
+                                    <input 
+                                        type="text" 
+                                        id="dashboard-title" 
+                                        name="title" 
+                                        required 
+                                        maxlength="200"
+                                        placeholder="My Dashboard"
+                                    />
+                                </div>
+                                <div class="form-group">
+                                    <label for="dashboard-source">Create From</label>
+                                    <select id="dashboard-source" name="source_dashboard">
+                                        <option value="">Blank Dashboard</option>
+                                        <!-- System dashboards will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="button-secondary" id="create-dashboard-cancel">Cancel</button>
+                                    <button type="submit" class="button-primary" id="create-dashboard-submit">Create</button>
+                                </div>
+                                <div id="create-dashboard-error" class="form-error" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rename Dashboard Modal -->
+                <div class="rename-dashboard-modal" id="rename-dashboard-modal" role="dialog" aria-labelledby="rename-dashboard-title" aria-hidden="true">
+                    <div class="rename-dashboard-overlay"></div>
+                    <div class="rename-dashboard-dialog">
+                        <div class="rename-dashboard-header">
+                            <h2 id="rename-dashboard-title">Rename Dashboard</h2>
+                            <button type="button" class="rename-dashboard-close" id="rename-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="rename-dashboard-content">
+                            <form id="rename-dashboard-form">
+                                <div class="form-group">
+                                    <label for="rename-title">Dashboard Title</label>
+                                    <input 
+                                        type="text" 
+                                        id="rename-title" 
+                                        name="new_title" 
+                                        required 
+                                        maxlength="200"
+                                        placeholder="Dashboard Title"
+                                    />
+                                    <small class="form-help">
+                                        Dashboard name (slug) cannot be changed. Only the display title can be updated (1-200 characters).
+                                    </small>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="button-secondary" id="rename-dashboard-cancel">Cancel</button>
+                                    <button type="submit" class="button-primary" id="rename-dashboard-submit">Rename</button>
+                                </div>
+                                <div id="rename-dashboard-error" class="form-error" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Duplicate Dashboard Modal -->
+                <div class="duplicate-dashboard-modal" id="duplicate-dashboard-modal" role="dialog" aria-labelledby="duplicate-dashboard-title" aria-hidden="true">
+                    <div class="duplicate-dashboard-overlay"></div>
+                    <div class="duplicate-dashboard-dialog">
+                        <div class="duplicate-dashboard-header">
+                            <h2 id="duplicate-dashboard-title">Duplicate Dashboard</h2>
+                            <button type="button" class="duplicate-dashboard-close" id="duplicate-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="duplicate-dashboard-content">
+                            <form id="duplicate-dashboard-form">
+                                <div class="form-group">
+                                    <label for="duplicate-name">Dashboard Name</label>
+                                    <input 
+                                        type="text" 
+                                        id="duplicate-name" 
+                                        name="new_name" 
+                                        required 
+                                        pattern="[a-zA-Z0-9_-]+"
+                                        placeholder="my-dashboard-copy"
+                                        aria-describedby="duplicate-name-help"
+                                    />
+                                    <small id="duplicate-name-help" class="form-help">
+                                        Letters, numbers, hyphens, and underscores only (1-100 characters)
+                                    </small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="duplicate-title">Dashboard Title</label>
+                                    <input 
+                                        type="text" 
+                                        id="duplicate-title" 
+                                        name="new_title" 
+                                        required 
+                                        maxlength="200"
+                                        placeholder="Dashboard Title (Copy)"
+                                    />
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="button-secondary" id="duplicate-dashboard-cancel">Cancel</button>
+                                    <button type="submit" class="button-primary" id="duplicate-dashboard-submit">Duplicate</button>
+                                </div>
+                                <div id="duplicate-dashboard-error" class="form-error" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Footer -->
                 <footer class="footer">
                     © RansomEye.Tech | Support: Gagan@RansomEye.Tech
@@ -233,7 +432,9 @@
         
         const dashboardName = '{{ dashboard.name | default("", true) }}';
         const dashboardDefinition = {{ dashboard | tojson }};
+        const originalDashboardState = JSON.parse(JSON.stringify(dashboardDefinition)); // Deep copy for comparison
         const panelRefreshTimers = {};
+        let hasUnsavedChanges = false;
         
         // ============================================================
         // RENDER DASHBOARD
@@ -292,25 +493,22 @@
             // Panel header
             const headerEl = document.createElement('div');
             headerEl.className = 'panel-header';
-            const removeButton = editModeActive ? '<button type="button" class="panel-remove-button" aria-label="Remove panel" title="Remove panel">✕</button>' : '';
             headerEl.innerHTML = `
                 <div class="panel-title">${escapeHtml(title)}</div>
                 <div class="panel-status-group">
                     <span class="status-badge status-${status}">${status}</span>
                     <span class="panel-timestamp" data-timestamp="${new Date().toISOString()}"></span>
-                    ${removeButton}
+                    <button type="button" class="panel-remove-button" aria-label="Remove panel" title="Remove panel" style="display: none;">✕</button>
                 </div>
             `;
             
-            // Attach remove handler if in edit mode
-            if (editModeActive) {
-                const removeBtn = headerEl.querySelector('.panel-remove-button');
-                if (removeBtn) {
-                    removeBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        handleRemovePanel(panelEl);
-                    });
-                }
+            // Attach remove handler
+            const removeBtn = headerEl.querySelector('.panel-remove-button');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleRemovePanel(panelEl);
+                });
             }
             
             // Panel body
@@ -513,53 +711,83 @@
             if (!dashboardListEl) return;
             
             try {
-                // Fetch dashboard list
-                const response = await fetch('/api/dashboards');
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                // Fetch folders and dashboards in parallel
+                const [foldersResponse, dashboardsResponse] = await Promise.all([
+                    fetch('/api/dashboard-folders'),
+                    fetch('/api/dashboards')
+                ]);
+                
+                if (!foldersResponse.ok || !dashboardsResponse.ok) {
+                    throw new Error(`HTTP ${foldersResponse.status} or ${dashboardsResponse.status}`);
                 }
                 
-                const data = await response.json();
-                const dashboardNames = data.dashboards || [];
+                const folders = await foldersResponse.json();
+                const dashboardsData = await dashboardsResponse.json();
+                const dashboardsWithFolders = dashboardsData.dashboards_with_folders || [];
                 
-                // Fetch full dashboard definitions to get categories
+                // Fetch full dashboard definitions for titles
                 const dashboardDefs = await Promise.all(
-                    dashboardNames.map(async (name) => {
+                    dashboardsWithFolders.map(async (dashInfo) => {
                         try {
-                            const defResponse = await fetch(`/api/dashboards/${name}`);
+                            const defResponse = await fetch(`/api/dashboards/${dashInfo.name}`);
                             if (defResponse.ok) {
-                                return await defResponse.json();
+                                const def = await defResponse.json();
+                                return {
+                                    name: dashInfo.name,
+                                    title: def.title || dashInfo.name,
+                                    folder_id: dashInfo.folder_id || 'general'
+                                };
                             }
                         } catch (e) {
-                            console.debug(`Failed to fetch dashboard ${name}:`, e);
+                            console.debug(`Failed to fetch dashboard ${dashInfo.name}:`, e);
                         }
                         // Fallback: minimal definition
-                        return { name, title: name, category: null };
+                        return {
+                            name: dashInfo.name,
+                            title: dashInfo.name,
+                            folder_id: dashInfo.folder_id || 'general'
+                        };
                     })
                 );
                 
-                // Group by category
-                const grouped = {};
+                // Create folder map for quick lookup
+                const folderMap = {};
+                folders.forEach(folder => {
+                    folderMap[folder.id] = folder;
+                });
+                
+                // Group dashboards by folder_id
+                const groupedByFolder = {};
                 dashboardDefs.forEach(dash => {
-                    const category = dash.category || dash.type || 'General';
-                    if (!grouped[category]) {
-                        grouped[category] = [];
+                    const folderId = dash.folder_id || 'general';
+                    if (!groupedByFolder[folderId]) {
+                        groupedByFolder[folderId] = [];
                     }
-                    grouped[category].push(dash);
+                    groupedByFolder[folderId].push(dash);
                 });
                 
-                // Sort categories alphabetically, but put "General" first
-                const categories = Object.keys(grouped).sort((a, b) => {
-                    if (a === 'General') return -1;
-                    if (b === 'General') return 1;
-                    return a.localeCompare(b);
+                // Sort folders by order
+                const sortedFolders = folders.slice().sort((a, b) => {
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    return a.name.localeCompare(b.name);
                 });
                 
-                // Render grouped dashboards
+                // Render folders with dashboards
                 let html = '';
-                categories.forEach(category => {
-                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(category)}</div></li>`;
-                    grouped[category].forEach(dash => {
+                sortedFolders.forEach(folder => {
+                    const dashboards = groupedByFolder[folder.id] || [];
+                    if (dashboards.length === 0) {
+                        // Skip empty folders for now
+                        return;
+                    }
+                    
+                    // Folder header
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(folder.name)}</div></li>`;
+                    
+                    // Dashboards in folder
+                    dashboards.forEach(dash => {
                         const title = dash.title || dash.name;
                         const isActive = dash.name === dashboardName;
                         const href = `/dashboard/${escapeHtml(dash.name)}`;
@@ -571,6 +799,26 @@
                             </li>
                         `;
                     });
+                });
+                
+                // Handle dashboards with unknown folder_id (fail-soft: show in General)
+                const knownFolderIds = new Set(folders.map(f => f.id));
+                Object.keys(groupedByFolder).forEach(folderId => {
+                    if (!knownFolderIds.has(folderId) && groupedByFolder[folderId].length > 0) {
+                        html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">General</div></li>`;
+                        groupedByFolder[folderId].forEach(dash => {
+                            const title = dash.title || dash.name;
+                            const isActive = dash.name === dashboardName;
+                            const href = `/dashboard/${escapeHtml(dash.name)}`;
+                            html += `
+                                <li class="sidebar-nav-item">
+                                    <a href="${href}" class="sidebar-nav-link ${isActive ? 'active' : ''}">
+                                        ${escapeHtml(title)}
+                                    </a>
+                                </li>
+                            `;
+                        });
+                    }
                 });
                 
                 dashboardListEl.innerHTML = html;
@@ -630,9 +878,11 @@
                     toggle.classList.add('active');
                     toggle.setAttribute('aria-pressed', 'true');
                     toggle.querySelector('.edit-mode-toggle-label').textContent = 'Done';
-                    // Show Add Panel button
+                    // Show Add Panel and Save buttons
                     const addPanelBtn = document.getElementById('add-panel-button');
                     if (addPanelBtn) addPanelBtn.style.display = '';
+                    const saveBtn = document.getElementById('save-dashboard-button');
+                    if (saveBtn) saveBtn.style.display = '';
                     // Add edit affordances to panels and enable drag/resize
                     document.querySelectorAll('.panel').forEach(panel => {
                         panel.classList.add('edit-mode-panel');
@@ -640,14 +890,18 @@
                         initPanelDragResize(panel);
                         addRemoveButton(panel);
                     });
+                    // Check for changes
+                    checkForChanges();
                 } else {
                     body.classList.remove('edit-mode');
                     toggle.classList.remove('active');
                     toggle.setAttribute('aria-pressed', 'false');
                     toggle.querySelector('.edit-mode-toggle-label').textContent = 'Edit';
-                    // Hide Add Panel button
+                    // Hide Add Panel and Save buttons
                     const addPanelBtn = document.getElementById('add-panel-button');
                     if (addPanelBtn) addPanelBtn.style.display = 'none';
+                    const saveBtn = document.getElementById('save-dashboard-button');
+                    if (saveBtn) saveBtn.style.display = 'none';
                     // Close panel picker if open
                     closePanelPicker();
                     // Remove edit affordances from panels and cleanup handlers
@@ -906,6 +1160,7 @@
                 
                 document.removeEventListener('mousemove', handleDragMove);
                 document.removeEventListener('mouseup', handleDragEnd);
+                checkForChanges();
             }
             
             document.addEventListener('mousemove', handleDragMove);
@@ -988,6 +1243,7 @@
                 }
                 
                 setPanelGridPos(panelEl, x, y, w, h);
+                checkForChanges();
             }
             
             function handleResizeEnd() {
@@ -997,10 +1253,493 @@
                 
                 document.removeEventListener('mousemove', handleResizeMove);
                 document.removeEventListener('mouseup', handleResizeEnd);
+                checkForChanges();
             }
             
             document.addEventListener('mousemove', handleResizeMove);
             document.addEventListener('mouseup', handleResizeEnd);
+        }
+        
+        // ============================================================
+        // PANEL ADD/REMOVE (Edit Mode Only, No Persistence)
+        // ============================================================
+        
+        // Predefined panel templates (static, safe list)
+        const PANEL_TEMPLATES = [
+            { id: 'metric_single', title: 'Single Metric', w: 3, h: 2, description: 'Display a single numeric value' },
+            { id: 'metric_double', title: 'Double Metric', w: 6, h: 2, description: 'Display two related metrics' },
+            { id: 'metric_wide', title: 'Wide Metric', w: 12, h: 2, description: 'Full-width metric display' },
+            { id: 'list_panel', title: 'List Panel', w: 4, h: 3, description: 'Display a list of items' },
+            { id: 'table_panel', title: 'Table Panel', w: 8, h: 4, description: 'Display data in a table format' },
+            { id: 'status_panel', title: 'Status Panel', w: 6, h: 2, description: 'Display status information' },
+            { id: 'chart_panel', title: 'Chart Panel', w: 6, h: 4, description: 'Display data visualization' },
+            { id: 'info_panel', title: 'Info Panel', w: 4, h: 2, description: 'Display informational content' }
+        ];
+        
+        // Find first available grid space
+        function findFirstAvailableSpace(w, h) {
+            const GRID_COLUMNS = 12;
+            const panels = document.querySelectorAll('.panel');
+            const occupied = new Set();
+            
+            // Mark all occupied cells
+            panels.forEach(panel => {
+                const x = parseInt(panel.getAttribute('data-x')) || 0;
+                const y = parseInt(panel.getAttribute('data-y')) || 0;
+                const pw = parseInt(panel.getAttribute('data-w')) || 12;
+                const ph = parseInt(panel.getAttribute('data-h')) || 1;
+                
+                for (let py = y; py < y + ph; py++) {
+                    for (let px = x; px < x + pw; px++) {
+                        occupied.add(`${px},${py}`);
+                    }
+                }
+            });
+            
+            // Find first available position (scan top to bottom, left to right)
+            for (let y = 0; y < 100; y++) { // Max 100 rows
+                for (let x = 0; x <= GRID_COLUMNS - w; x++) {
+                    let available = true;
+                    // Check if this position fits
+                    for (let py = y; py < y + h; py++) {
+                        for (let px = x; px < x + w; px++) {
+                            if (occupied.has(`${px},${py}`)) {
+                                available = false;
+                                break;
+                            }
+                        }
+                        if (!available) break;
+                    }
+                    if (available) {
+                        return { x, y };
+                    }
+                }
+            }
+            
+            // Fallback: place at bottom
+            let maxY = 0;
+            panels.forEach(panel => {
+                const y = parseInt(panel.getAttribute('data-y')) || 0;
+                const h = parseInt(panel.getAttribute('data-h')) || 1;
+                maxY = Math.max(maxY, y + h);
+            });
+            return { x: 0, y: maxY };
+        }
+        
+        // Show remove button on panel
+        function addRemoveButton(panelEl) {
+            const removeBtn = panelEl.querySelector('.panel-remove-button');
+            if (removeBtn) {
+                removeBtn.style.display = 'flex';
+            }
+        }
+        
+        // Hide remove button on panel
+        function removeRemoveButton(panelEl) {
+            const removeBtn = panelEl.querySelector('.panel-remove-button');
+            if (removeBtn) {
+                removeBtn.style.display = 'none';
+            }
+        }
+        
+        // Handle panel removal
+        function handleRemovePanel(panelEl) {
+            if (!editModeActive) return;
+            
+            const panelId = panelEl.getAttribute('data-panel-id');
+            const title = panelEl.querySelector('.panel-title')?.textContent || 'this panel';
+            
+            // Lightweight confirmation
+            if (confirm(`Remove "${title}"?\n\nThis change will not be saved until you click Save.`)) {
+                // Clear refresh timer if exists
+                if (panelRefreshTimers[panelId]) {
+                    clearInterval(panelRefreshTimers[panelId]);
+                    delete panelRefreshTimers[panelId];
+                }
+                
+                // Remove from DOM
+                panelEl.remove();
+                checkForChanges();
+            }
+        }
+        
+        // Open panel picker
+        function openPanelPicker() {
+            if (!editModeActive) return;
+            
+            const modal = document.getElementById('panel-picker-modal');
+            const content = document.getElementById('panel-picker-content');
+            
+            if (!modal || !content) return;
+            
+            // Populate panel templates
+            content.innerHTML = '';
+            PANEL_TEMPLATES.forEach(template => {
+                const item = document.createElement('div');
+                item.className = 'panel-picker-item';
+                item.innerHTML = `
+                    <div class="panel-picker-item-title">${escapeHtml(template.title)}</div>
+                    <div class="panel-picker-item-description">${escapeHtml(template.description)}</div>
+                    <div class="panel-picker-item-size">${template.w}×${template.h}</div>
+                `;
+                item.addEventListener('click', () => {
+                    handleAddPanel(template);
+                    closePanelPicker();
+                });
+                content.appendChild(item);
+            });
+            
+            modal.setAttribute('aria-hidden', 'false');
+            modal.classList.add('active');
+            
+            // Focus trap
+            const firstItem = content.querySelector('.panel-picker-item');
+            if (firstItem) firstItem.focus();
+        }
+        
+        // Close panel picker
+        function closePanelPicker() {
+            const modal = document.getElementById('panel-picker-modal');
+            if (modal) {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.classList.remove('active');
+            }
+        }
+        
+        // Handle adding a panel
+        function handleAddPanel(template) {
+            if (!editModeActive) return;
+            
+            const position = findFirstAvailableSpace(template.w, template.h);
+            
+            // Create panel definition
+            const panelDef = {
+                id: `panel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                title: template.title,
+                x: position.x,
+                y: position.y,
+                w: template.w,
+                h: template.h,
+                status: 'healthy',
+                content: '',
+                data_source: {
+                    endpoint: '/api/dashboards/soc',
+                    path: null
+                }
+            };
+            
+            // Render panel
+            renderPanel(panelDef).then(() => {
+                // Add edit mode affordances
+                const panelEl = document.querySelector(`[data-panel-id="${panelDef.id}"]`);
+                if (panelEl) {
+                    panelEl.classList.add('edit-mode-panel');
+                    addResizeHandles(panelEl);
+                    initPanelDragResize(panelEl);
+                    addRemoveButton(panelEl);
+                }
+                checkForChanges();
+            });
+        }
+        
+        // ============================================================
+        // DASHBOARD SAVE FUNCTIONALITY
+        // ============================================================
+        
+        // Serialize current dashboard state
+        function serializeDashboardState() {
+            const panels = Array.from(document.querySelectorAll('.panel')).map(panelEl => {
+                const panelId = panelEl.getAttribute('data-panel-id');
+                const title = panelEl.querySelector('.panel-title')?.textContent || 'Panel';
+                const x = parseInt(panelEl.getAttribute('data-x')) || 0;
+                const y = parseInt(panelEl.getAttribute('data-y')) || 0;
+                const w = parseInt(panelEl.getAttribute('data-w')) || 12;
+                const h = parseInt(panelEl.getAttribute('data-h')) || 1;
+                const refreshInterval = panelEl.getAttribute('data-refresh-interval');
+                
+                // Find original panel definition to preserve other fields
+                const originalPanel = dashboardDefinition.panels.find(p => p.id === panelId) || 
+                                     originalDashboardState.panels.find(p => p.id === panelId);
+                
+                const panel = {
+                    id: panelId,
+                    title: title,
+                    x: x,
+                    y: y,
+                    w: w,
+                    h: h
+                };
+                
+                // Preserve refresh_interval if exists
+                if (refreshInterval) {
+                    panel.refresh_interval = parseInt(refreshInterval);
+                } else if (originalPanel && originalPanel.refresh_interval) {
+                    panel.refresh_interval = originalPanel.refresh_interval;
+                }
+                
+                // Preserve status if exists
+                if (originalPanel && originalPanel.status) {
+                    panel.status = originalPanel.status;
+                } else {
+                    panel.status = 'healthy';
+                }
+                
+                // Preserve data_source if exists
+                if (originalPanel && originalPanel.data_source) {
+                    panel.data_source = originalPanel.data_source;
+                }
+                
+                // Preserve content if exists
+                if (originalPanel && originalPanel.content) {
+                    panel.content = originalPanel.content;
+                }
+                
+                return panel;
+            });
+            
+            // Build dashboard definition
+            const dashboard = {
+                name: dashboardName,
+                panels: panels
+            };
+            
+            // Preserve other top-level fields from original
+            if (originalDashboardState.title) {
+                dashboard.title = originalDashboardState.title;
+            }
+            if (originalDashboardState.description) {
+                dashboard.description = originalDashboardState.description;
+            }
+            if (originalDashboardState.category) {
+                dashboard.category = originalDashboardState.category;
+            }
+            if (originalDashboardState.type) {
+                dashboard.type = originalDashboardState.type;
+            }
+            
+            return dashboard;
+        }
+        
+        // Validate dashboard structure before sending
+        function validateDashboardStructure(dashboard) {
+            if (!dashboard.name || typeof dashboard.name !== 'string') {
+                return { valid: false, error: 'Dashboard name is required and must be a string' };
+            }
+            
+            if (!dashboard.panels || !Array.isArray(dashboard.panels)) {
+                return { valid: false, error: 'Dashboard must have a panels array' };
+            }
+            
+            if (dashboard.panels.length === 0) {
+                return { valid: false, error: 'Dashboard must have at least one panel' };
+            }
+            
+            for (let i = 0; i < dashboard.panels.length; i++) {
+                const panel = dashboard.panels[i];
+                
+                if (!panel.id || typeof panel.id !== 'string') {
+                    return { valid: false, error: `Panel ${i} must have a valid id string` };
+                }
+                
+                if (!panel.title || typeof panel.title !== 'string') {
+                    return { valid: false, error: `Panel ${i} must have a valid title string` };
+                }
+                
+                const requiredGridFields = ['x', 'y', 'w', 'h'];
+                for (const field of requiredGridFields) {
+                    if (typeof panel[field] !== 'number' || panel[field] < 0) {
+                        return { valid: false, error: `Panel ${i} ${field} must be a non-negative number` };
+                    }
+                }
+                
+                if (panel.w < 1 || panel.w > 12) {
+                    return { valid: false, error: `Panel ${i} w must be between 1 and 12` };
+                }
+                
+                if (panel.h < 1) {
+                    return { valid: false, error: `Panel ${i} h must be at least 1` };
+                }
+                
+                if (panel.refresh_interval !== undefined) {
+                    if (typeof panel.refresh_interval !== 'number' || panel.refresh_interval < 0) {
+                        return { valid: false, error: `Panel ${i} refresh_interval must be a non-negative number` };
+                    }
+                }
+            }
+            
+            return { valid: true };
+        }
+        
+        // Check for changes and update Save button state
+        function checkForChanges() {
+            if (!editModeActive) {
+                hasUnsavedChanges = false;
+                updateSaveButtonState();
+                return;
+            }
+            
+            const currentState = serializeDashboardState();
+            const currentStateStr = JSON.stringify(currentState, null, 2);
+            const originalStateStr = JSON.stringify(originalDashboardState, null, 2);
+            
+            hasUnsavedChanges = currentStateStr !== originalStateStr;
+            updateSaveButtonState();
+        }
+        
+        // Update Save button enabled/disabled state
+        function updateSaveButtonState() {
+            const saveBtn = document.getElementById('save-dashboard-button');
+            if (saveBtn) {
+                saveBtn.disabled = !hasUnsavedChanges || !editModeActive;
+            }
+        }
+        
+        // Save dashboard
+        async function saveDashboard() {
+            if (!editModeActive || !hasUnsavedChanges) {
+                return;
+            }
+            
+            const dashboard = serializeDashboardState();
+            
+            // Validate before sending
+            const validation = validateDashboardStructure(dashboard);
+            if (!validation.valid) {
+                alert(`Validation error: ${validation.error}`);
+                return;
+            }
+            
+            const saveBtn = document.getElementById('save-dashboard-button');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.querySelector('.save-dashboard-label').textContent = 'Saving...';
+            }
+            
+            try {
+                const response = await fetch(`/api/dashboards/${dashboardName}/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dashboard)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(error.error || `HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // Update original state to match current
+                Object.assign(originalDashboardState, dashboard);
+                hasUnsavedChanges = false;
+                updateSaveButtonState();
+                
+                // Show success feedback
+                if (saveBtn) {
+                    const label = saveBtn.querySelector('.save-dashboard-label');
+                    if (label) {
+                        label.textContent = 'Saved!';
+                        setTimeout(() => {
+                            label.textContent = 'Save';
+                        }, 2000);
+                    }
+                }
+                
+                console.log('Dashboard saved successfully:', result);
+                
+            } catch (error) {
+                console.error('Error saving dashboard:', error);
+                alert(`Failed to save dashboard: ${error.message}`);
+                
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.querySelector('.save-dashboard-label').textContent = 'Save';
+                }
+            }
+        }
+        
+        // Initialize panel picker
+        function initPanelPicker() {
+            const addBtn = document.getElementById('add-panel-button');
+            const closeBtn = document.getElementById('panel-picker-close');
+            const modal = document.getElementById('panel-picker-modal');
+            const overlay = modal?.querySelector('.panel-picker-overlay');
+            const saveBtn = document.getElementById('save-dashboard-button');
+            
+            if (addBtn) {
+                addBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openPanelPicker();
+                });
+            }
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    saveDashboard();
+                });
+            }
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    closePanelPicker();
+                });
+            }
+            
+            if (overlay) {
+                overlay.addEventListener('click', () => {
+                    closePanelPicker();
+                });
+            }
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (!editModeActive) return;
+                
+                // Ctrl+S or Cmd+S to save
+                if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                    const activeElement = document.activeElement;
+                    const isInput = activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    );
+                    
+                    if (!isInput && hasUnsavedChanges) {
+                        e.preventDefault();
+                        saveDashboard();
+                        return;
+                    }
+                }
+                
+                // 'A' key to open panel picker
+                if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const activeElement = document.activeElement;
+                    const isInput = activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    );
+                    
+                    if (!isInput) {
+                        e.preventDefault();
+                        if (modal && modal.classList.contains('active')) {
+                            closePanelPicker();
+                        } else {
+                            openPanelPicker();
+                        }
+                    }
+                }
+                
+                // Escape to close panel picker
+                if (e.key === 'Escape' && modal && modal.classList.contains('active')) {
+                    e.preventDefault();
+                    closePanelPicker();
+                }
+            });
         }
         
         // ============================================================
@@ -1016,8 +1755,630 @@
         // Initialize edit mode
         initEditMode();
         
+        // Initialize panel picker
+        initPanelPicker();
+        
         // Render dashboard on page load
         renderDashboard();
+        
+        // ============================================================
+        // DASHBOARD SOURCE BADGE (Read-Only Indicator)
+        // ============================================================
+        
+        async function loadDashboardSource() {
+            const badgeEl = document.getElementById('dashboard-source-badge');
+            if (!badgeEl || !dashboardName) {
+                return; // Fail-soft: no badge or no dashboard name
+            }
+            
+            try {
+                const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/source`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-cache'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const sourceInfo = await response.json();
+                updateSourceBadge(badgeEl, sourceInfo);
+            } catch (error) {
+                // Fail-soft: hide badge on error (don't show error state)
+                console.debug('Failed to load dashboard source info:', error);
+                badgeEl.style.display = 'none';
+            }
+        }
+        
+        function updateSourceBadge(badgeEl, sourceInfo) {
+            const badgeTextEl = badgeEl.querySelector('.dashboard-source-badge-text');
+            if (!badgeTextEl) return;
+            
+            const { source, has_overlay, has_system } = sourceInfo;
+            
+            // Determine badge text and tooltip
+            let badgeText = '';
+            let tooltip = '';
+            let badgeClass = 'dashboard-source-badge';
+            
+            if (source === 'merged' || (has_system && has_overlay)) {
+                badgeText = 'System + Personal';
+                tooltip = 'This dashboard combines the system version with your personal customizations';
+                badgeClass += ' dashboard-source-merged';
+            } else if (source === 'user' || has_overlay) {
+                badgeText = 'Personal';
+                tooltip = 'This is your personal dashboard customization';
+                badgeClass += ' dashboard-source-user';
+            } else if (source === 'system' || has_system) {
+                badgeText = 'System';
+                tooltip = 'This is the system dashboard (no personal customizations)';
+                badgeClass += ' dashboard-source-system';
+            } else {
+                // Unknown state - hide badge
+                badgeEl.style.display = 'none';
+                return;
+            }
+            
+            // Update badge
+            badgeEl.className = badgeClass;
+            badgeEl.setAttribute('title', tooltip);
+            badgeEl.setAttribute('aria-label', `Dashboard source: ${badgeText}`);
+            badgeTextEl.textContent = badgeText;
+            badgeEl.style.display = 'inline-flex';
+            
+            // Show/hide "Create Personal Copy" button (only for system dashboards)
+            const createCopyBtn = document.getElementById('create-personal-copy-button');
+            if (createCopyBtn) {
+                if (source === 'system' && has_system && !has_overlay) {
+                    createCopyBtn.style.display = 'inline-flex';
+                } else {
+                    createCopyBtn.style.display = 'none';
+                }
+            }
+            
+            // Show/hide "Rename Dashboard" button (only for personal dashboards)
+            const renameBtn = document.getElementById('rename-dashboard-button');
+            if (renameBtn) {
+                if (has_overlay && (source === 'user' || source === 'merged')) {
+                    renameBtn.style.display = 'inline-flex';
+                } else {
+                    renameBtn.style.display = 'none';
+                }
+            }
+            
+            // Show/hide "Duplicate Dashboard" button (only for personal dashboards)
+            const duplicateBtn = document.getElementById('duplicate-dashboard-button');
+            if (duplicateBtn) {
+                if (has_overlay && (source === 'user' || source === 'merged')) {
+                    duplicateBtn.style.display = 'inline-flex';
+                } else {
+                    duplicateBtn.style.display = 'none';
+                }
+            }
+        }
+        
+        // Load source info on page load (non-blocking)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadDashboardSource);
+        } else {
+            loadDashboardSource();
+        }
+        
+        // ============================================================
+        // CREATE DASHBOARD MODAL
+        // ============================================================
+        
+        function initCreateDashboardModal() {
+            const modal = document.getElementById('create-dashboard-modal');
+            const openButtons = [
+                document.getElementById('create-dashboard-button'),
+                document.getElementById('create-personal-copy-button')
+            ];
+            const closeButtons = [
+                document.getElementById('create-dashboard-close'),
+                document.getElementById('create-dashboard-cancel')
+            ];
+            const overlay = modal?.querySelector('.create-dashboard-overlay');
+            const form = document.getElementById('create-dashboard-form');
+            const sourceSelect = document.getElementById('dashboard-source');
+            
+            // Populate system dashboards in select
+            async function populateSystemDashboards() {
+                if (!sourceSelect) return;
+                
+                try {
+                    const response = await fetch('/api/dashboards', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const dashboards = data.dashboards || [];
+                        
+                        // Clear existing options (except blank)
+                        sourceSelect.innerHTML = '<option value="">Blank Dashboard</option>';
+                        
+                        // Add system dashboards
+                        dashboards.forEach(name => {
+                            const option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            sourceSelect.appendChild(option);
+                        });
+                    }
+                } catch (error) {
+                    console.debug('Failed to load system dashboards:', error);
+                }
+            }
+            
+            // Open modal
+            function openModal(prefillSource = null) {
+                if (!modal) return;
+                
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Reset form
+                if (form) {
+                    form.reset();
+                    const errorEl = document.getElementById('create-dashboard-error');
+                    if (errorEl) {
+                        errorEl.style.display = 'none';
+                        errorEl.textContent = '';
+                    }
+                }
+                
+                // Prefill source if provided
+                if (prefillSource && sourceSelect) {
+                    sourceSelect.value = prefillSource;
+                }
+                
+                // Focus on name input
+                const nameInput = document.getElementById('dashboard-name');
+                if (nameInput) {
+                    setTimeout(() => nameInput.focus(), 100);
+                }
+            }
+            
+            // Close modal
+            function closeModal() {
+                if (!modal) return;
+                
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+            
+            // Handle form submission
+            async function handleSubmit(e) {
+                e.preventDefault();
+                
+                const errorEl = document.getElementById('create-dashboard-error');
+                const submitBtn = document.getElementById('create-dashboard-submit');
+                
+                if (!form || !errorEl || !submitBtn) return;
+                
+                const formData = new FormData(form);
+                const data = {
+                    name: formData.get('name')?.trim() || '',
+                    title: formData.get('title')?.trim() || '',
+                    source_dashboard: formData.get('source_dashboard')?.trim() || null
+                };
+                
+                // Client-side validation
+                if (!data.name || !data.title) {
+                    errorEl.textContent = 'Dashboard name and title are required';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (!/^[a-zA-Z0-9_-]+$/.test(data.name)) {
+                    errorEl.textContent = 'Dashboard name must contain only letters, numbers, hyphens, and underscores';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                // Disable submit button
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Creating...';
+                errorEl.style.display = 'none';
+                
+                try {
+                    const response = await fetch('/api/dashboards/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - redirect to new dashboard
+                        window.location.href = `/dashboard/${encodeURIComponent(result.dashboard)}`;
+                    } else {
+                        // Error - show message
+                        errorEl.textContent = result.error || 'Failed to create dashboard';
+                        errorEl.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Create';
+                    }
+                } catch (error) {
+                    errorEl.textContent = 'Network error: Failed to create dashboard';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create';
+                }
+            }
+            
+            // Attach event listeners
+            openButtons.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        const prefillSource = btn.id === 'create-personal-copy-button' ? dashboardName : null;
+                        openModal(prefillSource);
+                    });
+                }
+            });
+            
+            closeButtons.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', closeModal);
+                }
+            });
+            
+            if (overlay) {
+                overlay.addEventListener('click', closeModal);
+            }
+            
+            if (form) {
+                form.addEventListener('submit', handleSubmit);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+            
+            // Populate system dashboards on init
+            populateSystemDashboards();
+        }
+        
+        // Initialize create dashboard modal
+        initCreateDashboardModal();
+        
+        // ============================================================
+        // RENAME DASHBOARD MODAL
+        // ============================================================
+        
+        function initRenameDashboardModal() {
+            const modal = document.getElementById('rename-dashboard-modal');
+            const openButton = document.getElementById('rename-dashboard-button');
+            const closeButtons = [
+                document.getElementById('rename-dashboard-close'),
+                document.getElementById('rename-dashboard-cancel')
+            ];
+            const overlay = modal?.querySelector('.rename-dashboard-overlay');
+            const form = document.getElementById('rename-dashboard-form');
+            const titleInput = document.getElementById('rename-title');
+            
+            // Open modal
+            function openModal() {
+                if (!modal || !titleInput) return;
+                
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Pre-fill current title
+                if (dashboardDefinition && dashboardDefinition.title) {
+                    titleInput.value = dashboardDefinition.title;
+                } else if (dashboardDefinition && dashboardDefinition.name) {
+                    titleInput.value = dashboardDefinition.name;
+                } else {
+                    titleInput.value = '';
+                }
+                
+                // Reset error
+                const errorEl = document.getElementById('rename-dashboard-error');
+                if (errorEl) {
+                    errorEl.style.display = 'none';
+                    errorEl.textContent = '';
+                }
+                
+                // Focus on input
+                setTimeout(() => titleInput.focus(), 100);
+                titleInput.select();
+            }
+            
+            // Close modal
+            function closeModal() {
+                if (!modal) return;
+                
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+            
+            // Handle form submission
+            async function handleSubmit(e) {
+                e.preventDefault();
+                
+                const errorEl = document.getElementById('rename-dashboard-error');
+                const submitBtn = document.getElementById('rename-dashboard-submit');
+                
+                if (!form || !errorEl || !submitBtn || !titleInput) return;
+                
+                const newTitle = titleInput.value.trim();
+                
+                // Client-side validation
+                if (!newTitle) {
+                    errorEl.textContent = 'Dashboard title is required';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (newTitle.length > 200) {
+                    errorEl.textContent = 'Title must be 200 characters or less';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                // Disable submit button
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Renaming...';
+                errorEl.style.display = 'none';
+                
+                try {
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/rename`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ new_title: newTitle })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - update local state and reload page to reflect changes
+                        if (dashboardDefinition) {
+                            dashboardDefinition.title = newTitle;
+                        }
+                        
+                        // Update page title
+                        const h1 = document.querySelector('.header-brand h1');
+                        if (h1) {
+                            h1.textContent = newTitle;
+                        }
+                        
+                        // Close modal
+                        closeModal();
+                        
+                        // Optionally reload to ensure consistency
+                        // window.location.reload();
+                    } else {
+                        // Error - show message
+                        errorEl.textContent = result.error || 'Failed to rename dashboard';
+                        errorEl.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Rename';
+                    }
+                } catch (error) {
+                    errorEl.textContent = 'Network error: Failed to rename dashboard';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Rename';
+                }
+            }
+            
+            // Attach event listeners
+            if (openButton) {
+                openButton.addEventListener('click', openModal);
+            }
+            
+            closeButtons.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', closeModal);
+                }
+            });
+            
+            if (overlay) {
+                overlay.addEventListener('click', closeModal);
+            }
+            
+            if (form) {
+                form.addEventListener('submit', handleSubmit);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+        }
+        
+        // Initialize rename dashboard modal
+        initRenameDashboardModal();
+        
+        // ============================================================
+        // DUPLICATE DASHBOARD MODAL
+        // ============================================================
+        
+        function initDuplicateDashboardModal() {
+            const modal = document.getElementById('duplicate-dashboard-modal');
+            const openButton = document.getElementById('duplicate-dashboard-button');
+            const closeButtons = [
+                document.getElementById('duplicate-dashboard-close'),
+                document.getElementById('duplicate-dashboard-cancel')
+            ];
+            const overlay = modal?.querySelector('.duplicate-dashboard-overlay');
+            const form = document.getElementById('duplicate-dashboard-form');
+            const nameInput = document.getElementById('duplicate-name');
+            const titleInput = document.getElementById('duplicate-title');
+            
+            // Open modal
+            function openModal() {
+                if (!modal || !nameInput || !titleInput) return;
+                
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Pre-fill with suggested values
+                const currentName = dashboardName || '';
+                const currentTitle = (dashboardDefinition && dashboardDefinition.title) || currentName || 'Dashboard';
+                
+                // Generate suggested name: "<original>-copy" or "<original>-copy-2" etc.
+                let suggestedName = currentName ? `${currentName}-copy` : 'dashboard-copy';
+                nameInput.value = suggestedName;
+                
+                // Generate suggested title: "<Original Title> (Copy)"
+                titleInput.value = `${currentTitle} (Copy)`;
+                
+                // Reset error
+                const errorEl = document.getElementById('duplicate-dashboard-error');
+                if (errorEl) {
+                    errorEl.style.display = 'none';
+                    errorEl.textContent = '';
+                }
+                
+                // Focus on name input
+                setTimeout(() => {
+                    nameInput.focus();
+                    nameInput.select();
+                }, 100);
+            }
+            
+            // Close modal
+            function closeModal() {
+                if (!modal) return;
+                
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+            
+            // Handle form submission
+            async function handleSubmit(e) {
+                e.preventDefault();
+                
+                const errorEl = document.getElementById('duplicate-dashboard-error');
+                const submitBtn = document.getElementById('duplicate-dashboard-submit');
+                
+                if (!form || !errorEl || !submitBtn || !nameInput || !titleInput) return;
+                
+                const newName = nameInput.value.trim();
+                const newTitle = titleInput.value.trim();
+                
+                // Client-side validation
+                if (!newName) {
+                    errorEl.textContent = 'Dashboard name is required';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (!/^[a-zA-Z0-9_-]+$/.test(newName)) {
+                    errorEl.textContent = 'Dashboard name must contain only letters, numbers, hyphens, and underscores';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (newName.length < 1 || newName.length > 100) {
+                    errorEl.textContent = 'Dashboard name must be between 1 and 100 characters';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (!newTitle) {
+                    errorEl.textContent = 'Dashboard title is required';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                if (newTitle.length > 200) {
+                    errorEl.textContent = 'Title must be 200 characters or less';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                // Disable submit button
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Duplicating...';
+                errorEl.style.display = 'none';
+                
+                try {
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/duplicate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            new_name: newName,
+                            new_title: newTitle
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - redirect to new dashboard
+                        closeModal();
+                        window.location.href = `/dashboard/${encodeURIComponent(newName)}`;
+                    } else {
+                        // Error - show message
+                        errorEl.textContent = result.error || 'Failed to duplicate dashboard';
+                        errorEl.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Duplicate';
+                    }
+                } catch (error) {
+                    errorEl.textContent = 'Network error: Failed to duplicate dashboard';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Duplicate';
+                }
+            }
+            
+            // Attach event listeners
+            if (openButton) {
+                openButton.addEventListener('click', openModal);
+            }
+            
+            closeButtons.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', closeModal);
+                }
+            });
+            
+            if (overlay) {
+                overlay.addEventListener('click', closeModal);
+            }
+            
+            if (form) {
+                form.addEventListener('submit', handleSubmit);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+        }
+        
+        // Initialize duplicate dashboard modal
+        initDuplicateDashboardModal();
         
         // Update all timestamps periodically
         setInterval(() => {

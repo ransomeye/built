@@ -1,5 +1,5 @@
 {
-  "created": "2026-01-05T09:32:30.066852Z",
+  "created": "2026-01-07T07:51:04.215285Z",
   "manifest_version": "1.0.0",
   "models": [
     {
@@ -12,13 +12,13 @@
       ],
       "f1_score": 1.0,
       "features": 256,
-      "hash": "sha256:78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+      "hash": "sha256:5210a7c441a2d768b417a69848009f5d70bdc6a6390a7a61923f69ea3084c893",
       "name": "ransomware_behavior.model",
       "precision": 1.0,
       "recall": 1.0,
       "shap_file": "baseline_pack/shap/ransomware_behavior_shap.json",
       "shap_required": true,
-      "training_data_hash": "sha256:4f95e3679f1aa2328a83e224c8696e6b79fba11c5c1504e1f12319b4625395c6",
+      "training_data_hash": "sha256:447228e9d5a9574a483892ad5f32104d8392129e8c65b42b3277106ad0a15025",
       "type": "behavior_classifier",
       "version": "1.0.0"
     },
@@ -26,27 +26,27 @@
       "algorithm": "isolation_forest",
       "contamination": 0.01,
       "features": 128,
-      "hash": "sha256:10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+      "hash": "sha256:0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
       "name": "anomaly_baseline.model",
       "shap_file": "baseline_pack/shap/anomaly_baseline_shap.json",
       "shap_required": true,
-      "training_data_hash": "sha256:d94cb7579829acb81c7a6e5edbc337068df19f35e78e811b3426bace96b8548d",
+      "training_data_hash": "sha256:866a8d70299b9cdb965e9d1aed0a4f41a1be6adae15f0ef12e3e743dff34af65",
       "type": "anomaly_detector",
       "version": "1.0.0"
     },
     {
       "algorithm": "platt_scaling",
       "features": 64,
-      "hash": "sha256:c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+      "hash": "sha256:a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
       "name": "confidence_calibration.model",
       "shap_file": "baseline_pack/shap/confidence_calibration_shap.json",
       "shap_required": true,
-      "training_data_hash": "sha256:928958fc7fb1b2b6170a2cf5c9a2ac92e46ce378449977f05c87dacceb14a5bf",
+      "training_data_hash": "sha256:ed1bcd2ca49221ee6f1beac20e0dfe92722869b358db2b214726591612f05744",
       "type": "calibration",
       "version": "1.0.0"
     }
   ],
-  "pack_hash": "sha256:8003f83ba2b1f74293b7c5921fe324308e5e53d137974ae234165e9c07a3c7e4",
+  "pack_hash": "sha256:6f23052b35ac988a14a64fa2e453c023dc6b85167109191f333c98006d1e8e1c",
   "pack_name": "RansomEye Baseline Intelligence Pack",
   "pack_version": "1.0.0",
   "signature": {
@@ -56,6 +56,6 @@
     "timestamp": "2025-12-31T08:30:31.247881Z"
   },
   "signer": "policy",
-  "trained_on": "2026-01-05T09:32:30.066873Z",
+  "trained_on": "2026-01-07T07:51:04.215297Z",
   "training_methodology": "synthetic_and_redteam"
 }

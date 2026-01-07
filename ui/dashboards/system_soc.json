@@ -2,6 +2,7 @@
   "name": "system_soc",
   "title": "System SOC Dashboard",
   "description": "Primary security operations center dashboard with sensor coverage, event pipeline, security signals, recent events, and integrity status",
+  "folder_id": "general",
   "panels": [
     {
       "id": "sensor_coverage",

@@ -1040,53 +1040,83 @@
             if (!dashboardListEl) return;
             
             try {
-                // Fetch dashboard list
-                const response = await fetch('/api/dashboards');
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                // Fetch folders and dashboards in parallel
+                const [foldersResponse, dashboardsResponse] = await Promise.all([
+                    fetch('/api/dashboard-folders'),
+                    fetch('/api/dashboards')
+                ]);
+                
+                if (!foldersResponse.ok || !dashboardsResponse.ok) {
+                    throw new Error(`HTTP ${foldersResponse.status} or ${dashboardsResponse.status}`);
                 }
                 
-                const data = await response.json();
-                const dashboardNames = data.dashboards || [];
+                const folders = await foldersResponse.json();
+                const dashboardsData = await dashboardsResponse.json();
+                const dashboardsWithFolders = dashboardsData.dashboards_with_folders || [];
                 
-                // Fetch full dashboard definitions to get categories
+                // Fetch full dashboard definitions for titles
                 const dashboardDefs = await Promise.all(
-                    dashboardNames.map(async (name) => {
+                    dashboardsWithFolders.map(async (dashInfo) => {
                         try {
-                            const defResponse = await fetch(`/api/dashboards/${name}`);
+                            const defResponse = await fetch(`/api/dashboards/${dashInfo.name}`);
                             if (defResponse.ok) {
-                                return await defResponse.json();
+                                const def = await defResponse.json();
+                                return {
+                                    name: dashInfo.name,
+                                    title: def.title || dashInfo.name,
+                                    folder_id: dashInfo.folder_id || 'general'
+                                };
                             }
                         } catch (e) {
-                            console.debug(`Failed to fetch dashboard ${name}:`, e);
+                            console.debug(`Failed to fetch dashboard ${dashInfo.name}:`, e);
                         }
                         // Fallback: minimal definition
-                        return { name, title: name, category: null };
+                        return {
+                            name: dashInfo.name,
+                            title: dashInfo.name,
+                            folder_id: dashInfo.folder_id || 'general'
+                        };
                     })
                 );
                 
-                // Group by category
-                const grouped = {};
+                // Create folder map for quick lookup
+                const folderMap = {};
+                folders.forEach(folder => {
+                    folderMap[folder.id] = folder;
+                });
+                
+                // Group dashboards by folder_id
+                const groupedByFolder = {};
                 dashboardDefs.forEach(dash => {
-                    const category = dash.category || dash.type || 'General';
-                    if (!grouped[category]) {
-                        grouped[category] = [];
+                    const folderId = dash.folder_id || 'general';
+                    if (!groupedByFolder[folderId]) {
+                        groupedByFolder[folderId] = [];
                     }
-                    grouped[category].push(dash);
+                    groupedByFolder[folderId].push(dash);
                 });
                 
-                // Sort categories alphabetically, but put "General" first
-                const categories = Object.keys(grouped).sort((a, b) => {
-                    if (a === 'General') return -1;
-                    if (b === 'General') return 1;
-                    return a.localeCompare(b);
+                // Sort folders by order
+                const sortedFolders = folders.slice().sort((a, b) => {
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    return a.name.localeCompare(b.name);
                 });
                 
-                // Render grouped dashboards (SOC Dashboard link already exists, so append others)
+                // Render folders with dashboards (SOC Dashboard link already exists, so append others)
                 let html = '';
-                categories.forEach(category => {
-                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(category)}</div></li>`;
-                    grouped[category].forEach(dash => {
+                sortedFolders.forEach(folder => {
+                    const dashboards = groupedByFolder[folder.id] || [];
+                    if (dashboards.length === 0) {
+                        // Skip empty folders for now
+                        return;
+                    }
+                    
+                    // Folder header
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(folder.name)}</div></li>`;
+                    
+                    // Dashboards in folder
+                    dashboards.forEach(dash => {
                         const title = dash.title || dash.name;
                         const href = `/dashboard/${escapeHtml(dash.name)}`;
                         html += `
@@ -1097,6 +1127,25 @@
                             </li>
                         `;
                     });
+                });
+                
+                // Handle dashboards with unknown folder_id (fail-soft: show in General)
+                const knownFolderIds = new Set(folders.map(f => f.id));
+                Object.keys(groupedByFolder).forEach(folderId => {
+                    if (!knownFolderIds.has(folderId) && groupedByFolder[folderId].length > 0) {
+                        html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">General</div></li>`;
+                        groupedByFolder[folderId].forEach(dash => {
+                            const title = dash.title || dash.name;
+                            const href = `/dashboard/${escapeHtml(dash.name)}`;
+                            html += `
+                                <li class="sidebar-nav-item">
+                                    <a href="${href}" class="sidebar-nav-link">
+                                        ${escapeHtml(title)}
+                                    </a>
+                                </li>
+                            `;
+                        });
+                    }
                 });
                 
                 // Replace the "Loading..." item with actual dashboards

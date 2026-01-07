@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-01-07T08:29:29.389662Z",
+  "project_root": "/home/ransomeye/rebuild",
+  "training_config": {
+    "baseline_pack": {
+      "enabled": false,
+      "use_feeds": true,
+      "n_samples": 100000
+    },
+    "risk_model": {
+      "enabled": true,
+      "n_samples": 10000
+    },
+    "threat_correlation": {
+      "enabled": true,
+      "n_samples": 50000
+    },
+    "forensic_malware_dna": {
+      "enabled": true,
+      "n_samples": 30000
+    },
+    "threat_intel_trust": {
+      "enabled": true,
+      "n_samples": 40000
+    },
+    "dpi_probe_classifier": {
+      "enabled": true,
+      "n_samples": 60000
+    },
+    "rag_index": {
+      "enabled": false,
+      "rebuild": true
+    },
+    "shap_generation": {
+      "enabled": true,
+      "n_samples": 1000
+    }
+  },
+  "results": {
+    "baseline_pack": false,
+    "risk_model": true,
+    "threat_correlation": true,
+    "forensic_malware_dna": true,
+    "threat_intel_trust": true,
+    "dpi_probe_classifier": true,
+    "rag_index": false,
+    "shap_generation": true
+  },
+  "trained_models": [
+    {
+      "module": "risk_model",
+      "models": [
+        "risk_model"
+      ],
+      "status": "success"
+    },
+    {
+      "module": "threat_correlation",
+      "models": [
+        "confidence_predictor"
+      ],
+      "status": "success"
+    },
+    {
+      "module": "forensic",
+      "models": [
+        "malware_dna"
+      ],
+      "status": "success"
+    },
+    {
+      "module": "threat_intel",
+      "models": [
+        "trust_scorer",
+        "ioc_clusterer"
+      ],
+      "status": "success"
+    },
+    {
+      "module": "dpi_probe",
+      "models": [
+        "asset_classifier"
+      ],
+      "status": "success"
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "success_count": 6,
+    "total_count": 8,
+    "success_rate": 0.75
+  }
+}

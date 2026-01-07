@@ -9,21 +9,21 @@
           {
             "name": "ransomware_behavior.model",
             "version": "1.0.0",
-            "hash": "sha256:78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+            "hash": "sha256:5210a7c441a2d768b417a69848009f5d70bdc6a6390a7a61923f69ea3084c893",
             "has_shap": true,
             "trained_on": "unknown"
           },
           {
             "name": "anomaly_baseline.model",
             "version": "1.0.0",
-            "hash": "sha256:10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+            "hash": "sha256:0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
             "has_shap": true,
             "trained_on": "unknown"
           },
           {
             "name": "confidence_calibration.model",
             "version": "1.0.0",
-            "hash": "sha256:c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+            "hash": "sha256:a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
             "has_shap": true,
             "trained_on": "unknown"
           }
@@ -40,8 +40,8 @@
         "model_name": "anomaly_baseline",
         "file_path": "ransomeye_intelligence/baseline_pack/models/anomaly_baseline.model",
         "exists": true,
-        "size_bytes": 1036071,
-        "hash": "10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+        "size_bytes": 1001196,
+        "hash": "0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -54,8 +54,8 @@
         "model_name": "confidence_calibration",
         "file_path": "ransomeye_intelligence/baseline_pack/models/confidence_calibration.model",
         "exists": true,
-        "size_bytes": 9852757,
-        "hash": "c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+        "size_bytes": 9922981,
+        "hash": "a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -68,8 +68,8 @@
         "model_name": "ransomware_behavior",
         "file_path": "ransomeye_intelligence/baseline_pack/models/ransomware_behavior.model",
         "exists": true,
-        "size_bytes": 3114228,
-        "hash": "78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+        "size_bytes": 3108596,
+        "hash": "5210a7c441a2d768b417a69848009f5d70bdc6a6390a7a61923f69ea3084c893",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -81,7 +81,7 @@
         "manifest_path": "core/ai/models/models.manifest.json",
         "exists": true,
         "models": [],
-        "has_signature": true,
+        "has_signature": false,
         "has_training_date": true,
         "issues": []
       }
@@ -94,7 +94,7 @@
         "file_path": "core/ai/models/risk_model.model",
         "exists": true,
         "size_bytes": 1055801,
-        "hash": "e21b1bd9622c351c8d08513129287f1249d67138ee335f20200b2e9bc7c69ca9",
+        "hash": "1236cb4a402d16a441276b3679d60deb8314a6691b5319b60006864fedae11a0",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -172,7 +172,9 @@
       "knowledge_base_exists": true,
       "has_real_hash": true,
       "has_chunks": true,
-      "issues": []
+      "issues": [
+        "RAG index file suspiciously small: 320 bytes"
+      ]
     }
   ],
   "issues": [],

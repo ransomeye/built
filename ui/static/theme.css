@@ -559,6 +559,60 @@ body.density-compact .sidebar-divider {
     margin: 0;
 }
 
+/* Dashboard Source Badge (Read-Only Indicator) */
+.dashboard-source-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.2;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    transition: all var(--transition-base);
+    cursor: help;
+    user-select: none;
+    margin-left: var(--spacing-sm);
+    opacity: 0.8;
+}
+
+.dashboard-source-badge:hover {
+    opacity: 1;
+    border-color: var(--border-secondary);
+}
+
+.dashboard-source-badge-text {
+    display: inline-block;
+}
+
+/* Source type variants (subtle, non-intrusive) */
+.dashboard-source-badge.dashboard-source-system {
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+.dashboard-source-badge.dashboard-source-user {
+    color: var(--status-text-info);
+    background: var(--status-bg-info);
+    border-color: var(--status-info);
+}
+
+.dashboard-source-badge.dashboard-source-merged {
+    color: var(--status-text-info);
+    background: var(--status-bg-info);
+    border-color: var(--status-info);
+}
+
+/* Density adjustments */
+body.density-compact .dashboard-source-badge {
+    padding: 2px var(--spacing-xs);
+    font-size: calc(var(--font-size-xs) * 0.9);
+    margin-left: var(--spacing-xs);
+}
+
 .header-status-group {
     display: flex;
     align-items: center;
@@ -616,6 +670,802 @@ body.density-compact .sidebar-divider {
 /* Density adjustments for edit mode toggle */
 body.density-compact .edit-mode-toggle {
     padding: calc(var(--spacing-xs) * 0.75) calc(var(--spacing-sm) * 0.75);
+    font-size: calc(var(--font-size-sm) * 0.9);
+}
+
+/* ============================================================
+   ADD PANEL BUTTON (Edit Mode Only)
+   ============================================================ */
+.add-panel-button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.add-panel-button:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.add-panel-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.add-panel-button:active {
+    transform: scale(0.98);
+}
+
+.add-panel-icon {
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    font-weight: var(--font-weight-bold);
+}
+
+.add-panel-label {
+    font-size: var(--font-size-sm);
+}
+
+/* Density adjustments for add panel button */
+body.density-compact .add-panel-button {
+    padding: calc(var(--spacing-xs) * 0.75) calc(var(--spacing-sm) * 0.75);
+    font-size: calc(var(--font-size-sm) * 0.9);
+}
+
+/* ============================================================
+   SAVE DASHBOARD BUTTON (Edit Mode Only)
+   ============================================================ */
+.save-dashboard-button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.save-dashboard-button:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.save-dashboard-button:focus:not(:disabled) {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.save-dashboard-button:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.save-dashboard-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.save-dashboard-button:not(:disabled) {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.save-dashboard-icon {
+    font-size: var(--font-size-base);
+    line-height: 1;
+}
+
+.save-dashboard-label {
+    font-size: var(--font-size-sm);
+}
+
+/* Density adjustments for save button */
+body.density-compact .save-dashboard-button {
+    padding: calc(var(--spacing-xs) * 0.75) calc(var(--spacing-sm) * 0.75);
+    font-size: calc(var(--font-size-sm) * 0.9);
+}
+
+/* ============================================================
+   CREATE DASHBOARD BUTTONS
+   ============================================================ */
+.create-dashboard-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.create-dashboard-button:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
+}
+
+.create-dashboard-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.create-dashboard-icon {
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    font-weight: var(--font-weight-bold);
+}
+
+.create-dashboard-label {
+    font-size: var(--font-size-sm);
+}
+
+.create-personal-copy-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.create-personal-copy-button:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.create-personal-copy-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.create-personal-copy-icon {
+    font-size: var(--font-size-base);
+    line-height: 1;
+}
+
+.create-personal-copy-label {
+    font-size: var(--font-size-sm);
+}
+
+.rename-dashboard-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.rename-dashboard-button:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.rename-dashboard-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.rename-dashboard-icon {
+    font-size: var(--font-size-base);
+    line-height: 1;
+}
+
+.rename-dashboard-label {
+    font-size: var(--font-size-sm);
+}
+
+/* ============================================================
+   CREATE DASHBOARD MODAL
+   ============================================================ */
+.create-dashboard-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.create-dashboard-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.create-dashboard-dialog {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.create-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.create-dashboard-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.create-dashboard-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    line-height: 1;
+    transition: color var(--transition-base);
+}
+
+.create-dashboard-close:hover {
+    color: var(--text-primary);
+}
+
+.create-dashboard-content {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    transition: all var(--transition-base);
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: -2px;
+    border-color: var(--border-focus);
+}
+
+.form-help {
+    display: block;
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.form-error {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background: var(--status-bg-warning);
+    border: 1px solid var(--status-warning);
+    border-radius: var(--radius);
+    color: var(--status-text-warning);
+    font-size: var(--font-size-sm);
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-end;
+    margin-top: var(--spacing-xl);
+}
+
+.button-primary,
+.button-secondary {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--radius);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+    border: 1px solid;
+}
+
+.button-primary {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.button-primary:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.button-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.button-secondary {
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
+    color: var(--text-secondary);
+}
+
+.button-secondary:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-secondary);
+    color: var(--text-primary);
+}
+
+/* Rename Dashboard Modal (reuses create dashboard modal styles) */
+.rename-dashboard-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.rename-dashboard-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.rename-dashboard-dialog {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.rename-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.rename-dashboard-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.rename-dashboard-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    line-height: 1;
+    transition: color var(--transition-base);
+}
+
+.rename-dashboard-close:hover {
+    color: var(--text-primary);
+}
+
+.rename-dashboard-content {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Duplicate Dashboard Button (reuses rename button styles) */
+.duplicate-dashboard-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.duplicate-dashboard-button:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.duplicate-dashboard-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.duplicate-dashboard-icon {
+    font-size: var(--font-size-base);
+    line-height: 1;
+}
+
+.duplicate-dashboard-label {
+    font-size: var(--font-size-sm);
+}
+
+/* Duplicate Dashboard Modal (reuses rename modal styles) */
+.duplicate-dashboard-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.duplicate-dashboard-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.duplicate-dashboard-dialog {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.duplicate-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.duplicate-dashboard-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.duplicate-dashboard-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xl);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    line-height: 1;
+    transition: color var(--transition-base);
+}
+
+.duplicate-dashboard-close:hover {
+    color: var(--text-primary);
+}
+
+.duplicate-dashboard-content {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* ============================================================
+   PANEL REMOVE BUTTON (Edit Mode Only)
+   ============================================================ */
+.panel-remove-button {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    margin-left: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+body.edit-mode .panel-remove-button {
+    display: flex;
+}
+
+.panel-remove-button:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.panel-remove-button:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.panel-remove-button:active {
+    transform: scale(0.95);
+}
+
+/* Density adjustments for remove button */
+body.density-compact .panel-remove-button {
+    width: 20px;
+    height: 20px;
+    font-size: var(--font-size-sm);
+}
+
+/* ============================================================
+   PANEL PICKER MODAL (Edit Mode Only)
+   ============================================================ */
+.panel-picker-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-base), visibility var(--transition-base);
+    pointer-events: none;
+}
+
+.panel-picker-modal.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.panel-picker-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.panel-picker-drawer {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 2001;
+    transform: translateY(20px);
+    transition: transform var(--transition-base);
+}
+
+.panel-picker-modal.active .panel-picker-drawer {
+    transform: translateY(0);
+}
+
+.panel-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-primary);
+    flex-shrink: 0;
+}
+
+.panel-picker-header h2 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.panel-picker-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.panel-picker-close:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.panel-picker-close:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.panel-picker-content {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.panel-picker-item {
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.panel-picker-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.panel-picker-item:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.panel-picker-item-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.panel-picker-item-description {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+    line-height: var(--line-height);
+}
+
+.panel-picker-item-size {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-family: var(--font-family-mono);
+}
+
+/* Density adjustments for panel picker */
+body.density-compact .panel-picker-header {
+    padding: var(--spacing-md);
+}
+
+body.density-compact .panel-picker-content {
+    padding: var(--spacing-md);
+    gap: var(--spacing-sm);
+}
+
+body.density-compact .panel-picker-item {
+    padding: var(--spacing-sm);
+}
+
+body.density-compact .panel-picker-item-title {
+    font-size: var(--font-size-sm);
+}
+
+body.density-compact .panel-picker-item-description {
     font-size: calc(var(--font-size-sm) * 0.9);
 }
 

@@ -1,0 +1,12 @@
+{
+  "model_name": "confidence_predictor",
+  "model_version": "1.0.0",
+  "model_hash": "43d281bccab9288a83a35dbc4ae8564da16238193e6b92f31a1b6d2c5093f602",
+  "model_size_bytes": 477355,
+  "trained_on": "2026-01-07T08:25:32.742498Z",
+  "model_type": "GradientBoostingRegressor",
+  "mse": 0.0008888929531765915,
+  "r2_score": 0.9522758595035868,
+  "n_features": 128,
+  "n_samples": 50000
+}

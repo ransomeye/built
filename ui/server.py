@@ -23,6 +23,7 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from schema_helper import SchemaAwareDB
 from dashboard_engine import DashboardEngine
+from folder_manager import FolderManager
 from settings_manager import SettingsManager
 from settings import SettingsValidationError
 
@@ -46,6 +47,10 @@ LOGO_PATH = REBUILD_ROOT / 'core' / 'logo-removebg-preview.png'
 
 # Initialize dashboard engine
 dashboard_engine = DashboardEngine(DASHBOARDS_DIR)
+
+# Initialize folder manager
+FOLDERS_FILE = BASE_DIR / 'dashboard_folders.json'
+folder_manager = FolderManager(FOLDERS_FILE)
 
 # Configuration via environment variables
 DB_NAME = os.environ.get("DB_NAME", "ransomeye")
@@ -106,22 +111,447 @@ def dashboard_view(dashboard_name: str):
 
 @app.route('/api/dashboards')
 def list_dashboards():
-    """List all available dashboards."""
-    dashboards = dashboard_engine.list_dashboards()
+    """
+    List all available dashboards with folder assignments.
+    
+    Returns:
+        JSON with dashboards array (names) and dashboards_with_folders array (name + folder_id)
+    """
+    dashboard_names = dashboard_engine.list_dashboards()
+    dashboards_with_folders = dashboard_engine.list_dashboards_with_folders()
     return jsonify({
-        "dashboards": dashboards,
-        "count": len(dashboards)
+        "dashboards": dashboard_names,
+        "dashboards_with_folders": dashboards_with_folders,
+        "count": len(dashboard_names)
     })
 
 
-@app.route('/api/dashboards/<dashboard_name>')
-def get_dashboard_definition(dashboard_name: str):
-    """Get dashboard JSON definition."""
+@app.route('/api/dashboard-folders', methods=['GET'])
+def list_dashboard_folders():
+    """
+    List all dashboard folders (system-scoped).
+    
+    Returns:
+        JSON array of folder objects with id, name, description, order
+    """
+    try:
+        folders = folder_manager.list_folders()
+        return jsonify(folders)
+    except Exception as e:
+        logger.error(f"Error listing folders: {e}", exc_info=True)
+        return jsonify({"error": "Failed to list folders"}), 500
+
+
+@app.route('/api/dashboard-folders', methods=['POST'])
+def create_dashboard_folder():
+    """
+    Create a new dashboard folder (system-scoped, strict validation).
+    
+    Request body (JSON):
+        {
+            "id": "folder-id",  # Required, slug-safe
+            "name": "Folder Name",  # Required
+            "description": "Optional description",  # Optional
+            "order": 10  # Optional, integer for sorting
+        }
+    
+    Rules:
+    - Strict validation (reject unknown fields)
+    - Fail-closed on corruption
+    - Audit-log all changes
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        folder_data = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in folder creation request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not folder_data:
+        return jsonify({"error": "Folder data is required"}), 400
+    
+    # Reject unknown fields (strict whitelist)
+    allowed_fields = {'id', 'name', 'description', 'order'}
+    for field in folder_data.keys():
+        if field not in allowed_fields:
+            logger.warning(f"Rejecting unknown field in folder creation: {field}")
+            return jsonify({"error": f"Unknown field: {field}"}), 400
+    
+    # Create folder
+    success, error_msg = folder_manager.create_folder(folder_data)
+    
+    if success:
+        folder = folder_manager.get_folder(folder_data['id'])
+        return jsonify({
+            "status": "success",
+            "message": f"Folder '{folder_data['id']}' created successfully",
+            "folder": folder
+        }), 201
+    else:
+        return jsonify({"error": error_msg or "Failed to create folder"}), 400
+
+
+@app.route('/api/dashboards/<dashboard_name>/move', methods=['POST'])
+def move_dashboard(dashboard_name: str):
+    """
+    Move a dashboard to a different folder.
+    
+    Request body (JSON):
+        {
+            "folder_id": "target-folder-id"  # Required
+        }
+    
+    Rules:
+    - Validate folder exists
+    - Fail-closed on invalid folder_id
+    - Audit-log all moves
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        data = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in move request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not data or 'folder_id' not in data:
+        return jsonify({"error": "folder_id is required"}), 400
+    
+    folder_id = data['folder_id']
+    
+    # Validate folder exists
+    folder = folder_manager.get_folder(folder_id)
+    if not folder:
+        return jsonify({"error": f"Folder '{folder_id}' not found"}), 404
+    
+    # Load dashboard
     dashboard = dashboard_engine.load_dashboard(dashboard_name)
     if not dashboard:
         return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
     
+    # Update folder_id
+    dashboard['folder_id'] = folder_id
+    
+    # Save dashboard
+    if dashboard_engine.save_dashboard(dashboard, dashboard_name):
+        logger.info(f"Moved dashboard '{dashboard_name}' to folder '{folder_id}'")
+        return jsonify({
+            "status": "success",
+            "message": f"Dashboard '{dashboard_name}' moved to folder '{folder_id}'",
+            "dashboard": dashboard_name,
+            "folder_id": folder_id
+        })
+    else:
+        return jsonify({"error": "Failed to save dashboard after move"}), 500
+
+
+@app.route('/api/dashboards/<dashboard_name>')
+def get_dashboard_definition(dashboard_name: str):
+    """
+    Get dashboard JSON definition (with user overlay merged if present).
+    
+    Returns:
+        Dashboard JSON with user overlay applied (if exists)
+    """
+    dashboard = dashboard_engine.load_dashboard(dashboard_name, include_overlay=True)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
     return jsonify(dashboard)
+
+
+@app.route('/api/dashboards/<dashboard_name>/source', methods=['GET'])
+def get_dashboard_source(dashboard_name: str):
+    """
+    Get dashboard source information (system vs user overlay).
+    
+    Returns:
+        JSON with source information:
+        {
+            "source": "system" | "user" | "merged" | "none",
+            "has_overlay": bool,
+            "has_system": bool,
+            "user_id": str | null
+        }
+    """
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    return jsonify(source_info)
+
+
+@app.route('/api/dashboards/<dashboard_name>/duplicate', methods=['POST'])
+def duplicate_dashboard(dashboard_name: str):
+    """
+    Duplicate a personal dashboard into a new personal dashboard.
+    
+    Request body (JSON):
+        {
+            "new_name": "dashboard-name-copy",  # Required, slug-safe
+            "new_title": "Dashboard Title (Copy)"  # Required, 1-200 characters
+        }
+    
+    Rules:
+    - Only personal dashboards can be duplicated
+    - System dashboards cannot be duplicated (fail-closed)
+    - Source dashboard remains unchanged
+    - New dashboard must have unique name (system + user overlays)
+    - Fail-closed on collisions or invalid input
+    - Audit-log duplication event
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        data = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in duplicate request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    if 'new_name' not in data or not data['new_name']:
+        return jsonify({"error": "new_name is required"}), 400
+    
+    if 'new_title' not in data or not data['new_title']:
+        return jsonify({"error": "new_title is required"}), 400
+    
+    new_name = data['new_name'].strip()
+    new_title = data['new_title'].strip()
+    
+    # Validate name (slug-safe: alphanumeric, hyphens, underscores only)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', new_name):
+        return jsonify({
+            "error": "Dashboard name must contain only letters, numbers, hyphens, and underscores"
+        }), 400
+    
+    if len(new_name) < 1 or len(new_name) > 100:
+        return jsonify({"error": "Dashboard name must be between 1 and 100 characters"}), 400
+    
+    if len(new_title) < 1 or len(new_title) > 200:
+        return jsonify({"error": "Dashboard title must be between 1 and 200 characters"}), 400
+    
+    # Check if source dashboard is a personal dashboard (has overlay)
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can be duplicated
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot be duplicated"
+        }), 403
+    
+    # Check for collision with system dashboard
+    system_dashboard_path = DASHBOARDS_DIR / f"{new_name}.json"
+    if system_dashboard_path.exists():
+        return jsonify({
+            "error": f"Dashboard name '{new_name}' conflicts with a system dashboard"
+        }), 409
+    
+    # Check for collision with existing user overlay
+    if dashboard_engine.overlay_manager.has_overlay(new_name, user_id):
+        return jsonify({
+            "error": f"Dashboard '{new_name}' already exists"
+        }), 409
+    
+    # Duplicate dashboard
+    success = dashboard_engine.overlay_manager.duplicate_dashboard(
+        source_dashboard_name=dashboard_name,
+        new_dashboard_name=new_name,
+        new_title=new_title,
+        user_id=user_id
+    )
+    
+    if not success:
+        return jsonify({
+            "error": "Failed to duplicate dashboard (internal error)"
+        }), 500
+    
+    logger.info(f"Duplicated personal dashboard '{dashboard_name}' to '{new_name}' (user: {user_id})")
+    
+    return jsonify({
+        "status": "success",
+        "message": f"Dashboard '{dashboard_name}' duplicated to '{new_name}' successfully",
+        "dashboard": new_name,
+        "source": "user_overlay"
+    }), 201
+
+
+@app.route('/api/dashboards/<dashboard_name>/rename', methods=['POST'])
+def rename_dashboard(dashboard_name: str):
+    """
+    Rename a personal dashboard (title only, slug remains unchanged).
+    
+    Request body (JSON):
+        {
+            "new_title": "New Dashboard Title"  # Required, 1-200 characters
+        }
+    
+    Rules:
+    - Only personal dashboards can be renamed
+    - System dashboards cannot be renamed (fail-closed)
+    - Dashboard name (slug) remains immutable
+    - Only title is updated
+    - Audit-log rename event
+    - Fail-closed on invalid input
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        data = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in rename request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not data or 'new_title' not in data:
+        return jsonify({"error": "new_title is required"}), 400
+    
+    new_title = data['new_title'].strip()
+    
+    # Validate title length
+    if len(new_title) < 1 or len(new_title) > 200:
+        return jsonify({"error": "Title must be between 1 and 200 characters"}), 400
+    
+    # Check if dashboard is a personal dashboard (has overlay)
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can be renamed
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot be renamed"
+        }), 403
+    
+    # Load current dashboard (will include overlay)
+    dashboard = dashboard_engine.load_dashboard(dashboard_name, include_overlay=True)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    # Update title only
+    dashboard['title'] = new_title
+    
+    # Save as overlay (only updates overlay, never system)
+    if dashboard_engine.save_dashboard(dashboard, dashboard_name, save_as_overlay=True):
+        logger.info(f"Renamed personal dashboard '{dashboard_name}' to '{new_title}' (user: {user_id})")
+        
+        # Audit log via overlay manager
+        dashboard_engine.overlay_manager._audit_log(
+            'rename_dashboard', user_id, dashboard_name, 
+            success=True, error=f"new_title:{new_title}"
+        )
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Dashboard '{dashboard_name}' renamed successfully",
+            "dashboard": dashboard_name,
+            "new_title": new_title
+        })
+    else:
+        return jsonify({"error": "Failed to save dashboard after rename"}), 500
+
+
+@app.route('/api/dashboards/create', methods=['POST'])
+def create_dashboard():
+    """
+    Create a new personal dashboard.
+    
+    Request body (JSON):
+        {
+            "name": "dashboard-name",  # Required, slug-safe
+            "title": "Dashboard Title",  # Required
+            "source_dashboard": "system_soc"  # Optional, system dashboard to use as template
+        }
+    
+    Rules:
+    - Validate name (slug-safe, non-empty)
+    - Check for collisions (fail-closed)
+    - Create from template or blank
+    - Audit-log creation
+    - Fail-closed on invalid input
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        data = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in create request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not data:
+        return jsonify({"error": "Request body is required"}), 400
+    
+    # Validate required fields
+    if 'name' not in data or not data['name']:
+        return jsonify({"error": "Dashboard name is required"}), 400
+    
+    if 'title' not in data or not data['title']:
+        return jsonify({"error": "Dashboard title is required"}), 400
+    
+    dashboard_name = data['name'].strip()
+    title = data['title'].strip()
+    source_dashboard = data.get('source_dashboard', '').strip() or None
+    
+    # Validate name (slug-safe: alphanumeric, hyphens, underscores only)
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', dashboard_name):
+        return jsonify({
+            "error": "Dashboard name must contain only letters, numbers, hyphens, and underscores"
+        }), 400
+    
+    if len(dashboard_name) < 1 or len(dashboard_name) > 100:
+        return jsonify({"error": "Dashboard name must be between 1 and 100 characters"}), 400
+    
+    if len(title) < 1 or len(title) > 200:
+        return jsonify({"error": "Dashboard title must be between 1 and 200 characters"}), 400
+    
+    # Check for collision with system dashboard
+    system_dashboard_path = DASHBOARDS_DIR / f"{dashboard_name}.json"
+    if system_dashboard_path.exists():
+        return jsonify({
+            "error": f"Dashboard name '{dashboard_name}' conflicts with a system dashboard"
+        }), 409
+    
+    # Check for collision with existing user overlay
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    if dashboard_engine.overlay_manager.has_overlay(dashboard_name, user_id):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' already exists"
+        }), 409
+    
+    # Validate source dashboard if provided
+    if source_dashboard:
+        source_path = DASHBOARDS_DIR / f"{source_dashboard}.json"
+        if not source_path.exists():
+            return jsonify({
+                "error": f"Source dashboard '{source_dashboard}' not found"
+            }), 404
+    
+    # Create dashboard
+    success = dashboard_engine.overlay_manager.create_personal_dashboard(
+        dashboard_name=dashboard_name,
+        title=title,
+        source_dashboard=source_dashboard,
+        user_id=user_id
+    )
+    
+    if not success:
+        return jsonify({
+            "error": "Failed to create dashboard (internal error)"
+        }), 500
+    
+    logger.info(f"Created personal dashboard '{dashboard_name}' (user: {user_id}, source: {source_dashboard or 'blank'})")
+    
+    return jsonify({
+        "status": "success",
+        "message": f"Dashboard '{dashboard_name}' created successfully",
+        "dashboard": dashboard_name,
+        "source": "user_overlay"
+    }), 201
 
 
 @app.route('/api/dashboards/<dashboard_name>/panels')
@@ -150,6 +580,68 @@ def get_dashboard_panels(dashboard_name: str):
         "panels": panels_info,
         "refresh_intervals": refresh_intervals
     })
+
+
+@app.route('/api/dashboards/<dashboard_name>/save', methods=['POST'])
+def save_dashboard(dashboard_name: str):
+    """
+    Save dashboard definition as user overlay (never modifies system dashboards).
+    
+    Rules:
+    - Always saves as user overlay (never overwrites system dashboards)
+    - Validate incoming JSON strictly
+    - Reject unknown fields
+    - Reject invalid grid values
+    - Fail-closed on any schema violation
+    - Write atomically with backup
+    - Full audit logging
+    """
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    try:
+        dashboard = request.get_json()
+    except Exception as e:
+        logger.error(f"Invalid JSON in save request: {e}")
+        return jsonify({"error": "Invalid JSON"}), 400
+    
+    if not dashboard:
+        return jsonify({"error": "Dashboard definition is required"}), 400
+    
+    # Ensure dashboard name matches URL parameter
+    if dashboard.get('name') != dashboard_name:
+        logger.warning(f"Dashboard name mismatch: URL={dashboard_name}, JSON={dashboard.get('name')}")
+        dashboard['name'] = dashboard_name
+    
+    # Ensure folder_id exists (default to 'general' if missing)
+    if 'folder_id' not in dashboard:
+        dashboard['folder_id'] = 'general'
+    
+    # Validate folder_id exists
+    folder = folder_manager.get_folder(dashboard['folder_id'])
+    if not folder:
+        logger.warning(f"Dashboard '{dashboard_name}' references unknown folder '{dashboard['folder_id']}', defaulting to 'general'")
+        dashboard['folder_id'] = 'general'
+    
+    # Get user ID for audit logging
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Safety check: Never allow saving to system dashboard path
+    system_dashboard_path = DASHBOARDS_DIR / f"{dashboard_name}.json"
+    if system_dashboard_path.exists():
+        logger.info(f"Saving dashboard '{dashboard_name}' as user overlay (user: {user_id}) - system dashboard preserved")
+    
+    # Validate and save as user overlay (default behavior)
+    if dashboard_engine.save_dashboard(dashboard, dashboard_name, save_as_overlay=True):
+        logger.info(f"Saved dashboard '{dashboard_name}' as user overlay (user: {user_id})")
+        return jsonify({
+            "status": "success",
+            "message": f"Dashboard '{dashboard_name}' saved as user overlay",
+            "dashboard": dashboard_name,
+            "source": "user_overlay"
+        })
+    else:
+        return jsonify({"error": "Failed to save dashboard (validation or write error)"}), 400
 
 
 @app.route('/api/health')
