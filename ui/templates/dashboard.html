@@ -9,38 +9,222 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }} - RansomEye</title>
     <link rel="stylesheet" href="/static/theme.css">
+    <script>
+        // ============================================================
+        // UI SETTINGS APPLICATION (Non-blocking, Fail-Soft)
+        // ============================================================
+        // Fetches and applies UI appearance settings on page load
+        // Fails silently to defaults if API unavailable
+        
+        (function() {
+            // Default settings (fail-safe fallback)
+            const defaults = {
+                theme: 'soc_dark',
+                density: 'comfortable',
+                font_size: 'medium'
+            };
+            
+            // Font size scaling map
+            const fontScaleMap = {
+                'small': 0.875,
+                'medium': 1.0,
+                'large': 1.125
+            };
+            
+            // Apply settings to DOM (non-blocking, synchronous)
+            function applySettings(settings) {
+                const html = document.documentElement;
+                const body = document.body;
+                
+                // Apply theme
+                const theme = settings.theme || defaults.theme;
+                html.setAttribute('data-theme', theme);
+                
+                // Apply density
+                const density = settings.density || defaults.density;
+                // Remove existing density classes
+                body.classList.remove('density-compact', 'density-comfortable');
+                body.classList.add(`density-${density}`);
+                
+                // Apply font size scaling
+                const fontSize = settings.font_size || defaults.font_size;
+                const scale = fontScaleMap[fontSize] || fontScaleMap.medium;
+                document.documentElement.style.setProperty('--font-scale', scale.toString());
+            }
+            
+            // Fetch settings (non-blocking, async)
+            async function loadSettings() {
+                try {
+                    const response = await fetch('/api/ui/settings', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const settings = await response.json();
+                        applySettings(settings);
+                        // Cache settings in sessionStorage for consistency
+                        try {
+                            sessionStorage.setItem('ransomeye_ui_settings', JSON.stringify(settings));
+                        } catch (e) {
+                            // Ignore sessionStorage errors (private browsing, etc.)
+                        }
+                    } else {
+                        // Fallback to defaults on non-OK response
+                        applySettings(defaults);
+                    }
+                } catch (error) {
+                    // Fail-soft: use defaults on any error (network, timeout, etc.)
+                    console.debug('UI settings fetch failed, using defaults:', error);
+                    applySettings(defaults);
+                    
+                    // Try to use cached settings from sessionStorage
+                    try {
+                        const cached = sessionStorage.getItem('ransomeye_ui_settings');
+                        if (cached) {
+                            const settings = JSON.parse(cached);
+                            applySettings(settings);
+                        }
+                    } catch (e) {
+                        // Ignore cache errors
+                    }
+                }
+            }
+            
+            // Apply defaults immediately (prevents flash of unstyled content)
+            applySettings(defaults);
+            
+            // Fetch and apply actual settings (non-blocking)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadSettings);
+            } else {
+                // DOM already loaded, fetch immediately
+                loadSettings();
+            }
+        })();
+    </script>
 </head>
 <body>
-    <!-- Global Header -->
-    <header class="global-header">
-        <div class="header-brand">
-            <h1>RansomEye</h1>
-        </div>
-        <div class="header-status-group">
-            <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
-        </div>
-    </header>
-    
-    <!-- Dashboard Container -->
-    <div class="dashboard-container">
-        <div class="dashboard-title">{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</div>
-        {% if dashboard.description %}
-        <div style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
-            {{ dashboard.description }}
-        </div>
-        {% endif %}
+    <div class="app-layout">
+        <!-- Sidebar Toggle (Mobile Only) -->
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            ☰
+        </button>
         
-        <!-- Dashboard Grid -->
-        <div class="dashboard-grid" id="dashboard-grid">
-            <!-- Panels will be rendered here by JavaScript -->
-            <div class="panel-loading">Loading dashboard panels...</div>
-        </div>
+        <!-- Left Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Branding -->
+            <div class="sidebar-brand">
+                <a href="/" class="sidebar-brand-link">
+                    <img src="/logo.png" alt="RansomEye" class="sidebar-logo">
+                </a>
+            </div>
+            
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- Dashboards section will be populated by JavaScript -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Dashboards</div>
+                    <ul class="sidebar-nav-list" id="dashboard-list">
+                        <li class="sidebar-nav-item">
+                            <span class="sidebar-nav-link" style="color: var(--text-muted);">Loading...</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Divider -->
+                <hr class="sidebar-divider">
+                
+                <!-- Settings -->
+                <div class="sidebar-section">
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="#" class="sidebar-nav-link disabled">Settings</a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Administration -->
+                <div class="sidebar-section">
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="#" class="sidebar-nav-link disabled">Administration</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-content-header">
+                <div class="header-brand">
+                    <h1>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</h1>
+                </div>
+                <div class="header-status-group">
+                    <button 
+                        type="button" 
+                        id="add-panel-button" 
+                        class="add-panel-button" 
+                        aria-label="Add panel"
+                        title="Add panel (A)"
+                        style="display: none;">
+                        <span class="add-panel-icon">+</span>
+                        <span class="add-panel-label">Add Panel</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="edit-mode-toggle" 
+                        class="edit-mode-toggle" 
+                        aria-label="Toggle edit mode"
+                        aria-pressed="false"
+                        title="Toggle edit mode (E)">
+                        <span class="edit-mode-toggle-icon">✎</span>
+                        <span class="edit-mode-toggle-label">Edit</span>
+                    </button>
+                    <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
+                </div>
+            </header>
+            
+            <!-- Dashboard Content -->
+            <div class="main-content-body">
+                <div class="dashboard-container">
+                    {% if dashboard.description %}
+                    <div style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
+                        {{ dashboard.description }}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Dashboard Grid -->
+                    <div class="dashboard-grid" id="dashboard-grid">
+                        <!-- Panels will be rendered here by JavaScript -->
+                        <div class="panel-loading">Loading dashboard panels...</div>
+                    </div>
+                </div>
+                
+                <!-- Panel Picker Modal -->
+                <div class="panel-picker-modal" id="panel-picker-modal" role="dialog" aria-labelledby="panel-picker-title" aria-hidden="true">
+                    <div class="panel-picker-overlay"></div>
+                    <div class="panel-picker-drawer">
+                        <div class="panel-picker-header">
+                            <h2 id="panel-picker-title">Add Panel</h2>
+                            <button type="button" class="panel-picker-close" id="panel-picker-close" aria-label="Close panel picker">✕</button>
+                        </div>
+                        <div class="panel-picker-content" id="panel-picker-content">
+                            <!-- Panel templates will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <footer class="footer">
+                    © RansomEye.Tech | Support: Gagan@RansomEye.Tech
+                </footer>
+            </div>
+        </main>
     </div>
-    
-    <!-- Footer -->
-    <footer class="footer">
-        © RansomEye.Tech | Support: Gagan@RansomEye.Tech
-    </footer>
     
     <script>
         // ============================================================
@@ -108,13 +292,26 @@
             // Panel header
             const headerEl = document.createElement('div');
             headerEl.className = 'panel-header';
+            const removeButton = editModeActive ? '<button type="button" class="panel-remove-button" aria-label="Remove panel" title="Remove panel">✕</button>' : '';
             headerEl.innerHTML = `
                 <div class="panel-title">${escapeHtml(title)}</div>
                 <div class="panel-status-group">
                     <span class="status-badge status-${status}">${status}</span>
                     <span class="panel-timestamp" data-timestamp="${new Date().toISOString()}"></span>
+                    ${removeButton}
                 </div>
             `;
+            
+            // Attach remove handler if in edit mode
+            if (editModeActive) {
+                const removeBtn = headerEl.querySelector('.panel-remove-button');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleRemovePanel(panelEl);
+                    });
+                }
+            }
             
             // Panel body
             const bodyEl = document.createElement('div');
@@ -123,6 +320,12 @@
             
             panelEl.appendChild(headerEl);
             panelEl.appendChild(bodyEl);
+            
+            // Add resize handles for edit mode
+            if (editModeActive) {
+                addResizeHandles(panelEl);
+            }
+            
             gridEl.appendChild(panelEl);
             
             // Load panel data
@@ -130,6 +333,12 @@
             
             // Update timestamp
             updatePanelTimestamp(panelEl);
+            
+            // Apply edit mode class if active
+            if (editModeActive) {
+                panelEl.classList.add('edit-mode-panel');
+                initPanelDragResize(panelEl);
+            }
         }
         
         // ============================================================
@@ -296,8 +505,516 @@
         }
         
         // ============================================================
+        // SIDEBAR NAVIGATION
+        // ============================================================
+        
+        async function loadSidebarDashboards() {
+            const dashboardListEl = document.getElementById('dashboard-list');
+            if (!dashboardListEl) return;
+            
+            try {
+                // Fetch dashboard list
+                const response = await fetch('/api/dashboards');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const dashboardNames = data.dashboards || [];
+                
+                // Fetch full dashboard definitions to get categories
+                const dashboardDefs = await Promise.all(
+                    dashboardNames.map(async (name) => {
+                        try {
+                            const defResponse = await fetch(`/api/dashboards/${name}`);
+                            if (defResponse.ok) {
+                                return await defResponse.json();
+                            }
+                        } catch (e) {
+                            console.debug(`Failed to fetch dashboard ${name}:`, e);
+                        }
+                        // Fallback: minimal definition
+                        return { name, title: name, category: null };
+                    })
+                );
+                
+                // Group by category
+                const grouped = {};
+                dashboardDefs.forEach(dash => {
+                    const category = dash.category || dash.type || 'General';
+                    if (!grouped[category]) {
+                        grouped[category] = [];
+                    }
+                    grouped[category].push(dash);
+                });
+                
+                // Sort categories alphabetically, but put "General" first
+                const categories = Object.keys(grouped).sort((a, b) => {
+                    if (a === 'General') return -1;
+                    if (b === 'General') return 1;
+                    return a.localeCompare(b);
+                });
+                
+                // Render grouped dashboards
+                let html = '';
+                categories.forEach(category => {
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(category)}</div></li>`;
+                    grouped[category].forEach(dash => {
+                        const title = dash.title || dash.name;
+                        const isActive = dash.name === dashboardName;
+                        const href = `/dashboard/${escapeHtml(dash.name)}`;
+                        html += `
+                            <li class="sidebar-nav-item">
+                                <a href="${href}" class="sidebar-nav-link ${isActive ? 'active' : ''}">
+                                    ${escapeHtml(title)}
+                                </a>
+                            </li>
+                        `;
+                    });
+                });
+                
+                dashboardListEl.innerHTML = html;
+                
+            } catch (error) {
+                console.debug('Failed to load sidebar dashboards:', error);
+                dashboardListEl.innerHTML = `
+                    <li class="sidebar-nav-item">
+                        <span class="sidebar-nav-link" style="color: var(--text-muted);">Dashboards unavailable</span>
+                    </li>
+                `;
+            }
+        }
+        
+        // Sidebar toggle (mobile)
+        function initSidebarToggle() {
+            const toggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (toggle && sidebar) {
+                toggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('collapsed');
+                });
+                
+                // Close sidebar when clicking outside on mobile
+                document.addEventListener('click', (e) => {
+                    if (window.innerWidth <= 768 && 
+                        !sidebar.contains(e.target) && 
+                        !toggle.contains(e.target) &&
+                        !sidebar.classList.contains('collapsed')) {
+                        sidebar.classList.add('collapsed');
+                    }
+                });
+            }
+        }
+        
+        // ============================================================
+        // EDIT MODE MANAGEMENT
+        // ============================================================
+        
+        let editModeActive = false;
+        
+        function initEditMode() {
+            const toggle = document.getElementById('edit-mode-toggle');
+            const dashboardGrid = document.getElementById('dashboard-grid');
+            const body = document.body;
+            
+            if (!toggle || !dashboardGrid) return;
+            
+            // Toggle edit mode
+            function toggleEditMode() {
+                editModeActive = !editModeActive;
+                
+                // Update UI state
+                if (editModeActive) {
+                    body.classList.add('edit-mode');
+                    toggle.classList.add('active');
+                    toggle.setAttribute('aria-pressed', 'true');
+                    toggle.querySelector('.edit-mode-toggle-label').textContent = 'Done';
+                    // Show Add Panel button
+                    const addPanelBtn = document.getElementById('add-panel-button');
+                    if (addPanelBtn) addPanelBtn.style.display = '';
+                    // Add edit affordances to panels and enable drag/resize
+                    document.querySelectorAll('.panel').forEach(panel => {
+                        panel.classList.add('edit-mode-panel');
+                        addResizeHandles(panel);
+                        initPanelDragResize(panel);
+                        addRemoveButton(panel);
+                    });
+                } else {
+                    body.classList.remove('edit-mode');
+                    toggle.classList.remove('active');
+                    toggle.setAttribute('aria-pressed', 'false');
+                    toggle.querySelector('.edit-mode-toggle-label').textContent = 'Edit';
+                    // Hide Add Panel button
+                    const addPanelBtn = document.getElementById('add-panel-button');
+                    if (addPanelBtn) addPanelBtn.style.display = 'none';
+                    // Close panel picker if open
+                    closePanelPicker();
+                    // Remove edit affordances from panels and cleanup handlers
+                    document.querySelectorAll('.panel').forEach(panel => {
+                        panel.classList.remove('edit-mode-panel');
+                        removeResizeHandles(panel);
+                        cleanupPanelDragResize(panel);
+                        removeRemoveButton(panel);
+                    });
+                }
+            }
+            
+            // Click handler
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleEditMode();
+            });
+            
+            // Keyboard shortcut (E key)
+            document.addEventListener('keydown', (e) => {
+                // Only trigger if not typing in an input/textarea
+                if (e.key === 'e' || e.key === 'E') {
+                    const activeElement = document.activeElement;
+                    const isInput = activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    );
+                    
+                    if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        toggleEditMode();
+                    }
+                }
+            });
+        }
+        
+        // ============================================================
+        // PANEL DRAG & RESIZE (Edit Mode Only)
+        // ============================================================
+        
+        const GRID_COLUMNS = 12;
+        const MIN_PANEL_WIDTH = 2; // Minimum 2 grid units
+        const MIN_PANEL_HEIGHT = 1; // Minimum 1 grid unit
+        const panelDragState = new Map();
+        const panelResizeState = new Map();
+        
+        // Add resize handles to panel
+        function addResizeHandles(panelEl) {
+            if (panelEl.querySelector('.resize-handle')) return; // Already added
+            
+            const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+            handles.forEach(direction => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle resize-handle-${direction}`;
+                handle.setAttribute('data-direction', direction);
+                panelEl.appendChild(handle);
+            });
+        }
+        
+        // Remove resize handles from panel
+        function removeResizeHandles(panelEl) {
+            panelEl.querySelectorAll('.resize-handle').forEach(handle => handle.remove());
+        }
+        
+        // Initialize drag and resize for a panel
+        function initPanelDragResize(panelEl) {
+            // Remove old listeners if any
+            cleanupPanelDragResize(panelEl);
+            
+            panelEl.dataset.dragResizeInitialized = 'true';
+            
+            // Ensure resize handles exist
+            if (!panelEl.querySelector('.resize-handle')) {
+                addResizeHandles(panelEl);
+            }
+            
+            // Drag functionality - attach to panel header (grip area)
+            const panelHeader = panelEl.querySelector('.panel-header');
+            if (panelHeader) {
+                panelHeader.addEventListener('mousedown', handleDragStart);
+            }
+            
+            // Resize functionality
+            panelEl.querySelectorAll('.resize-handle').forEach(handle => {
+                handle.addEventListener('mousedown', handleResizeStart);
+            });
+        }
+        
+        // Cleanup drag and resize handlers
+        function cleanupPanelDragResize(panelEl) {
+            panelEl.dataset.dragResizeInitialized = 'false';
+            panelDragState.delete(panelEl);
+            panelResizeState.delete(panelEl);
+            // Note: Event listeners remain but are safe because handlers check editModeActive
+            // Resize handles are removed separately via removeResizeHandles()
+        }
+        
+        // Get panel grid position
+        function getPanelGridPos(panelEl) {
+            const x = parseInt(panelEl.getAttribute('data-x')) || 0;
+            const y = parseInt(panelEl.getAttribute('data-y')) || 0;
+            const w = parseInt(panelEl.getAttribute('data-w')) || 12;
+            const h = parseInt(panelEl.getAttribute('data-h')) || 1;
+            return { x, y, w, h };
+        }
+        
+        // Set panel grid position
+        function setPanelGridPos(panelEl, x, y, w, h) {
+            // Clamp values
+            x = Math.max(0, Math.min(x, GRID_COLUMNS - 1));
+            y = Math.max(0, y);
+            w = Math.max(MIN_PANEL_WIDTH, Math.min(w, GRID_COLUMNS - x));
+            h = Math.max(MIN_PANEL_HEIGHT, h);
+            
+            panelEl.setAttribute('data-x', x);
+            panelEl.setAttribute('data-y', y);
+            panelEl.setAttribute('data-w', w);
+            panelEl.setAttribute('data-h', h);
+            panelEl.style.gridColumn = `span ${w}`;
+            panelEl.style.gridRow = `span ${h}`;
+        }
+        
+        // Get grid cell from mouse position
+        function getGridCellFromMouse(e, gridEl) {
+            const rect = gridEl.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const cellWidth = rect.width / GRID_COLUMNS;
+            const cellHeight = cellWidth; // Assume square cells (approximate)
+            
+            const col = Math.floor(x / cellWidth);
+            const row = Math.floor(y / cellHeight);
+            
+            return {
+                col: Math.max(0, Math.min(col, GRID_COLUMNS - 1)),
+                row: Math.max(0, row)
+            };
+        }
+        
+        // Check if position collides with other panels
+        function checkCollision(panelEl, x, y, w, h, excludeSelf = true) {
+            const panels = document.querySelectorAll('.panel');
+            const bounds = { x, y, w, h };
+            
+            for (const otherPanel of panels) {
+                if (excludeSelf && otherPanel === panelEl) continue;
+                
+                const other = getPanelGridPos(otherPanel);
+                
+                // Check for overlap
+                if (bounds.x < other.x + other.w &&
+                    bounds.x + bounds.w > other.x &&
+                    bounds.y < other.y + other.h &&
+                    bounds.y + bounds.h > other.y) {
+                    return { collides: true, panel: otherPanel, bounds: other };
+                }
+            }
+            
+            return { collides: false };
+        }
+        
+        // Resolve collision by adjusting position
+        function resolveCollision(panelEl, x, y, w, h) {
+            let newX = x;
+            let newY = y;
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            while (attempts < maxAttempts) {
+                const collision = checkCollision(panelEl, newX, newY, w, h);
+                if (!collision.collides) {
+                    return { x: newX, y: newY, resolved: true };
+                }
+                
+                // Try moving right
+                if (newX + w < GRID_COLUMNS) {
+                    newX++;
+                } else if (newY > 0) {
+                    // Try moving down
+                    newY++;
+                    newX = 0;
+                } else {
+                    // Can't resolve, return original
+                    break;
+                }
+                
+                attempts++;
+            }
+            
+            // Fail-soft: return original position
+            return { x, y, resolved: false };
+        }
+        
+        // Drag handlers
+        function handleDragStart(e) {
+            if (!editModeActive) return;
+            
+            const panelEl = e.currentTarget;
+            if (!panelEl.classList.contains('edit-mode-panel')) return;
+            
+            // Don't start drag if clicking on resize handle
+            if (e.target.classList.contains('resize-handle')) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const gridEl = document.getElementById('dashboard-grid');
+            if (!gridEl) return;
+            
+            const startPos = getPanelGridPos(panelEl);
+            const gridRect = gridEl.getBoundingClientRect();
+            const cellWidth = gridRect.width / GRID_COLUMNS;
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startGridX = startPos.x;
+            const startGridY = startPos.y;
+            
+            panelEl.classList.add('dragging');
+            document.body.style.cursor = 'move';
+            document.body.style.userSelect = 'none';
+            
+            panelDragState.set(panelEl, {
+                startX, startY, startGridX, startGridY,
+                w: startPos.w, h: startPos.h
+            });
+            
+            function handleDragMove(e) {
+                if (!panelDragState.has(panelEl)) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                const deltaCol = Math.round(deltaX / cellWidth);
+                const deltaRow = Math.round(deltaY / cellWidth);
+                
+                let newX = startGridX + deltaCol;
+                let newY = startGridY + deltaRow;
+                
+                // Clamp to grid bounds
+                newX = Math.max(0, Math.min(newX, GRID_COLUMNS - startPos.w));
+                newY = Math.max(0, newY);
+                
+                // Check collision and resolve
+                const resolved = resolveCollision(panelEl, newX, newY, startPos.w, startPos.h);
+                setPanelGridPos(panelEl, resolved.x, resolved.y, startPos.w, startPos.h);
+            }
+            
+            function handleDragEnd() {
+                panelEl.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                panelDragState.delete(panelEl);
+                
+                document.removeEventListener('mousemove', handleDragMove);
+                document.removeEventListener('mouseup', handleDragEnd);
+            }
+            
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+        }
+        
+        // Resize handlers
+        function handleResizeStart(e) {
+            if (!editModeActive) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const handle = e.currentTarget;
+            const panelEl = handle.closest('.panel');
+            if (!panelEl || !panelEl.classList.contains('edit-mode-panel')) return;
+            
+            const direction = handle.getAttribute('data-direction');
+            const gridEl = document.getElementById('dashboard-grid');
+            if (!gridEl) return;
+            
+            const startPos = getPanelGridPos(panelEl);
+            const gridRect = gridEl.getBoundingClientRect();
+            const cellWidth = gridRect.width / GRID_COLUMNS;
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            
+            panelEl.classList.add('resizing');
+            document.body.style.userSelect = 'none';
+            
+            panelResizeState.set(panelEl, {
+                startX, startY, direction,
+                startPos: { ...startPos }
+            });
+            
+            function handleResizeMove(e) {
+                if (!panelResizeState.has(panelEl)) return;
+                
+                const state = panelResizeState.get(panelEl);
+                const deltaX = e.clientX - state.startX;
+                const deltaY = e.clientY - state.startY;
+                
+                const deltaCol = Math.round(deltaX / cellWidth);
+                const deltaRow = Math.round(deltaY / cellWidth);
+                
+                let { x, y, w, h } = state.startPos;
+                
+                // Apply resize based on direction
+                if (direction.includes('e')) {
+                    w = Math.max(MIN_PANEL_WIDTH, Math.min(w + deltaCol, GRID_COLUMNS - x));
+                }
+                if (direction.includes('w')) {
+                    const newW = Math.max(MIN_PANEL_WIDTH, w - deltaCol);
+                    const newX = x + (w - newW);
+                    if (newX >= 0) {
+                        x = newX;
+                        w = newW;
+                    }
+                }
+                if (direction.includes('s')) {
+                    h = Math.max(MIN_PANEL_HEIGHT, h + deltaRow);
+                }
+                if (direction.includes('n')) {
+                    const newH = Math.max(MIN_PANEL_HEIGHT, h - deltaRow);
+                    const newY = y + (h - newH);
+                    if (newY >= 0) {
+                        y = newY;
+                        h = newH;
+                    }
+                }
+                
+                // Check collision (only for position changes, not size-only)
+                if (x !== state.startPos.x || y !== state.startPos.y) {
+                    const collision = checkCollision(panelEl, x, y, w, h);
+                    if (collision.collides) {
+                        // Don't apply if collision
+                        return;
+                    }
+                }
+                
+                setPanelGridPos(panelEl, x, y, w, h);
+            }
+            
+            function handleResizeEnd() {
+                panelEl.classList.remove('resizing');
+                document.body.style.userSelect = '';
+                panelResizeState.delete(panelEl);
+                
+                document.removeEventListener('mousemove', handleResizeMove);
+                document.removeEventListener('mouseup', handleResizeEnd);
+            }
+            
+            document.addEventListener('mousemove', handleResizeMove);
+            document.addEventListener('mouseup', handleResizeEnd);
+        }
+        
+        // ============================================================
         // INITIALIZE
         // ============================================================
+        
+        // Load sidebar navigation
+        loadSidebarDashboards();
+        
+        // Initialize sidebar toggle
+        initSidebarToggle();
+        
+        // Initialize edit mode
+        initEditMode();
         
         // Render dashboard on page load
         renderDashboard();

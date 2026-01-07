@@ -1,82 +1,38 @@
 /* Path and File Name : /home/ransomeye/rebuild/ui/static/theme.css */
 /* Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU */
-/* Details: SOC-grade dark theme using CSS variables only - no hardcoded colors */
+/* Details: SOC-grade multi-theme system using CSS variables only - no hardcoded colors */
 
 /* ============================================================
-   RANSOMEYE SOC-GRADE DARK THEME
+   RANSOMEYE MULTI-THEME SYSTEM
    ============================================================
+   Theme modes: soc_dark (default), high_contrast, executive
    All colors via CSS variables only - no hardcoded values
    Supports 40+ dashboards without code duplication
    ============================================================ */
 
+/* ============================================================
+   BASE VARIABLES (Shared across all themes)
+   ============================================================ */
 :root {
-    /* ============================================================
-       BACKGROUND COLORS
-       ============================================================ */
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-card: #1c2128;
-    --bg-hover: #22272e;
-    --bg-panel: #1c2128;
-    --bg-panel-header: #161b22;
+    /* Sidebar Layout */
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 0px;
+    --sidebar-transition: var(--transition-base);
     
-    /* ============================================================
-       TEXT COLORS
-       ============================================================ */
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
-    --text-disabled: #484f58;
+    /* Font Scaling (controlled by UI settings) */
+    --font-scale: 1;
     
-    /* ============================================================
-       STATUS COLORS (Info / Warning / Critical)
-       ============================================================ */
-    --status-healthy: #238636;
-    --status-warning: #d29922;
-    --status-critical: #da3633;
-    --status-info: #58a6ff;
-    --status-degraded: #d29922;
-    
-    /* Status badge backgrounds */
-    --status-bg-healthy: rgba(35, 134, 54, 0.15);
-    --status-bg-warning: rgba(210, 153, 34, 0.15);
-    --status-bg-critical: rgba(218, 54, 51, 0.15);
-    --status-bg-info: rgba(88, 166, 255, 0.15);
-    
-    /* Status badge text */
-    --status-text-healthy: #3fb950;
-    --status-text-warning: #d29922;
-    --status-text-critical: #f85149;
-    --status-text-info: #58a6ff;
-    
-    /* ============================================================
-       ACCENT COLORS
-       ============================================================ */
-    --accent-primary: #58a6ff;
-    --accent-secondary: #388bfd;
-    --accent-muted: #1f6feb;
-    
-    /* ============================================================
-       BORDER COLORS
-       ============================================================ */
-    --border-primary: #30363d;
-    --border-secondary: #21262d;
-    --border-hover: #484f58;
-    --border-panel: #30363d;
-    
-    /* ============================================================
-       TYPOGRAPHY
-       ============================================================ */
+    /* Typography (theme-agnostic) */
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
     --font-family-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
     
-    --font-size-xs: 10px;
-    --font-size-sm: 12px;
-    --font-size-base: 14px;
-    --font-size-lg: 16px;
-    --font-size-xl: 20px;
-    --font-size-2xl: 24px;
-    --font-size-3xl: 32px;
+    --font-size-xs: calc(10px * var(--font-scale));
+    --font-size-sm: calc(12px * var(--font-scale));
+    --font-size-base: calc(14px * var(--font-scale));
+    --font-size-lg: calc(16px * var(--font-scale));
+    --font-size-xl: calc(20px * var(--font-scale));
+    --font-size-2xl: calc(24px * var(--font-scale));
+    --font-size-3xl: calc(32px * var(--font-scale));
     
     --font-weight-normal: 400;
     --font-weight-medium: 500;
@@ -86,9 +42,7 @@
     --line-height: 1.5;
     --line-height-tight: 1.25;
     
-    /* ============================================================
-       SPACING
-       ============================================================ */
+    /* Spacing (theme-agnostic) */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 16px;
@@ -96,27 +50,210 @@
     --spacing-xl: 32px;
     --spacing-2xl: 48px;
     
-    /* ============================================================
-       BORDER RADIUS
-       ============================================================ */
+    /* Border Radius (theme-agnostic) */
     --radius-sm: 4px;
     --radius: 6px;
     --radius-lg: 8px;
     --radius-xl: 12px;
     
-    /* ============================================================
-       SHADOWS
-       ============================================================ */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-    
-    /* ============================================================
-       TRANSITIONS
-       ============================================================ */
+    /* Transitions (theme-agnostic) */
     --transition-fast: 0.15s ease;
     --transition-base: 0.2s ease;
     --transition-slow: 0.3s ease;
+}
+
+/* ============================================================
+   THEME: SOC_DARK (Default - Backward Compatible)
+   ============================================================
+   Purpose: SOC-grade dark theme optimized for security operations
+   Characteristics: High contrast for data visibility, professional dark palette
+   ============================================================ */
+:root,
+:root[data-theme="soc_dark"] {
+    /* Background Colors */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-hover: #22272e;
+    --bg-panel: #1c2128;
+    --bg-panel-header: #161b22;
+    --bg-focus: #1c6beb;
+    
+    /* Text Colors */
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --text-disabled: #484f58;
+    
+    /* Status Colors (Red ONLY for critical/threat states) */
+    --status-healthy: #238636;
+    --status-warning: #d29922;
+    --status-critical: #da3633;  /* RED - Only for real threats */
+    --status-info: #58a6ff;
+    --status-degraded: #d29922;
+    
+    /* Status Badge Backgrounds */
+    --status-bg-healthy: rgba(35, 134, 54, 0.15);
+    --status-bg-warning: rgba(210, 153, 34, 0.15);
+    --status-bg-critical: rgba(218, 54, 51, 0.15);
+    --status-bg-info: rgba(88, 166, 255, 0.15);
+    
+    /* Status Badge Text */
+    --status-text-healthy: #3fb950;
+    --status-text-warning: #d29922;
+    --status-text-critical: #f85149;  /* RED - Only for real threats */
+    --status-text-info: #58a6ff;
+    
+    /* Accent Colors */
+    --accent-primary: #58a6ff;
+    --accent-secondary: #388bfd;
+    --accent-muted: #1f6feb;
+    
+    /* Border Colors */
+    --border-primary: #30363d;
+    --border-secondary: #21262d;
+    --border-hover: #484f58;
+    --border-panel: #30363d;
+    --border-focus: #1c6beb;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   THEME: HIGH_CONTRAST
+   ============================================================
+   Purpose: Accessibility-first theme with maximum readability
+   Characteristics: Strong separation, high contrast ratios, clear boundaries
+   ============================================================ */
+:root[data-theme="high_contrast"] {
+    /* Background Colors - Stronger separation */
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --bg-card: #262626;
+    --bg-hover: #333333;
+    --bg-panel: #262626;
+    --bg-panel-header: #1a1a1a;
+    --bg-focus: #0066ff;
+    
+    /* Text Colors - Maximum contrast */
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-muted: #999999;
+    --text-disabled: #666666;
+    
+    /* Status Colors - High contrast variants (Red ONLY for critical/threat states) */
+    --status-healthy: #00ff00;
+    --status-warning: #ffaa00;
+    --status-critical: #ff0000;  /* RED - Only for real threats */
+    --status-info: #0099ff;
+    --status-degraded: #ffaa00;
+    
+    /* Status Badge Backgrounds - Higher opacity for visibility */
+    --status-bg-healthy: rgba(0, 255, 0, 0.25);
+    --status-bg-warning: rgba(255, 170, 0, 0.25);
+    --status-bg-critical: rgba(255, 0, 0, 0.25);
+    --status-bg-info: rgba(0, 153, 255, 0.25);
+    
+    /* Status Badge Text - Full saturation */
+    --status-text-healthy: #00ff00;
+    --status-text-warning: #ffaa00;
+    --status-text-critical: #ff0000;  /* RED - Only for real threats */
+    --status-text-info: #0099ff;
+    
+    /* Accent Colors - High visibility */
+    --accent-primary: #0099ff;
+    --accent-secondary: #0066ff;
+    --accent-muted: #0052cc;
+    
+    /* Border Colors - Strong definition */
+    --border-primary: #666666;
+    --border-secondary: #4d4d4d;
+    --border-hover: #808080;
+    --border-panel: #666666;
+    --border-focus: #0099ff;
+    
+    /* Shadows - More pronounced */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================
+   THEME: EXECUTIVE
+   ============================================================
+   Purpose: Calm, professional theme for executive dashboards
+   Characteristics: Lower contrast, muted palette, reduced visual noise
+   ============================================================ */
+:root[data-theme="executive"] {
+    /* Background Colors - Softer, warmer tones */
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #2a2a2a;
+    --bg-card: #343434;
+    --bg-hover: #3d3d3d;
+    --bg-panel: #343434;
+    --bg-panel-header: #2a2a2a;
+    --bg-focus: #4a7c9e;
+    
+    /* Text Colors - Lower contrast, easier on eyes */
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-muted: #888888;
+    --text-disabled: #606060;
+    
+    /* Status Colors - Muted, professional (Red ONLY for critical/threat states) */
+    --status-healthy: #4a9b5f;
+    --status-warning: #b8944f;
+    --status-critical: #c85a5a;  /* RED - Only for real threats (muted but clear) */
+    --status-info: #6b9bd1;
+    --status-degraded: #b8944f;
+    
+    /* Status Badge Backgrounds - Subtle, low opacity */
+    --status-bg-healthy: rgba(74, 155, 95, 0.12);
+    --status-bg-warning: rgba(184, 148, 79, 0.12);
+    --status-bg-critical: rgba(200, 90, 90, 0.12);
+    --status-bg-info: rgba(107, 155, 209, 0.12);
+    
+    /* Status Badge Text - Muted but readable */
+    --status-text-healthy: #6fb884;
+    --status-text-warning: #c4a76a;
+    --status-text-critical: #d97777;  /* RED - Only for real threats (muted variant) */
+    --status-text-info: #8db5d9;
+    
+    /* Accent Colors - Subdued, professional */
+    --accent-primary: #6b9bd1;
+    --accent-secondary: #5a8bb8;
+    --accent-muted: #4a7c9e;
+    
+    /* Border Colors - Subtle, reduced visual noise */
+    --border-primary: #404040;
+    --border-secondary: #353535;
+    --border-hover: #4a4a4a;
+    --border-panel: #404040;
+    --border-focus: #5a8bb8;
+    
+    /* Shadows - Softer, less pronounced */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 3px 5px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 6px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================================
+   DENSITY MODES (controlled by UI settings)
+   ============================================================ */
+body.density-compact {
+    --spacing-xs: 3px;
+    --spacing-sm: 6px;
+    --spacing-md: 12px;
+    --spacing-lg: 18px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 36px;
+}
+
+body.density-comfortable {
+    /* Default spacing (already defined in :root) */
 }
 
 /* ============================================================
@@ -136,6 +273,234 @@ body {
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+}
+
+/* ============================================================
+   LAYOUT CONTAINER (Sidebar + Main Content)
+   ============================================================ */
+.app-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: width var(--sidebar-transition), transform var(--sidebar-transition);
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: var(--radius);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+.sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 0;
+}
+
+/* Sidebar Branding */
+.sidebar-brand {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.sidebar-brand-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: opacity var(--transition-base);
+    width: 100%;
+}
+
+.sidebar-brand-link:hover {
+    opacity: 0.8;
+}
+
+.sidebar-brand-link:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+.sidebar-logo {
+    height: 28px;
+    width: auto;
+    object-fit: contain;
+}
+
+
+/* Sidebar Navigation */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md) 0;
+}
+
+.sidebar-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.sidebar-section-title {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 var(--spacing-lg) var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.sidebar-nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-nav-item {
+    margin: 0;
+}
+
+.sidebar-nav-link {
+    display: block;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: var(--font-size-base);
+    transition: background var(--transition-base), color var(--transition-base);
+    border-left: 2px solid transparent;
+}
+
+.sidebar-nav-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-nav-link:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: -2px;
+    border-radius: 0;
+}
+
+.sidebar-nav-link.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-left-color: var(--accent-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+.sidebar-nav-link.disabled {
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--spacing-lg) var(--spacing-lg);
+    border: none;
+}
+
+/* Sidebar Toggle (Mobile) */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    z-index: 1000;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    padding: var(--spacing-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-base);
+}
+
+.sidebar-toggle:hover {
+    background: var(--bg-hover);
+}
+
+.sidebar-toggle:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   MAIN CONTENT AREA
+   ============================================================ */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.main-content-header {
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    padding: var(--spacing-md) var(--spacing-xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+}
+
+.main-content-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Density adjustments for sidebar */
+body.density-compact .sidebar-brand {
+    padding: var(--spacing-md);
+}
+
+body.density-compact .sidebar-section-title {
+    padding: 0 var(--spacing-md) var(--spacing-xs);
+}
+
+body.density-compact .sidebar-nav-link {
+    padding: var(--spacing-xs) var(--spacing-md);
+}
+
+body.density-compact .sidebar-divider {
+    margin: var(--spacing-md) var(--spacing-md);
 }
 
 /* ============================================================
@@ -158,6 +523,34 @@ body {
     gap: var(--spacing-md);
 }
 
+.header-brand-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    text-decoration: none;
+    transition: opacity var(--transition-base);
+}
+
+.header-brand-link:hover {
+    opacity: 0.8;
+}
+
+.header-brand-link:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+.re-logo {
+    height: 32px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    filter: brightness(1.1) contrast(1.05);
+}
+
 .header-brand h1 {
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-semibold);
@@ -171,6 +564,59 @@ body {
     align-items: center;
     gap: var(--spacing-lg);
     flex-wrap: wrap;
+}
+
+/* Edit Mode Toggle */
+.edit-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-family: inherit;
+}
+
+.edit-mode-toggle:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.edit-mode-toggle:focus {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.edit-mode-toggle:active {
+    transform: scale(0.98);
+}
+
+.edit-mode-toggle.active {
+    background: var(--bg-primary);
+    border-color: var(--border-focus);
+    color: var(--text-primary);
+}
+
+.edit-mode-toggle-icon {
+    font-size: var(--font-size-base);
+    line-height: 1;
+}
+
+.edit-mode-toggle-label {
+    font-size: var(--font-size-sm);
+}
+
+/* Density adjustments for edit mode toggle */
+body.density-compact .edit-mode-toggle {
+    padding: calc(var(--spacing-xs) * 0.75) calc(var(--spacing-sm) * 0.75);
+    font-size: calc(var(--font-size-sm) * 0.9);
 }
 
 /* ============================================================
@@ -249,6 +695,188 @@ body {
 .panel:hover {
     border-color: var(--border-hover);
     box-shadow: var(--shadow-md);
+}
+
+.panel:focus-within {
+    border-color: var(--border-focus);
+    outline: 2px solid var(--border-focus);
+    outline-offset: -2px;
+}
+
+/* Edit Mode Panel States */
+body.edit-mode .panel.edit-mode-panel {
+    border-color: var(--border-focus);
+    border-width: 2px;
+    position: relative;
+    cursor: move;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+body.edit-mode .panel.edit-mode-panel::before {
+    content: '⋮⋮';
+    position: absolute;
+    top: var(--spacing-xs);
+    right: var(--spacing-xs);
+    color: var(--text-muted);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+}
+
+body.edit-mode .panel.edit-mode-panel:hover {
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+}
+
+body.edit-mode .panel.edit-mode-panel.dragging {
+    opacity: 0.8;
+    z-index: 1000;
+    box-shadow: var(--shadow-xl);
+    transform: scale(1.02);
+}
+
+body.edit-mode .panel.edit-mode-panel.resizing {
+    opacity: 0.9;
+}
+
+body.edit-mode .panel.edit-mode-panel .panel-header {
+    cursor: move;
+}
+
+body.edit-mode .panel.edit-mode-panel .panel-body {
+    cursor: move;
+}
+
+/* Resize Handles */
+body.edit-mode .panel.edit-mode-panel .resize-handle {
+    position: absolute;
+    background: transparent;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+body.edit-mode .panel.edit-mode-panel:hover .resize-handle {
+    opacity: 1;
+}
+
+body.edit-mode .panel.edit-mode-panel.resizing .resize-handle {
+    opacity: 1;
+}
+
+/* Corner handles */
+body.edit-mode .panel.edit-mode-panel .resize-handle-nw {
+    top: 0;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nwse-resize;
+    border-top: 2px solid var(--border-focus);
+    border-left: 2px solid var(--border-focus);
+    border-radius: var(--radius-sm) 0 0 0;
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-ne {
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nesw-resize;
+    border-top: 2px solid var(--border-focus);
+    border-right: 2px solid var(--border-focus);
+    border-radius: 0 var(--radius-sm) 0 0;
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-sw {
+    bottom: 0;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nesw-resize;
+    border-bottom: 2px solid var(--border-focus);
+    border-left: 2px solid var(--border-focus);
+    border-radius: 0 0 0 var(--radius-sm);
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-se {
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nwse-resize;
+    border-bottom: 2px solid var(--border-focus);
+    border-right: 2px solid var(--border-focus);
+    border-radius: 0 0 var(--radius-sm) 0;
+}
+
+/* Edge handles */
+body.edit-mode .panel.edit-mode-panel .resize-handle-n {
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 8px;
+    cursor: ns-resize;
+    border-top: 2px solid var(--border-focus);
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-s {
+    bottom: 0;
+    left: 12px;
+    right: 12px;
+    height: 8px;
+    cursor: ns-resize;
+    border-bottom: 2px solid var(--border-focus);
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-e {
+    top: 12px;
+    bottom: 12px;
+    right: 0;
+    width: 8px;
+    cursor: ew-resize;
+    border-right: 2px solid var(--border-focus);
+}
+
+body.edit-mode .panel.edit-mode-panel .resize-handle-w {
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    width: 8px;
+    cursor: ew-resize;
+    border-left: 2px solid var(--border-focus);
+}
+
+/* Resize handle hover states */
+body.edit-mode .panel.edit-mode-panel .resize-handle:hover {
+    opacity: 1;
+    background: var(--bg-tertiary);
+}
+
+/* Density adjustments for resize handles */
+body.density-compact .panel.edit-mode-panel .resize-handle-nw,
+body.density-compact .panel.edit-mode-panel .resize-handle-ne,
+body.density-compact .panel.edit-mode-panel .resize-handle-sw,
+body.density-compact .panel.edit-mode-panel .resize-handle-se {
+    width: 10px;
+    height: 10px;
+}
+
+body.density-compact .panel.edit-mode-panel .resize-handle-n,
+body.density-compact .panel.edit-mode-panel .resize-handle-s {
+    height: 6px;
+    left: 10px;
+    right: 10px;
+}
+
+body.density-compact .panel.edit-mode-panel .resize-handle-e,
+body.density-compact .panel.edit-mode-panel .resize-handle-w {
+    width: 6px;
+    top: 10px;
+    bottom: 10px;
 }
 
 /* Panel Header */
@@ -395,6 +1023,26 @@ body {
    RESPONSIVE ADJUSTMENTS
    ============================================================ */
 @media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 999;
+    }
+    
+    .sidebar-toggle {
+        display: block;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .sidebar.collapsed ~ .main-content {
+        margin-left: 0;
+    }
+    
     .dashboard-container {
         padding: var(--spacing-md);
     }
@@ -407,6 +1055,14 @@ body {
     .panel-status-group {
         width: 100%;
         justify-content: space-between;
+    }
+    
+    .re-logo {
+        height: 28px;
+    }
+    
+    .header-brand h1 {
+        font-size: var(--font-size-lg);
     }
 }
 
@@ -431,4 +1087,3 @@ body {
 .panel-body::-webkit-scrollbar-thumb:hover {
     background: var(--border-hover);
 }
-

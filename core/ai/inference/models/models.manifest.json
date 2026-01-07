@@ -1,10 +1,21 @@
 {
   "model_name": "ransomware_behavior",
   "model_version": "1.0.0",
-  "model_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "model_size_bytes": 1024,
-  "signature": "dummy_signature_base64_placeholder",
-  "trained_on": "2024-01-01",
-  "model_type": "advisory_only",
-  "features": ["feature_0", "feature_1", "feature_2", "feature_3", "feature_4"]
+  "model_hash": "78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+  "model_size_bytes": 3114228,
+  "signature": "XJScrcmi4oGSXp816TJsHFStDVEZnCWkb6ShCUHl1qLIXiIx/4I8G8g0RWNaFQHeNcAgFHYZ2WhfhCWVE3N5bQUg+DUnJQNE1tJSOlw1E+lbNyavpgX8PAIu3MhIuRxCGh16CKYmgBOI2BWOgfW5YRwbO3nLCCOjfJZbCVnD4HGozqIlZGn9VCZU8SKIZ071BMzaVBzTyvIGl6jITRGDOt4bxlJmSe/1kx177qafYTArzpxgEQ8wAdqhjt45o9BVBDMEkW7I19OC6fQfiaTQEnUmqd57kSRilp9zGxEo+0xEyfU6y/vY1ukaczMt+EwSbF0kEcAo1OkjoAjgnK6IN5XUaIy/TwbZ/jH2ikhJctYm/U3sx/fuBpw6acMM0eNvHJIbqoStq40ek3sgy8gFYsG6WQioKef34cbx2u+F8/N1F1RzKE3gbFZrJZWFPTx2V5jxjQVL946wxqOJ228VImXDsuoLqNrfhXCCuI5TwB8B5haJ6S3jMQcSXhdrYP8wiXUe3H0oMytT5sMiCGu2H1aXmhBBcTI/xTz1AtauEv6Yo2PwwKBufB5V8CJD1cYm0p3xSBg8+6CHcd0n0iSn4sqmqeJS0fDgnj/GK8EbplNb7JU0911u/bfVgKDjwqrbZ5jIjwHNsts3y1qv2Mu9chWYfNDAgFYjG0ri2nNyGDU=",
+  "trained_on": "2026-01-05T09:32:30.066873Z",
+  "model_type": "behavior_classifier",
+  "features": [
+    "network_connections",
+    "file_operations",
+    "process_creations",
+    "registry_modifications",
+    "network_bytes_sent",
+    "network_bytes_received",
+    "cpu_usage",
+    "memory_usage",
+    "disk_io",
+    "suspicious_strings"
+  ]
 }

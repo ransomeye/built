@@ -1,0 +1,60 @@
+{
+  "dpi_probe": {
+    "module": "DPI Probe",
+    "status": "PASS - Real data only",
+    "data_sources": [
+      {
+        "file": "edge/dpi/src/capture.rs",
+        "type": "REAL_PACKET_CAPTURE",
+        "method": "libpcap"
+      },
+      {
+        "file": "edge/dpi/probe/src/capture.rs",
+        "type": "REAL_PACKET_CAPTURE",
+        "method": "libpcap"
+      },
+      {
+        "file": "edge/dpi/src/main.rs",
+        "type": "REAL_PACKET_CAPTURE",
+        "method": "unknown"
+      },
+      {
+        "file": "edge/dpi/probe/src/main.rs",
+        "type": "REAL_PACKET_CAPTURE",
+        "method": "pcap_rust"
+      }
+    ],
+    "issues": [],
+    "verification": {
+      "real_capture_detected": true,
+      "synthetic_data_detected": false,
+      "uses_pcap": false,
+      "uses_af_packet": false
+    }
+  },
+  "linux_agent": {
+    "module": "Linux Agent",
+    "status": "PASS - Real data only",
+    "data_sources": [
+      {
+        "file": "edge/agent/linux/src/process.rs",
+        "type": "REAL_PROC_MONITORING",
+        "method": "procfs"
+      },
+      {
+        "file": "edge/agent/linux/src/telemetry.rs",
+        "type": "REAL_PROC_MONITORING",
+        "method": "procfs"
+      }
+    ],
+    "issues": [],
+    "verification": {
+      "real_monitoring_detected": true,
+      "synthetic_data_detected": false,
+      "synthetic_in_main_loop": false,
+      "uses_procfs": true,
+      "uses_ebpf": false,
+      "uses_auditd": false
+    }
+  }
+}

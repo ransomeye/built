@@ -1,0 +1,188 @@
+{
+  "models": [
+    {
+      "module": "Baseline Pack",
+      "manifest": {
+        "manifest_path": "ransomeye_intelligence/baseline_pack/models/model_manifest.json",
+        "exists": true,
+        "models": [
+          {
+            "name": "ransomware_behavior.model",
+            "version": "1.0.0",
+            "hash": "sha256:78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+            "has_shap": true,
+            "trained_on": "unknown"
+          },
+          {
+            "name": "anomaly_baseline.model",
+            "version": "1.0.0",
+            "hash": "sha256:10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+            "has_shap": true,
+            "trained_on": "unknown"
+          },
+          {
+            "name": "confidence_calibration.model",
+            "version": "1.0.0",
+            "hash": "sha256:c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+            "has_shap": true,
+            "trained_on": "unknown"
+          }
+        ],
+        "has_signature": true,
+        "has_training_date": true,
+        "issues": []
+      }
+    },
+    {
+      "module": "Baseline Pack",
+      "model": {
+        "module": "Baseline Pack",
+        "model_name": "anomaly_baseline",
+        "file_path": "ransomeye_intelligence/baseline_pack/models/anomaly_baseline.model",
+        "exists": true,
+        "size_bytes": 1036071,
+        "hash": "10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Baseline Pack",
+      "model": {
+        "module": "Baseline Pack",
+        "model_name": "confidence_calibration",
+        "file_path": "ransomeye_intelligence/baseline_pack/models/confidence_calibration.model",
+        "exists": true,
+        "size_bytes": 9852757,
+        "hash": "c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Baseline Pack",
+      "model": {
+        "module": "Baseline Pack",
+        "model_name": "ransomware_behavior",
+        "file_path": "ransomeye_intelligence/baseline_pack/models/ransomware_behavior.model",
+        "exists": true,
+        "size_bytes": 3114228,
+        "hash": "78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Core AI",
+      "manifest": {
+        "manifest_path": "core/ai/models/models.manifest.json",
+        "exists": true,
+        "models": [],
+        "has_signature": true,
+        "has_training_date": true,
+        "issues": []
+      }
+    },
+    {
+      "module": "Core AI",
+      "model": {
+        "module": "Core AI",
+        "model_name": "risk_model",
+        "file_path": "core/ai/models/risk_model.model",
+        "exists": true,
+        "size_bytes": 1055801,
+        "hash": "e21b1bd9622c351c8d08513129287f1249d67138ee335f20200b2e9bc7c69ca9",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Inference",
+      "manifest": {
+        "manifest_path": "core/ai/inference/models/models.manifest.json",
+        "exists": true,
+        "models": [],
+        "has_signature": true,
+        "has_training_date": true,
+        "issues": []
+      }
+    },
+    {
+      "module": "Inference",
+      "model": {
+        "module": "Inference",
+        "model_name": "anomaly_baseline",
+        "file_path": "core/ai/inference/models/anomaly_baseline.model",
+        "exists": true,
+        "size_bytes": 1036071,
+        "hash": "10566a07cf4c261e0ccd9f952b8d38fa8de4f847be8af49248d43dba8ad48333",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Inference",
+      "model": {
+        "module": "Inference",
+        "model_name": "confidence_calibration",
+        "file_path": "core/ai/inference/models/confidence_calibration.model",
+        "exists": true,
+        "size_bytes": 9852757,
+        "hash": "c570ebbab3ee0ce97d2bab9076201867330345f47fdb70486cdfe468da79077d",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Inference",
+      "model": {
+        "module": "Inference",
+        "model_name": "ransomware_behavior",
+        "file_path": "core/ai/inference/models/ransomware_behavior.model",
+        "exists": true,
+        "size_bytes": 3114228,
+        "hash": "78a5feb8fe4c4f4f8d5829ca7069d70439136f59cf4b49b0e9e60581de7b3f58",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "SHAP",
+      "shap": {
+        "shap_path": "core/ai/models/risk_model_shap_baseline.json",
+        "exists": true,
+        "is_valid_json": true,
+        "has_data": true,
+        "issues": []
+      }
+    }
+  ],
+  "llm_modules": [
+    {
+      "module": "LLM/RAG",
+      "rag_index_exists": true,
+      "rag_index_is_dummy": false,
+      "knowledge_base_exists": true,
+      "has_real_hash": true,
+      "has_chunks": true,
+      "issues": []
+    }
+  ],
+  "issues": [],
+  "summary": {
+    "total_models": 7,
+    "real_models": 7,
+    "dummy_models": 0,
+    "missing_models": 0,
+    "placeholder_models": 0,
+    "modules_with_issues": [],
+    "overall_status": "PASS - All models are real"
+  }
+}

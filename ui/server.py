@@ -23,6 +23,8 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from schema_helper import SchemaAwareDB
 from dashboard_engine import DashboardEngine
+from settings_manager import SettingsManager
+from settings import SettingsValidationError
 
 # Configure logging - errors logged, not exposed to UI
 logging.basicConfig(
@@ -982,6 +984,136 @@ def logo():
 def serve_static(filename):
     """Serve static files (CSS, JS, etc.)."""
     return send_from_directory(STATIC_DIR, filename)
+
+
+# ============================================================================
+# UI SETTINGS API ENDPOINTS
+# ============================================================================
+
+@app.route('/api/ui/settings', methods=['GET'])
+def get_ui_settings():
+    """
+    Get UI settings for current user.
+    
+    Returns:
+        JSON with theme, density, font_size (defaults applied if missing)
+    """
+    conn = get_db_connection()
+    if not conn:
+        # Fail-soft: return defaults if DB unavailable
+        from settings import get_default_settings
+        return jsonify(get_default_settings())
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        settings_manager = SettingsManager(conn)
+        settings = settings_manager.get_settings()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify(settings)
+    
+    except Exception as e:
+        logger.error(f"Error getting UI settings: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+        # Fail-soft: return defaults on error
+        from settings import get_default_settings
+        return jsonify(get_default_settings())
+
+
+@app.route('/api/ui/settings', methods=['POST'])
+def update_ui_settings():
+    """
+    Update UI settings for current user.
+    
+    Request body (JSON):
+        {
+            "theme": "soc_dark" | "high_contrast" | "executive",
+            "density": "compact" | "comfortable",
+            "font_size": "small" | "medium" | "large"
+        }
+        
+    All fields optional (partial updates supported).
+    
+    Returns:
+        JSON with success status and updated settings
+    """
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        # Parse request body
+        if not request.is_json:
+            return jsonify({
+                "error": "Request must be JSON",
+                "status": "failed"
+            }), 400
+        
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({
+                "error": "Request body must be a JSON object",
+                "status": "failed"
+            }), 400
+        
+        # Validate settings (fail-closed on invalid enum values)
+        try:
+            validated = validate_settings(data)
+        except SettingsValidationError as e:
+            return jsonify({
+                "error": str(e),
+                "status": "validation_failed"
+            }), 400
+        
+        # Save settings
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        settings_manager = SettingsManager(conn)
+        success, error_msg = settings_manager.save_settings(validated)
+        
+        if not success:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": error_msg or "Failed to save settings",
+                "status": "failed"
+            }), 500
+        
+        # Get updated settings (merged with defaults)
+        updated_settings = settings_manager.get_settings()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "settings": updated_settings
+        })
+    
+    except Exception as e:
+        logger.error(f"Error updating UI settings: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
 
 
 if __name__ == '__main__':

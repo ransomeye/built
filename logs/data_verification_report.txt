@@ -1,0 +1,48 @@
+================================================================================
+RANSOMEYE DATA VERIFICATION REPORT
+================================================================================
+
+Purpose: Verify that DPI Probe and Linux Agent collect REAL data,
+         not synthetic, dummy, or placeholder data.
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+DPI Probe Status: PASS - Real data only
+  ✓ Real packet capture detected
+
+Linux Agent Status: PASS - Real data only
+  ✓ Real process monitoring detected
+
+================================================================================
+DETAILED FINDINGS - DPI PROBE
+================================================================================
+
+Status: PASS - Real data only
+
+Data Sources:
+  - edge/dpi/src/capture.rs: REAL_PACKET_CAPTURE (libpcap)
+  - edge/dpi/probe/src/capture.rs: REAL_PACKET_CAPTURE (libpcap)
+  - edge/dpi/src/main.rs: REAL_PACKET_CAPTURE (unknown)
+  - edge/dpi/probe/src/main.rs: REAL_PACKET_CAPTURE (pcap_rust)
+
+No issues found.
+
+================================================================================
+DETAILED FINDINGS - LINUX AGENT
+================================================================================
+
+Status: PASS - Real data only
+
+Data Sources:
+  - edge/agent/linux/src/process.rs: REAL_PROC_MONITORING (procfs)
+  - edge/agent/linux/src/telemetry.rs: REAL_PROC_MONITORING (procfs)
+
+No issues found.
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+================================================================================

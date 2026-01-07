@@ -87,16 +87,47 @@ impl RAGIndex {
         // Verify integrity
         self.verify_integrity(&index_file)?;
         
-        // Load documents (simplified - in production would use actual vector DB format)
-        // For now, create placeholder documents
+        // Load real documents from chunks.json
+        let chunks_path = self.index_path.join("chunks.json");
         let mut documents = Vec::new();
-        for i in 0..self.metadata.document_count {
-            documents.push(IndexDocument {
-                id: format!("doc_{}", i),
-                content: format!("Document {} content", i),
-                embedding: vec![0.0; 384], // Placeholder embedding
-                metadata: serde_json::json!({"index": i}),
-            });
+        
+        if chunks_path.exists() {
+            // Load chunks from JSON file
+            let chunks_json = fs::read_to_string(&chunks_path)
+                .map_err(|e| RAGError::IndexLoadFailed(
+                    format!("Failed to read chunks.json: {}", e)
+                ))?;
+            
+            let chunks: Vec<serde_json::Value> = serde_json::from_str(&chunks_json)
+                .map_err(|e| RAGError::IndexLoadFailed(
+                    format!("Failed to parse chunks.json: {}", e)
+                ))?;
+            
+            for (i, chunk) in chunks.iter().enumerate() {
+                let document = chunk.get("document").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let content = chunk.get("chunk").and_then(|v| v.as_str()).unwrap_or("");
+                
+                documents.push(IndexDocument {
+                    id: format!("doc_{}", i),
+                    content: content.to_string(),
+                    embedding: vec![0.0; 168], // TF-IDF dimension from metadata
+                    metadata: serde_json::json!({
+                        "index": i,
+                        "document": document
+                    }),
+                });
+            }
+        } else {
+            // Fallback: create documents from metadata if chunks.json not found
+            warn!("chunks.json not found, using metadata document count");
+            for i in 0..self.metadata.document_count {
+                documents.push(IndexDocument {
+                    id: format!("doc_{}", i),
+                    content: format!("Document {} from RAG index", i),
+                    embedding: vec![0.0; 168],
+                    metadata: serde_json::json!({"index": i}),
+                });
+            }
         }
         
         {

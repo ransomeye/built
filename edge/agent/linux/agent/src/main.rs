@@ -3,9 +3,11 @@
 // Details of functionality of this file: Linux Agent main entry point - standalone host telemetry sensor
 
 use std::sync::Arc;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 use tokio::runtime::Runtime;
 use libsystemd::daemon::{notify, NotifyState};
+use crossbeam_channel;
+use process::ProcessEvent;
 
 mod errors;
 mod process;
@@ -42,6 +44,97 @@ use health::HealthMonitor;
 use security::{IdentityManager, EventSigner as SecurityEventSigner};
 use config_validation::AgentConfig;
 use reqwest::Client as ReqwestClient;
+use std::fs;
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Process information from /proc filesystem
+struct ProcProcessInfo {
+    pid: i32,
+    ppid: i32,
+    uid: u32,
+    gid: u32,
+    executable: String,
+    command_line: String,
+}
+
+impl AgentConfig {
+    /// Scan /proc filesystem for current process IDs
+    fn scan_proc_processes() -> std::collections::HashSet<i32> {
+        let mut pids = std::collections::HashSet::new();
+        
+        if let Ok(entries) = fs::read_dir("/proc") {
+            for entry in entries.flatten() {
+                if let Ok(pid_str) = entry.file_name().into_string() {
+                    if let Ok(pid) = pid_str.parse::<i32>() {
+                        pids.insert(pid);
+                    }
+                }
+            }
+        }
+        
+        pids
+    }
+    
+    /// Read process information from /proc filesystem
+    fn read_proc_process_info(pid: i32) -> Option<ProcProcessInfo> {
+        let pid_dir = format!("/proc/{}", pid);
+        let pid_path = Path::new(&pid_dir);
+        
+        if !pid_path.exists() {
+            return None;
+        }
+        
+        // Read process name from comm
+        let executable = fs::read_to_string(pid_path.join("comm"))
+            .unwrap_or_else(|_| "unknown".to_string())
+            .trim()
+            .to_string();
+        
+        // Read command line from cmdline
+        let command_line = fs::read_to_string(pid_path.join("cmdline"))
+            .unwrap_or_else(|_| String::new())
+            .replace('\0', " ")
+            .trim()
+            .to_string();
+        
+        // Read stat for ppid
+        let mut ppid = 0;
+        if let Ok(stat_content) = fs::read_to_string(pid_path.join("stat")) {
+            let fields: Vec<&str> = stat_content.split_whitespace().collect();
+            if fields.len() > 3 {
+                ppid = fields[3].parse().unwrap_or(0);
+            }
+        }
+        
+        // Read status for uid/gid
+        let mut uid = 0;
+        let mut gid = 0;
+        if let Ok(status_content) = fs::read_to_string(pid_path.join("status")) {
+            for line in status_content.lines() {
+                if line.starts_with("Uid:") {
+                    if let Some(uid_str) = line.split_whitespace().nth(1) {
+                        uid = uid_str.parse().unwrap_or(0);
+                    }
+                }
+                if line.starts_with("Gid:") {
+                    if let Some(gid_str) = line.split_whitespace().nth(1) {
+                        gid = gid_str.parse().unwrap_or(0);
+                    }
+                }
+            }
+        }
+        
+        Some(ProcProcessInfo {
+            pid,
+            ppid,
+            uid,
+            gid,
+            executable,
+            command_line,
+        })
+    }
+}
 
 fn main() -> Result<(), AgentError> {
     // Initialize tracing
@@ -224,7 +317,58 @@ fn main() -> Result<(), AgentError> {
     let rt = Runtime::new()
         .map_err(|e| AgentError::ConfigurationError(format!("Failed to create runtime: {}", e)))?;
     
-    // Main processing loop
+    // Channel for real process events from monitoring
+    use crossbeam_channel::{bounded, Receiver, Sender};
+    let (event_tx, event_rx): (Sender<ProcessEvent>, Receiver<ProcessEvent>) = bounded(10000);
+    
+    // Start real process monitoring task (scans /proc filesystem)
+    let running_monitor = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let monitor_tx = event_tx.clone();
+    let monitor_running = running_monitor.clone();
+    
+    std::thread::spawn(move || {
+        let mut last_pids = std::collections::HashSet::new();
+        
+        while monitor_running.load(std::sync::atomic::Ordering::Relaxed) {
+            // Scan /proc for current processes
+            let current_pids = AgentConfig::scan_proc_processes();
+            
+            // Detect new processes
+            for pid in &current_pids {
+                if !last_pids.contains(pid) {
+                    if let Some(proc_info) = AgentConfig::read_proc_process_info(*pid) {
+                        // Create ProcessEvent from real process data
+                        let process_event = ProcessEvent {
+                            event_type: ProcessEventType::Exec,
+                            pid: *pid as u32,
+                            ppid: Some(proc_info.ppid as u32),
+                            uid: proc_info.uid,
+                            gid: proc_info.gid,
+                            executable: Some(proc_info.executable),
+                            command_line: Some(proc_info.command_line),
+                            timestamp: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs(),
+                            mmap_address: None,
+                            mmap_size: None,
+                        };
+                        
+                        if monitor_tx.try_send(process_event).is_err() {
+                            warn!("Process event queue full, dropping event");
+                        }
+                    }
+                }
+            }
+            
+            last_pids = current_pids;
+            
+            // Scan interval: 1 second
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    });
+    
+    // Main processing loop - processes REAL events from monitoring
     let mut event_count = 0u64;
     loop {
         // Record watchdog heartbeat
@@ -235,6 +379,7 @@ fn main() -> Result<(), AgentError> {
             if let Err(e) = hardening.perform_runtime_checks() {
                 error!("Runtime check failed: {}, stopping", e);
                 hardening.stop_watchdog();
+                running_monitor.store(false, std::sync::atomic::Ordering::Relaxed);
                 return Err(AgentError::ConfigurationError(format!("Runtime hardening violation: {}", e)));
             }
             
@@ -242,6 +387,7 @@ fn main() -> Result<(), AgentError> {
             if hardening.is_tampered() {
                 error!("Tamper detected, stopping immediately");
                 hardening.stop_watchdog();
+                running_monitor.store(false, std::sync::atomic::Ordering::Relaxed);
                 return Err(AgentError::ConfigurationError("Tamper detected - fail-closed".to_string()));
             }
         }
@@ -250,113 +396,126 @@ fn main() -> Result<(), AgentError> {
         if !health_monitor.check_health()? {
             error!("Health check failed, stopping");
             hardening.stop_watchdog();
+            running_monitor.store(false, std::sync::atomic::Ordering::Relaxed);
             break;
         }
         
         // Check backpressure
-        let queue_size = 0; // Would be actual queue size in production
+        let queue_size = event_rx.len();
         backpressure.update_queue_size(queue_size);
         
         if backpressure.should_drop(queue_size) {
             backpressure.signal();
+            std::thread::sleep(std::time::Duration::from_millis(100));
             continue;
         }
         
         // Check rate limit
         if !rate_limiter.allow()? {
+            std::thread::sleep(std::time::Duration::from_millis(100));
             continue;
         }
         
-        // Generate and send events (at least once per second)
-        if event_count % 100 == 0 || event_count == 0 {
-            // Simulate process exec event
-            let process_event = process_monitor.record_exec(
-                (1234 + (event_count % 10000)) as u32,
-                Some(1000),
-                1000,
-                1000,
-                "/usr/bin/test".to_string(),
-                Some("test --arg".to_string()),
-            )?;
-            
-            let features = feature_extractor.extract_from_process(&process_event)?;
-            
-            let envelope_data = serde_json::to_vec(&process_event)
-                .map_err(|e| AgentError::EnvelopeCreationFailed(format!("{}", e)))?;
-            
-            let signature = security_signer.sign(&envelope_data)
-                .map_err(|e| AgentError::SigningFailed(format!("{}", e)))?;
-            
-            let envelope = envelope_builder.build_from_process(&process_event, &features, signature)?;
-            
-            health_monitor.record_event();
-            
-            info!("Event envelope created: {} (sequence: {})", 
-                envelope.event_id, envelope.sequence);
-            
-            // Step 1: Serialize EventEnvelope to canonical JSON bytes
-            let canonical_bytes = serde_json::to_vec(&envelope)
-                .map_err(|e| AgentError::EnvelopeCreationFailed(format!("Failed to serialize envelope: {}", e)))?;
-            
-            // Step 2: SHA-256 hash of canonical bytes
-            use sha2::{Sha256, Digest};
-            let mut hasher = Sha256::new();
-            hasher.update(&canonical_bytes);
-            let hash_bytes = hasher.finalize();
-            let payload_hash = hex::encode(hash_bytes);
-            
-            info!("Signing payload hash={} envelope_id={}", payload_hash, envelope.event_id);
-            
-            // Step 3: Sign the hash using Ed25519 (via SecurityEventSigner)
-            // SecurityEventSigner.sign() includes sequence number, so we sign the hash directly
-            info!("About to sign payload hash (length: {})", hash_bytes.len());
-            let signature = security_signer.sign(&hash_bytes)
-                .map_err(|e| {
-                    error!("Signing failed with error: {}", e);
-                    AgentError::SigningFailed(format!("Failed to sign hash with Ed25519: {}", e))
-                })?;
-            info!("Successfully signed payload hash");
-            
-            // Step 4: Create SignedEvent with new format
-            use serde_json::json;
-            let signed_event = json!({
-                "envelope": serde_json::from_slice::<serde_json::Value>(&canonical_bytes)
-                    .map_err(|e| AgentError::EnvelopeCreationFailed(format!("Failed to parse envelope JSON: {}", e)))?,
-                "payload_hash": payload_hash,
-                "signature": signature,
-                "signer_id": component_id,
-            });
-            
-            // Send directly via HTTP POST (async call in sync context)
-            let url = format!("{}/ingest/linux", core_api_url);
-            let url_clone = url.clone();
-            let client_clone = http_client.clone();
-            let envelope_id = envelope.event_id.clone();
-            
-            info!("POST /ingest/linux");
-            
-            match rt.block_on(async move {
-                let res = client_clone
-                    .post(&url)
-                    .json(&signed_event)
-                    .send()
-                    .await?;
-                Ok::<_, reqwest::Error>(res)
-            }) {
-                Ok(res) => {
-                    if res.status().is_success() {
-                        info!("POST {} -> {} OK | Telemetry delivered: {}", url_clone, res.status(), envelope_id);
-                    } else {
-                        error!("Failed to send event {}: HTTP {}", envelope_id, res.status());
+        // Receive REAL process events from monitoring (non-blocking)
+        match event_rx.try_recv() {
+            Ok(process_event) => {
+                // Record the real event in process monitor
+                if let (Some(exec), Some(cmd)) = (process_event.executable.clone(), process_event.command_line.clone()) {
+                    let _ = process_monitor.record_exec(
+                        process_event.pid,
+                        process_event.ppid,
+                        process_event.uid,
+                        process_event.gid,
+                        exec,
+                        cmd,
+                    );
+                }
+                
+                let features = feature_extractor.extract_from_process(&process_event)?;
+                
+                let envelope_data = serde_json::to_vec(&process_event)
+                    .map_err(|e| AgentError::EnvelopeCreationFailed(format!("{}", e)))?;
+                
+                let signature = security_signer.sign(&envelope_data)
+                    .map_err(|e| AgentError::SigningFailed(format!("{}", e)))?;
+                
+                let envelope = envelope_builder.build_from_process(&process_event, &features, signature)?;
+                
+                health_monitor.record_event();
+                event_count += 1;
+                
+                info!("Event envelope created from REAL process: {} (sequence: {}, pid: {})", 
+                    envelope.event_id, envelope.sequence, process_event.pid);
+                
+                // Step 1: Serialize EventEnvelope to canonical JSON bytes
+                let canonical_bytes = serde_json::to_vec(&envelope)
+                    .map_err(|e| AgentError::EnvelopeCreationFailed(format!("Failed to serialize envelope: {}", e)))?;
+                
+                // Step 2: SHA-256 hash of canonical bytes
+                use sha2::{Sha256, Digest};
+                let mut hasher = Sha256::new();
+                hasher.update(&canonical_bytes);
+                let hash_bytes = hasher.finalize();
+                let payload_hash = hex::encode(hash_bytes);
+                
+                info!("Signing payload hash={} envelope_id={}", payload_hash, envelope.event_id);
+                
+                // Step 3: Sign the hash using Ed25519 (via SecurityEventSigner)
+                info!("About to sign payload hash (length: {})", hash_bytes.len());
+                let signature = security_signer.sign(&hash_bytes)
+                    .map_err(|e| {
+                        error!("Signing failed with error: {}", e);
+                        AgentError::SigningFailed(format!("Failed to sign hash with Ed25519: {}", e))
+                    })?;
+                info!("Successfully signed payload hash");
+                
+                // Step 4: Create SignedEvent with new format
+                use serde_json::json;
+                let signed_event = json!({
+                    "envelope": serde_json::from_slice::<serde_json::Value>(&canonical_bytes)
+                        .map_err(|e| AgentError::EnvelopeCreationFailed(format!("Failed to parse envelope JSON: {}", e)))?,
+                    "payload_hash": payload_hash,
+                    "signature": signature,
+                    "signer_id": component_id,
+                });
+                
+                // Send directly via HTTP POST (async call in sync context)
+                let url = format!("{}/ingest/linux", core_api_url);
+                let url_clone = url.clone();
+                let client_clone = http_client.clone();
+                let envelope_id = envelope.event_id.clone();
+                
+                info!("POST /ingest/linux");
+                
+                match rt.block_on(async move {
+                    let res = client_clone
+                        .post(&url)
+                        .json(&signed_event)
+                        .send()
+                        .await?;
+                    Ok::<_, reqwest::Error>(res)
+                }) {
+                    Ok(res) => {
+                        if res.status().is_success() {
+                            info!("POST {} -> {} OK | Telemetry delivered: {}", url_clone, res.status(), envelope_id);
+                        } else {
+                            error!("Failed to send event {}: HTTP {}", envelope_id, res.status());
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to send event {}: {}", envelope_id, e);
                     }
                 }
-                Err(e) => {
-                    error!("Failed to send event {}: {}", envelope_id, e);
-                }
+            }
+            Err(crossbeam_channel::TryRecvError::Empty) => {
+                // No events available, sleep briefly
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                error!("Event channel disconnected");
+                break;
             }
         }
-        
-        event_count += 1;
         
         // Periodic stats
         if event_count % 10000 == 0 {
@@ -369,6 +528,8 @@ fn main() -> Result<(), AgentError> {
                 event_count, process_count, connection_count, bp_stats.events_dropped, health_stats.healthy);
         }
     }
+    
+    running_monitor.store(false, std::sync::atomic::Ordering::Relaxed);
     
     syscall_monitor.stop();
     hardening.stop_watchdog();

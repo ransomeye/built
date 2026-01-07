@@ -4,6 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RansomEye Security Operations Center</title>
+    <link rel="stylesheet" href="/static/theme.css">
+    <script>
+        // ============================================================
+        // UI SETTINGS APPLICATION (Non-blocking, Fail-Soft)
+        // ============================================================
+        // Fetches and applies UI appearance settings on page load
+        // Fails silently to defaults if API unavailable
+        
+        (function() {
+            // Default settings (fail-safe fallback)
+            const defaults = {
+                theme: 'soc_dark',
+                density: 'comfortable',
+                font_size: 'medium'
+            };
+            
+            // Font size scaling map
+            const fontScaleMap = {
+                'small': 0.875,
+                'medium': 1.0,
+                'large': 1.125
+            };
+            
+            // Apply settings to DOM (non-blocking, synchronous)
+            function applySettings(settings) {
+                const html = document.documentElement;
+                const body = document.body;
+                
+                // Apply theme
+                const theme = settings.theme || defaults.theme;
+                html.setAttribute('data-theme', theme);
+                
+                // Apply density
+                const density = settings.density || defaults.density;
+                // Remove existing density classes
+                body.classList.remove('density-compact', 'density-comfortable');
+                body.classList.add(`density-${density}`);
+                
+                // Apply font size scaling
+                const fontSize = settings.font_size || defaults.font_size;
+                const scale = fontScaleMap[fontSize] || fontScaleMap.medium;
+                document.documentElement.style.setProperty('--font-scale', scale.toString());
+            }
+            
+            // Fetch settings (non-blocking, async)
+            async function loadSettings() {
+                try {
+                    const response = await fetch('/api/ui/settings', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const settings = await response.json();
+                        applySettings(settings);
+                        // Cache settings in sessionStorage for consistency
+                        try {
+                            sessionStorage.setItem('ransomeye_ui_settings', JSON.stringify(settings));
+                        } catch (e) {
+                            // Ignore sessionStorage errors (private browsing, etc.)
+                        }
+                    } else {
+                        // Fallback to defaults on non-OK response
+                        applySettings(defaults);
+                    }
+                } catch (error) {
+                    // Fail-soft: use defaults on any error (network, timeout, etc.)
+                    console.debug('UI settings fetch failed, using defaults:', error);
+                    applySettings(defaults);
+                    
+                    // Try to use cached settings from sessionStorage
+                    try {
+                        const cached = sessionStorage.getItem('ransomeye_ui_settings');
+                        if (cached) {
+                            const settings = JSON.parse(cached);
+                            applySettings(settings);
+                        }
+                    } catch (e) {
+                        // Ignore cache errors
+                    }
+                }
+            }
+            
+            // Apply defaults immediately (prevents flash of unstyled content)
+            applySettings(defaults);
+            
+            // Fetch and apply actual settings (non-blocking)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadSettings);
+            } else {
+                // DOM already loaded, fetch immediately
+                loadSettings();
+            }
+        })();
+    </script>
     <style>
         /* ============================================================
            SOC-GRADE CALM DARK THEME - Enterprise Excellence
@@ -91,6 +187,28 @@
             display: flex;
             align-items: center;
             gap: var(--spacing-md);
+        }
+        
+        .header-brand-link {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+        
+        .header-brand-link:hover {
+            opacity: 0.8;
+        }
+        
+        .re-logo {
+            height: 32px;
+            width: auto;
+            display: block;
+            object-fit: contain;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            filter: brightness(1.1) contrast(1.05);
         }
         
         .header-brand h1 {
@@ -510,18 +628,74 @@
     </style>
 </head>
 <body>
-    <!-- Global Header -->
-    <header class="global-header">
-        <div class="header-brand">
-            <h1>RansomEye</h1>
-        </div>
-        <div class="header-status-group" id="header-status">
-            <div class="loading">Loading status...</div>
-        </div>
-    </header>
-    
-    <!-- Main Container -->
-    <div class="container">
+    <div class="app-layout">
+        <!-- Sidebar Toggle (Mobile Only) -->
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            ☰
+        </button>
+        
+        <!-- Left Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Branding -->
+            <div class="sidebar-brand">
+                <a href="/" class="sidebar-brand-link">
+                    <img src="/logo.png" alt="RansomEye" class="sidebar-logo">
+                </a>
+            </div>
+            
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- Dashboards section will be populated by JavaScript -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Dashboards</div>
+                    <ul class="sidebar-nav-list" id="dashboard-list">
+                        <li class="sidebar-nav-item">
+                            <a href="/" class="sidebar-nav-link active">SOC Dashboard</a>
+                        </li>
+                        <li class="sidebar-nav-item">
+                            <span class="sidebar-nav-link" style="color: var(--text-muted);">Loading...</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Divider -->
+                <hr class="sidebar-divider">
+                
+                <!-- Settings -->
+                <div class="sidebar-section">
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="#" class="sidebar-nav-link disabled">Settings</a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Administration -->
+                <div class="sidebar-section">
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="#" class="sidebar-nav-link disabled">Administration</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-content-header">
+                <div class="header-brand">
+                    <h1>RansomEye Security Operations Center</h1>
+                </div>
+                <div class="header-status-group" id="header-status">
+                    <div class="loading">Loading status...</div>
+                </div>
+            </header>
+            
+            <!-- Main Container -->
+            <div class="main-content-body">
+                <div class="container">
         <!-- Section 1: Ransomware Risk Snapshot -->
         <section class="risk-snapshot">
             <h2 class="section-title">Ransomware Risk Snapshot</h2>
@@ -553,12 +727,15 @@
                 <div class="loading">Loading sensor status...</div>
             </div>
         </section>
+                </div>
+                
+                <!-- Footer -->
+                <footer class="footer">
+                    © RansomEye.Tech | Support: Gagan@RansomEye.Tech
+                </footer>
+            </div>
+        </main>
     </div>
-    
-    <!-- Footer -->
-    <footer class="footer">
-        © RansomEye.Tech | Support: Gagan@RansomEye.Tech
-    </footer>
     
     <script>
         // ============================================================
@@ -853,6 +1030,118 @@
                 }
             });
         }
+        
+        // ============================================================
+        // SIDEBAR NAVIGATION
+        // ============================================================
+        
+        async function loadSidebarDashboards() {
+            const dashboardListEl = document.getElementById('dashboard-list');
+            if (!dashboardListEl) return;
+            
+            try {
+                // Fetch dashboard list
+                const response = await fetch('/api/dashboards');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const dashboardNames = data.dashboards || [];
+                
+                // Fetch full dashboard definitions to get categories
+                const dashboardDefs = await Promise.all(
+                    dashboardNames.map(async (name) => {
+                        try {
+                            const defResponse = await fetch(`/api/dashboards/${name}`);
+                            if (defResponse.ok) {
+                                return await defResponse.json();
+                            }
+                        } catch (e) {
+                            console.debug(`Failed to fetch dashboard ${name}:`, e);
+                        }
+                        // Fallback: minimal definition
+                        return { name, title: name, category: null };
+                    })
+                );
+                
+                // Group by category
+                const grouped = {};
+                dashboardDefs.forEach(dash => {
+                    const category = dash.category || dash.type || 'General';
+                    if (!grouped[category]) {
+                        grouped[category] = [];
+                    }
+                    grouped[category].push(dash);
+                });
+                
+                // Sort categories alphabetically, but put "General" first
+                const categories = Object.keys(grouped).sort((a, b) => {
+                    if (a === 'General') return -1;
+                    if (b === 'General') return 1;
+                    return a.localeCompare(b);
+                });
+                
+                // Render grouped dashboards (SOC Dashboard link already exists, so append others)
+                let html = '';
+                categories.forEach(category => {
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(category)}</div></li>`;
+                    grouped[category].forEach(dash => {
+                        const title = dash.title || dash.name;
+                        const href = `/dashboard/${escapeHtml(dash.name)}`;
+                        html += `
+                            <li class="sidebar-nav-item">
+                                <a href="${href}" class="sidebar-nav-link">
+                                    ${escapeHtml(title)}
+                                </a>
+                            </li>
+                        `;
+                    });
+                });
+                
+                // Replace the "Loading..." item with actual dashboards
+                const loadingItem = dashboardListEl.querySelector('span');
+                if (loadingItem) {
+                    loadingItem.parentElement.remove();
+                }
+                dashboardListEl.insertAdjacentHTML('beforeend', html);
+                
+            } catch (error) {
+                console.debug('Failed to load sidebar dashboards:', error);
+                const loadingItem = dashboardListEl.querySelector('span');
+                if (loadingItem) {
+                    loadingItem.textContent = 'Dashboards unavailable';
+                }
+            }
+        }
+        
+        // Sidebar toggle (mobile)
+        function initSidebarToggle() {
+            const toggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (toggle && sidebar) {
+                toggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('collapsed');
+                });
+                
+                // Close sidebar when clicking outside on mobile
+                document.addEventListener('click', (e) => {
+                    if (window.innerWidth <= 768 && 
+                        !sidebar.contains(e.target) && 
+                        !toggle.contains(e.target) &&
+                        !sidebar.classList.contains('collapsed')) {
+                        sidebar.classList.add('collapsed');
+                    }
+                });
+            }
+        }
+        
+        // Load sidebar navigation
+        loadSidebarDashboards();
+        
+        // Initialize sidebar toggle
+        initSidebarToggle();
         
         // Load dashboard on page load
         loadDashboard();
