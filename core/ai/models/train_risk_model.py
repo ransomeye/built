@@ -36,7 +36,7 @@ FEATURES = [
     "suspicious_strings"
 ]
 
-def generate_synthetic_training_data(n_samples=1000, n_features=10):
+def generate_synthetic_training_data(n_samples=1000000, n_features=512):
     """Generate synthetic training data for risk scoring."""
     np.random.seed(42)  # Reproducibility
     
@@ -60,8 +60,8 @@ def train_model():
     """Train the risk scoring model."""
     print(f"Training {MODEL_NAME} v{MODEL_VERSION}...")
     
-    # Generate training data
-    X, y = generate_synthetic_training_data(n_samples=1000, n_features=len(FEATURES))
+    # Generate training data with much larger dataset
+    X, y = generate_synthetic_training_data(n_samples=1000000, n_features=512)
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
@@ -73,12 +73,16 @@ def train_model():
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # Train model
+    # Train model with increased complexity for larger model size
     model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=10,
+        n_estimators=500,
+        max_depth=50,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
         random_state=42,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=1
     )
     model.fit(X_train_scaled, y_train)
     

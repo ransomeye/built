@@ -1,6 +1,6 @@
 {
   "baseline_shap_version": "1.0.0",
-  "generated": "2026-01-07T10:45:31.727214Z",
+  "generated": "2026-01-07T12:18:22.406782Z",
   "models": {
     "ransomware_behavior.model": {
       "mean_absolute_shap": [
@@ -39,7 +39,7 @@
         77,
         80
       ],
-      "expected_base_value": 5.3571428571428575e-05,
+      "expected_base_value": 6.45e-05,
       "validation_thresholds": {
         "min_shap_sum": -1.0,
         "max_shap_sum": 1.0,
@@ -84,7 +84,7 @@
         119,
         118
       ],
-      "expected_base_value": 0.06627552541865193,
+      "expected_base_value": 0.0658954088015117,
       "validation_thresholds": {
         "min_shap_sum": -0.5,
         "max_shap_sum": 0.5,
@@ -129,7 +129,7 @@
         60,
         61
       ],
-      "expected_base_value": 3.469221501804122e-05,
+      "expected_base_value": 3.207012062516292e-05,
       "validation_thresholds": {
         "min_shap_sum": -0.8,
         "max_shap_sum": 0.8,

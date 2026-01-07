@@ -20,7 +20,7 @@ warnings.filterwarnings('ignore')
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
-def generate_trust_scoring_training_data(n_samples=40000, n_features=96):
+def generate_trust_scoring_training_data(n_samples=1000000, n_features=512):
     """Generate synthetic trust scoring training data."""
     # Features: source reputation, IOC quality, recency, verification, etc.
     X = np.random.rand(n_samples, n_features)
@@ -44,19 +44,23 @@ def main():
     print("Training threat intel trust scoring model...")
     
     # Generate training data
-    X, y = generate_trust_scoring_training_data(n_samples=40000, n_features=96)
+    X, y = generate_trust_scoring_training_data(n_samples=1000000, n_features=512)
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_SEED
     )
     
-    # Train trust scoring model
+    # Train trust scoring model with increased complexity
     trust_model = GradientBoostingRegressor(
-        n_estimators=100,
-        max_depth=5,
-        learning_rate=0.1,
-        random_state=RANDOM_SEED
+        n_estimators=500,
+        max_depth=20,
+        learning_rate=0.05,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
+        random_state=RANDOM_SEED,
+        verbose=1
     )
     trust_model.fit(X_train, y_train)
     
@@ -81,7 +85,7 @@ def main():
     # Train clustering model
     print("Training IOC clustering model...")
     cluster_model = DBSCAN(eps=0.5, min_samples=5)
-    cluster_labels = cluster_model.fit_predict(X_train[:10000])  # Sample for clustering
+    cluster_labels = cluster_model.fit_predict(X_train[:100000])  # Use more samples for clustering
     
     cluster_model_path = models_dir / "ioc_clusterer.model"
     with open(cluster_model_path, 'wb') as f:

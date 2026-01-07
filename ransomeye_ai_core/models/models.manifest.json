@@ -1,0 +1,21 @@
+{
+  "model_name": "risk_model",
+  "model_version": "1.0.0",
+  "model_hash": "0c749aef49acec9772356816b52084a85ca41110795610c321dd737a058af455",
+  "model_size_bytes": 1055801,
+  "signature": "",
+  "trained_on": "2026-01-07T12:09:24.317147Z",
+  "model_type": "RandomForestClassifier",
+  "features": [
+    "network_connections",
+    "file_operations",
+    "process_creations",
+    "registry_modifications",
+    "network_bytes_sent",
+    "network_bytes_received",
+    "cpu_usage",
+    "memory_usage",
+    "disk_io",
+    "suspicious_strings"
+  ]
+}

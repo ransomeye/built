@@ -1,0 +1,937 @@
+<!-- Path and File Name : /home/ransomeye/rebuild/ui/templates/incident_report.html -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gQ -->
+<!-- Details: Share Incident Report - forensic read-only report for share activity in a time window -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Share Incident Report - RansomEye</title>
+    <link rel="stylesheet" href="/static/theme.css">
+    <script>
+        // ============================================================
+        // UI SETTINGS APPLICATION (Non-blocking, Fail-Soft)
+        // ============================================================
+        (function() {
+            const defaults = {
+                theme: 'soc_dark',
+                density: 'comfortable',
+                font_size: 'medium'
+            };
+            
+            const fontScaleMap = {
+                'small': 0.875,
+                'medium': 1.0,
+                'large': 1.125
+            };
+            
+            function applySettings(settings) {
+                const html = document.documentElement;
+                const body = document.body;
+                
+                const theme = settings.theme || defaults.theme;
+                html.setAttribute('data-theme', theme);
+                
+                const density = settings.density || defaults.density;
+                body.classList.remove('density-compact', 'density-comfortable');
+                body.classList.add(`density-${density}`);
+                
+                const fontSize = settings.font_size || defaults.font_size;
+                const scale = fontScaleMap[fontSize] || fontScaleMap.medium;
+                document.documentElement.style.setProperty('--font-scale', scale.toString());
+            }
+            
+            async function loadSettings() {
+                try {
+                    const response = await fetch('/api/ui/settings', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const settings = await response.json();
+                        applySettings(settings);
+                        try {
+                            sessionStorage.setItem('ransomeye_ui_settings', JSON.stringify(settings));
+                        } catch (e) {}
+                    } else {
+                        applySettings(defaults);
+                    }
+                } catch (error) {
+                    console.debug('UI settings fetch failed, using defaults:', error);
+                    applySettings(defaults);
+                    try {
+                        const cached = sessionStorage.getItem('ransomeye_ui_settings');
+                        if (cached) {
+                            const settings = JSON.parse(cached);
+                            applySettings(settings);
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            applySettings(defaults);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadSettings);
+            } else {
+                loadSettings();
+            }
+        })();
+    </script>
+    <style>
+        .incident-report-container {
+            padding: var(--spacing-lg);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .incident-report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
+        }
+        
+        .incident-report-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .incident-report-controls {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .control-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .control-item label {
+            display: block;
+            margin-bottom: var(--spacing-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+        
+        .control-item input[type="datetime-local"] {
+            width: 100%;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: var(--font-size-base);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .control-item input[type="datetime-local"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .generate-button {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .generate-button:hover:not(:disabled) {
+            background: var(--accent-muted);
+        }
+        
+        .generate-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .summary-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: var(--spacing-lg);
+        }
+        
+        .summary-card-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .summary-card-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .timeline-container {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .timeline-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .timeline-table thead {
+            background: var(--bg-tertiary);
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .timeline-table th {
+            padding: var(--spacing-md);
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+        
+        .timeline-table td {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .timeline-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .event-type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .event-type-badge.create {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+        
+        .event-type-badge.access {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+        
+        .event-type-badge.rotate {
+            background: rgba(234, 179, 8, 0.1);
+            color: #eab308;
+        }
+        
+        .event-type-badge.revoke {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        
+        .outcome-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .outcome-badge.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+        
+        .outcome-badge.rate_limited {
+            background: rgba(234, 179, 8, 0.1);
+            color: #eab308;
+        }
+        
+        .outcome-badge.deny {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+        
+        .top-dashboards-container {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            padding: var(--spacing-lg);
+        }
+        
+        .top-dashboards-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .top-dashboards-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .top-dashboards-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .top-dashboards-item:last-child {
+            border-bottom: none;
+        }
+        
+        .top-dashboards-name {
+            color: var(--text-primary);
+        }
+        
+        .top-dashboards-count {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .incident-report-error {
+            padding: var(--spacing-md);
+            background: var(--bg-error);
+            border: 1px solid var(--border-error);
+            border-radius: var(--border-radius);
+            color: var(--text-error);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .incident-report-empty {
+            padding: var(--spacing-xl);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        .incident-report-loading {
+            padding: var(--spacing-xl);
+            text-align: center;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Toggle (Mobile Only) -->
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            ☰
+        </button>
+        
+        <!-- Left Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Branding -->
+            <div class="sidebar-brand">
+                <a href="/" class="sidebar-brand-link">
+                    <img src="/logo.png" alt="RansomEye" class="sidebar-logo">
+                </a>
+            </div>
+            
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- Dashboards section will be populated by JavaScript -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Dashboards</div>
+                    <ul class="sidebar-nav-list" id="dashboard-list">
+                        <li class="sidebar-nav-item">
+                            <a href="/" class="sidebar-nav-link">SOC Dashboard</a>
+                        </li>
+                        <li class="sidebar-nav-item">
+                            <span class="sidebar-nav-link" style="color: var(--text-muted);">Loading...</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Divider -->
+                <hr class="sidebar-divider">
+                
+                <!-- Administration -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Administration</div>
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="/shares/activity" class="sidebar-nav-link">Shared Dashboards</a>
+                        </li>
+                        <li class="sidebar-nav-item">
+                            <a href="/shares/incident-report" class="sidebar-nav-link active">Incident Report</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-content-header">
+                <div class="header-brand">
+                    <h1>Share Incident Report</h1>
+                </div>
+            </header>
+            
+            <!-- Main Container -->
+            <div class="main-content-body">
+                <div class="incident-report-container">
+                    <div class="incident-report-header">
+                        <h2 class="incident-report-title">Forensic Share Activity Report</h2>
+                        <button 
+                            type="button" 
+                            id="export-csv-button" 
+                            class="button-secondary"
+                            aria-label="Export to CSV"
+                            style="display: none;"
+                        >
+                            Export CSV
+                        </button>
+                    </div>
+                    
+                    <div id="incident-report-error" class="incident-report-error" style="display: none;"></div>
+                    
+                    <div class="incident-report-controls">
+                        <div class="control-group">
+                            <div class="control-item">
+                                <label for="from-datetime">From (UTC)</label>
+                                <input 
+                                    type="datetime-local" 
+                                    id="from-datetime" 
+                                    required
+                                />
+                            </div>
+                            <div class="control-item">
+                                <label for="to-datetime">To (UTC)</label>
+                                <input 
+                                    type="datetime-local" 
+                                    id="to-datetime" 
+                                    required
+                                />
+                            </div>
+                            <div class="control-item" style="flex: 0 0 auto;">
+                                <button 
+                                    type="button" 
+                                    id="generate-button" 
+                                    class="generate-button"
+                                >
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="report-content" style="display: none;">
+                        <!-- Summary Cards -->
+                        <div class="summary-cards" id="summary-cards">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                        
+                        <!-- Timeline -->
+                        <div class="timeline-container">
+                            <table class="timeline-table" id="timeline-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Event Type</th>
+                                        <th>Dashboard</th>
+                                        <th>Token ID</th>
+                                        <th>Outcome</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timeline-tbody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Top Dashboards -->
+                        <div class="top-dashboards-container">
+                            <h3 class="top-dashboards-title">Top Dashboards by Access Count</h3>
+                            <ul class="top-dashboards-list" id="top-dashboards-list">
+                                <!-- Populated by JavaScript -->
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div id="report-loading" class="incident-report-loading" style="display: none;">
+                        Generating report...
+                    </div>
+                    
+                    <div id="report-empty" class="incident-report-empty" style="display: none;">
+                        No data available for the selected time range.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // ============================================================
+        // SHARE INCIDENT REPORT
+        // ============================================================
+        
+        let reportData = null;
+        
+        // Load sidebar dashboards
+        async function loadSidebarDashboards() {
+            const dashboardListEl = document.getElementById('dashboard-list');
+            if (!dashboardListEl) return;
+            
+            try {
+                const [foldersResponse, dashboardsResponse] = await Promise.all([
+                    fetch('/api/dashboard-folders'),
+                    fetch('/api/dashboards')
+                ]);
+                
+                if (!foldersResponse.ok || !dashboardsResponse.ok) {
+                    throw new Error(`HTTP ${foldersResponse.status} or ${dashboardsResponse.status}`);
+                }
+                
+                const folders = await foldersResponse.json();
+                const dashboardsData = await dashboardsResponse.json();
+                const dashboardsWithFolders = dashboardsData.dashboards_with_folders || [];
+                
+                const dashboardDefs = await Promise.all(
+                    dashboardsWithFolders.map(async (dash) => {
+                        try {
+                            const response = await fetch(`/api/dashboards/${encodeURIComponent(dash.name)}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                return { ...dash, title: data.title || dash.name };
+                            }
+                        } catch (e) {
+                            console.debug(`Failed to load dashboard ${dash.name}:`, e);
+                        }
+                        return { ...dash, title: dash.name };
+                    })
+                );
+                
+                const groupedByFolder = {};
+                dashboardDefs.forEach(dash => {
+                    const folderId = dash.folder_id || 'unknown';
+                    if (!groupedByFolder[folderId]) {
+                        groupedByFolder[folderId] = [];
+                    }
+                    groupedByFolder[folderId].push(dash);
+                });
+                
+                const sortedFolders = folders.slice().sort((a, b) => {
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+                
+                let html = '';
+                sortedFolders.forEach(folder => {
+                    const dashboards = groupedByFolder[folder.id] || [];
+                    if (dashboards.length === 0) return;
+                    
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(folder.name)}</div></li>`;
+                    
+                    dashboards.forEach(dash => {
+                        const title = dash.title || dash.name;
+                        const href = `/dashboard/${escapeHtml(dash.name)}`;
+                        html += `
+                            <li class="sidebar-nav-item">
+                                <a href="${href}" class="sidebar-nav-link">
+                                    ${escapeHtml(title)}
+                                </a>
+                            </li>
+                        `;
+                    });
+                });
+                
+                const knownFolderIds = new Set(folders.map(f => f.id));
+                Object.keys(groupedByFolder).forEach(folderId => {
+                    if (!knownFolderIds.has(folderId) && groupedByFolder[folderId].length > 0) {
+                        html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">General</div></li>`;
+                        groupedByFolder[folderId].forEach(dash => {
+                            const title = dash.title || dash.name;
+                            const href = `/dashboard/${escapeHtml(dash.name)}`;
+                            html += `
+                                <li class="sidebar-nav-item">
+                                    <a href="${href}" class="sidebar-nav-link">
+                                        ${escapeHtml(title)}
+                                    </a>
+                                </li>
+                            `;
+                        });
+                    }
+                });
+                
+                dashboardListEl.innerHTML = html;
+                
+            } catch (error) {
+                console.debug('Failed to load sidebar dashboards:', error);
+                dashboardListEl.innerHTML = `
+                    <li class="sidebar-nav-item">
+                        <span class="sidebar-nav-link" style="color: var(--text-muted);">Dashboards unavailable</span>
+                    </li>
+                `;
+            }
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Format timestamp
+        function formatTimestamp(isoString) {
+            if (!isoString) return 'N/A';
+            try {
+                const date = new Date(isoString);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZone: 'UTC',
+                    timeZoneName: 'short'
+                });
+            } catch (e) {
+                return isoString;
+            }
+        }
+        
+        // Convert datetime-local to ISO string
+        function datetimeLocalToISO(datetimeLocal) {
+            if (!datetimeLocal) return null;
+            // datetime-local is in local time, but we need UTC
+            // Convert to ISO string with Z suffix
+            const date = new Date(datetimeLocal);
+            return date.toISOString();
+        }
+        
+        // Generate report
+        async function generateReport() {
+            const fromInput = document.getElementById('from-datetime');
+            const toInput = document.getElementById('to-datetime');
+            const errorDiv = document.getElementById('incident-report-error');
+            const reportContent = document.getElementById('report-content');
+            const reportLoading = document.getElementById('report-loading');
+            const reportEmpty = document.getElementById('report-empty');
+            const exportButton = document.getElementById('export-csv-button');
+            
+            if (!fromInput.value || !toInput.value) {
+                errorDiv.textContent = 'Please select both "From" and "To" dates.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            const fromISO = datetimeLocalToISO(fromInput.value);
+            const toISO = datetimeLocalToISO(toInput.value);
+            
+            if (!fromISO || !toISO) {
+                errorDiv.textContent = 'Invalid date format.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Show loading
+            errorDiv.style.display = 'none';
+            reportContent.style.display = 'none';
+            reportEmpty.style.display = 'none';
+            reportLoading.style.display = 'block';
+            exportButton.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/shares/incident-report?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status !== 'success') {
+                    throw new Error(result.error || 'Failed to generate report');
+                }
+                
+                reportData = result.report;
+                
+                // Check if report has data
+                const hasData = reportData.timeline && reportData.timeline.length > 0;
+                
+                if (!hasData) {
+                    reportLoading.style.display = 'none';
+                    reportEmpty.style.display = 'block';
+                    return;
+                }
+                
+                // Render report
+                renderReport(reportData);
+                
+                reportLoading.style.display = 'none';
+                reportContent.style.display = 'block';
+                exportButton.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error generating report:', error);
+                errorDiv.textContent = `Failed to generate report: ${error.message}`;
+                errorDiv.style.display = 'block';
+                reportLoading.style.display = 'none';
+            }
+        }
+        
+        // Render report
+        function renderReport(data) {
+            // Render summary cards
+            const summaryCards = document.getElementById('summary-cards');
+            const summary = data.summary || {};
+            
+            summaryCards.innerHTML = `
+                <div class="summary-card">
+                    <div class="summary-card-label">Shares Created</div>
+                    <div class="summary-card-value">${summary.total_shares_created || 0}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Shares Revoked</div>
+                    <div class="summary-card-value">${summary.total_shares_revoked || 0}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Access Attempts</div>
+                    <div class="summary-card-value">${summary.total_access_attempts || 0}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Rate Limited</div>
+                    <div class="summary-card-value">${summary.total_rate_limited || 0}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Expired</div>
+                    <div class="summary-card-value">${summary.total_expired || 0}</div>
+                </div>
+            `;
+            
+            // Render timeline
+            const timelineTbody = document.getElementById('timeline-tbody');
+            const timeline = data.timeline || [];
+            
+            if (timeline.length === 0) {
+                timelineTbody.innerHTML = '<tr><td colspan="5" class="incident-report-empty">No events in this time range.</td></tr>';
+            } else {
+                let html = '';
+                timeline.forEach(event => {
+                    const eventType = event.event_type || 'unknown';
+                    const outcome = event.outcome || 'unknown';
+                    
+                    html += `
+                        <tr>
+                            <td class="timestamp">${formatTimestamp(event.timestamp)}</td>
+                            <td><span class="event-type-badge ${eventType}">${escapeHtml(eventType)}</span></td>
+                            <td>${escapeHtml(event.dashboard_name || 'N/A')}</td>
+                            <td class="timestamp">${escapeHtml(event.token_id || 'N/A')}</td>
+                            <td><span class="outcome-badge ${outcome}">${escapeHtml(outcome)}</span></td>
+                        </tr>
+                    `;
+                });
+                timelineTbody.innerHTML = html;
+            }
+            
+            // Render top dashboards
+            const topDashboardsList = document.getElementById('top-dashboards-list');
+            const topDashboards = data.top_dashboards || [];
+            
+            if (topDashboards.length === 0) {
+                topDashboardsList.innerHTML = '<li class="top-dashboards-item"><span class="top-dashboards-name">No dashboard access in this time range.</span></li>';
+            } else {
+                let html = '';
+                topDashboards.forEach(dash => {
+                    html += `
+                        <li class="top-dashboards-item">
+                            <span class="top-dashboards-name">${escapeHtml(dash.dashboard_name)}</span>
+                            <span class="top-dashboards-count">${dash.access_count} access${dash.access_count !== 1 ? 'es' : ''}</span>
+                        </li>
+                    `;
+                });
+                topDashboardsList.innerHTML = html;
+            }
+        }
+        
+        // Export to CSV
+        function exportToCSV() {
+            if (!reportData) {
+                alert('No report data to export. Please generate a report first.');
+                return;
+            }
+            
+            const fromInput = document.getElementById('from-datetime');
+            const toInput = document.getElementById('to-datetime');
+            const fromDate = fromInput.value ? fromInput.value.replace(/:/g, '-').replace('T', '_') : 'unknown';
+            const toDate = toInput.value ? toInput.value.replace(/:/g, '-').replace('T', '_') : 'unknown';
+            
+            // Summary row
+            const summary = reportData.summary || {};
+            const summaryRow = [
+                'Summary',
+                summary.total_shares_created || 0,
+                summary.total_shares_revoked || 0,
+                summary.total_access_attempts || 0,
+                summary.total_rate_limited || 0,
+                summary.total_expired || 0
+            ];
+            
+            // Timeline headers
+            const timelineHeaders = ['Timestamp', 'Event Type', 'Dashboard', 'Token ID', 'Outcome'];
+            const timelineRows = (reportData.timeline || []).map(event => [
+                event.timestamp || '',
+                event.event_type || '',
+                event.dashboard_name || '',
+                event.token_id || '',
+                event.outcome || ''
+            ]);
+            
+            // Top dashboards headers
+            const topDashboardsHeaders = ['Dashboard', 'Access Count'];
+            const topDashboardsRows = (reportData.top_dashboards || []).map(dash => [
+                dash.dashboard_name || '',
+                dash.access_count || 0
+            ]);
+            
+            // Combine all sections
+            const csvLines = [
+                'RansomEye Share Incident Report',
+                `Generated: ${new Date().toISOString()}`,
+                `Time Range: ${fromDate} to ${toDate}`,
+                '',
+                'Summary',
+                'Shares Created,Shares Revoked,Access Attempts,Rate Limited,Expired',
+                summaryRow.slice(1).join(','),
+                '',
+                'Timeline',
+                timelineHeaders.join(','),
+                ...timelineRows.map(row => row.map(cell => {
+                    const str = String(cell);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(',')),
+                '',
+                'Top Dashboards',
+                topDashboardsHeaders.join(','),
+                ...topDashboardsRows.map(row => row.map(cell => {
+                    const str = String(cell);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(','))
+            ];
+            
+            const csvContent = csvLines.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `ransomeye_incident_report_${fromDate}_${toDate}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Sidebar toggle
+        function initSidebarToggle() {
+            const toggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (toggle && sidebar) {
+                toggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('sidebar-open');
+                });
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSidebarDashboards();
+            initSidebarToggle();
+            
+            // Set default time range (last 7 days)
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            const fromInput = document.getElementById('from-datetime');
+            const toInput = document.getElementById('to-datetime');
+            
+            // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+            const formatForInput = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            fromInput.value = formatForInput(sevenDaysAgo);
+            toInput.value = formatForInput(now);
+            
+            // Generate button handler
+            const generateButton = document.getElementById('generate-button');
+            if (generateButton) {
+                generateButton.addEventListener('click', generateReport);
+            }
+            
+            // Export button handler
+            const exportButton = document.getElementById('export-csv-button');
+            if (exportButton) {
+                exportButton.addEventListener('click', exportToCSV);
+            }
+        });
+    </script>
+</body>
+</html>
+

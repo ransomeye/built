@@ -3,7 +3,7 @@
   "model_version": "1.0.0",
   "model_hash": "d23083f28eb4368da8e7a924c1aa3e4df0e06955c700cd5d2b4253126ab4679d",
   "model_size_bytes": 97977431,
-  "trained_on": "2026-01-07T10:45:30.753477Z",
+  "trained_on": "2026-01-07T12:18:21.544504Z",
   "model_type": "RandomForestClassifier",
   "accuracy": 0.3080833333333333,
   "n_features": 192,

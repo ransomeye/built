@@ -747,6 +747,20 @@
                                 </div>
                             </div>
                             <div id="share-dashboard-form" style="display: none;">
+                                <div id="share-policy-info" class="share-policy-section" style="display: none;">
+                                    <div class="share-policy-item">
+                                        <strong>Sharing Status:</strong>
+                                        <span id="share-policy-enabled" class="policy-status">-</span>
+                                    </div>
+                                    <div class="share-policy-item">
+                                        <strong>Default Expiry:</strong>
+                                        <span id="share-policy-default-expiry">-</span>
+                                    </div>
+                                    <div class="share-policy-item">
+                                        <strong>Max Expiry:</strong>
+                                        <span id="share-policy-max-expiry">-</span>
+                                    </div>
+                                </div>
                                 <form id="create-share-form">
                                     <div class="form-group">
                                         <label for="share-expires-in">Expiration (Optional)</label>
@@ -3152,10 +3166,100 @@
             const rotateButton = document.getElementById('rotate-share-button');
             const revokeButton = document.getElementById('revoke-share-button');
             const submitButton = document.getElementById('share-dashboard-submit');
+            const policyInfoDiv = document.getElementById('share-policy-info');
             
             if (!modal || !shareButton || !dashboardName) return;
             
             let currentShareToken = null;
+            let sharePolicy = null;
+            
+            // Load share policy
+            async function loadSharePolicy() {
+                try {
+                    const response = await fetch('/api/ui/share-policy', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        sharePolicy = await response.json();
+                        displayPolicyInfo();
+                        applyPolicyRestrictions();
+                    }
+                } catch (error) {
+                    console.error('Error loading share policy:', error);
+                    // Fail-soft: assume sharing is enabled if policy fetch fails
+                    sharePolicy = { enabled: true, default_expiry_days: null, max_expiry_days: null };
+                }
+            }
+            
+            // Display policy info
+            function displayPolicyInfo() {
+                if (!sharePolicy || !policyInfoDiv) return;
+                
+                const enabledEl = document.getElementById('share-policy-enabled');
+                const defaultExpiryEl = document.getElementById('share-policy-default-expiry');
+                const maxExpiryEl = document.getElementById('share-policy-max-expiry');
+                
+                if (enabledEl) {
+                    enabledEl.textContent = sharePolicy.enabled ? 'Enabled' : 'Disabled';
+                    enabledEl.className = sharePolicy.enabled ? 'policy-status policy-enabled' : 'policy-status policy-disabled';
+                }
+                
+                if (defaultExpiryEl) {
+                    defaultExpiryEl.textContent = sharePolicy.default_expiry_days 
+                        ? `${sharePolicy.default_expiry_days} days` 
+                        : 'No default';
+                }
+                
+                if (maxExpiryEl) {
+                    maxExpiryEl.textContent = sharePolicy.max_expiry_days 
+                        ? `${sharePolicy.max_expiry_days} days` 
+                        : 'No limit';
+                }
+                
+                policyInfoDiv.style.display = 'block';
+            }
+            
+            // Apply policy restrictions to UI
+            function applyPolicyRestrictions() {
+                if (!sharePolicy) return;
+                
+                const sharingDisabled = !sharePolicy.enabled;
+                
+                // Disable form submission if sharing disabled
+                if (submitButton) {
+                    submitButton.disabled = sharingDisabled;
+                    if (sharingDisabled) {
+                        submitButton.title = 'Dashboard sharing is disabled by policy';
+                    } else {
+                        submitButton.title = '';
+                    }
+                }
+                
+                // Disable rotate button if sharing disabled
+                if (rotateButton) {
+                    rotateButton.disabled = sharingDisabled || rotateButton.disabled;
+                    if (sharingDisabled && !rotateButton.disabled) {
+                        rotateButton.title = 'Dashboard sharing is disabled by policy';
+                    }
+                }
+                
+                // Note: Revoke can still work even if sharing is disabled (to clean up existing shares)
+                
+                // Update expiry select options based on max_expiry_days
+                const expirySelect = document.getElementById('share-expires-in');
+                if (expirySelect && sharePolicy.max_expiry_days) {
+                    const options = expirySelect.querySelectorAll('option[value]');
+                    options.forEach(option => {
+                        const value = parseInt(option.value);
+                        if (value && value > sharePolicy.max_expiry_days) {
+                            option.disabled = true;
+                            option.textContent += ` (exceeds max: ${sharePolicy.max_expiry_days} days)`;
+                        }
+                    });
+                }
+            }
             
             // Show modal
             function openModal() {
@@ -3172,7 +3276,8 @@
                 form.reset();
                 currentShareToken = null;
                 
-                // Check for existing shares
+                // Load policy and existing shares
+                loadSharePolicy();
                 loadExistingShares();
             }
             
@@ -3210,6 +3315,11 @@
                             // Show form to create new share
                             formDiv.style.display = 'block';
                             successDiv.style.display = 'none';
+                        }
+                        
+                        // Apply policy restrictions after loading shares
+                        if (sharePolicy) {
+                            applyPolicyRestrictions();
                         }
                     }
                 } catch (error) {
@@ -3260,10 +3370,14 @@
                 
                 // Disable actions for expired/revoked tokens
                 const isExpired = status === 'expired' || status === 'revoked';
+                const sharingDisabled = sharePolicy && !sharePolicy.enabled;
+                
                 if (rotateButton) {
-                    rotateButton.disabled = isExpired;
+                    rotateButton.disabled = isExpired || sharingDisabled;
                     if (isExpired) {
                         rotateButton.title = 'Cannot rotate expired or revoked share link';
+                    } else if (sharingDisabled) {
+                        rotateButton.title = 'Dashboard sharing is disabled by policy';
                     } else {
                         rotateButton.title = '';
                     }
@@ -3288,9 +3402,23 @@
                 e.preventDefault();
                 if (!form || !dashboardName) return;
                 
+                // Check policy (fail-soft UI check, backend will enforce)
+                if (sharePolicy && !sharePolicy.enabled) {
+                    errorDiv.textContent = 'Dashboard sharing is disabled by policy';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
                 // Get expiration
                 const expiresInDays = form.querySelector('#share-expires-in').value;
                 const expiresInDaysNum = expiresInDays ? parseInt(expiresInDays) : null;
+                
+                // Validate expiry against max policy (fail-soft UI check, backend will enforce)
+                if (sharePolicy && sharePolicy.max_expiry_days && expiresInDaysNum && expiresInDaysNum > sharePolicy.max_expiry_days) {
+                    errorDiv.textContent = `Expiry exceeds maximum allowed (${sharePolicy.max_expiry_days} days)`;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
                 
                 // Show loading
                 loadingDiv.style.display = 'block';
@@ -3360,6 +3488,13 @@
             // Handle rotate
             async function handleRotate() {
                 if (!currentShareToken || !dashboardName) return;
+                
+                // Check policy (fail-soft UI check, backend will enforce)
+                if (sharePolicy && !sharePolicy.enabled) {
+                    errorDiv.textContent = 'Dashboard sharing is disabled by policy';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
                 
                 if (!confirm('Rotate this share link? The old link will stop working and a new link will be created.')) {
                     return;

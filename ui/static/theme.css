@@ -2931,6 +2931,48 @@ body.density-compact .panel.edit-mode-panel .resize-handle-w {
     font-weight: var(--font-weight-medium);
 }
 
+.share-policy-section {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius);
+    font-size: var(--font-size-sm);
+}
+
+.share-policy-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-secondary);
+}
+
+.share-policy-item:last-child {
+    margin-bottom: 0;
+}
+
+.share-policy-item strong {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
+}
+
+.policy-status {
+    font-weight: var(--font-weight-medium);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+}
+
+.policy-status.policy-enabled {
+    background: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.policy-status.policy-disabled {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+}
+
 .share-actions-section {
     margin-top: var(--spacing-lg);
     padding-top: var(--spacing-lg);

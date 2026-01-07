@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
 
-def generate_correlation_training_data(n_samples=50000, n_features=128):
+def generate_correlation_training_data(n_samples=1000000, n_features=512):
     """Generate synthetic threat correlation training data."""
     # Features: entity similarity, temporal proximity, IOC overlap, etc.
     X = np.random.rand(n_samples, n_features)
@@ -43,19 +43,23 @@ def main():
     print("Training threat correlation confidence predictor...")
     
     # Generate training data
-    X, y = generate_correlation_training_data(n_samples=50000, n_features=128)
+    X, y = generate_correlation_training_data(n_samples=1000000, n_features=512)
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_SEED
     )
     
-    # Train model
+    # Train model with increased complexity for larger model size
     model = GradientBoostingRegressor(
-        n_estimators=100,
-        max_depth=5,
-        learning_rate=0.1,
-        random_state=RANDOM_SEED
+        n_estimators=500,
+        max_depth=20,
+        learning_rate=0.05,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
+        random_state=RANDOM_SEED,
+        verbose=1
     )
     model.fit(X_train, y_train)
     
@@ -87,8 +91,8 @@ def main():
         'model_type': 'GradientBoostingRegressor',
         'mse': float(mse),
         'r2_score': float(r2),
-        'n_features': 128,
-        'n_samples': 50000
+        'n_features': 512,
+        'n_samples': 1000000
     }
     
     metadata_path = models_dir / "confidence_predictor_metadata.json"

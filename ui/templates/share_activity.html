@@ -280,6 +280,15 @@
                         <div class="share-activity-actions">
                             <button 
                                 type="button" 
+                                id="revoke-all-shares-button" 
+                                class="button-danger"
+                                aria-label="Revoke All Shares"
+                                title="Revoke all your active share links"
+                            >
+                                Revoke All Shares
+                            </button>
+                            <button 
+                                type="button" 
                                 id="export-csv-button" 
                                 class="button-secondary"
                                 aria-label="Export to CSV"
@@ -719,6 +728,106 @@
             const exportButton = document.getElementById('export-csv-button');
             if (exportButton) {
                 exportButton.addEventListener('click', exportToCSV);
+            }
+            
+            // Revoke All Shares handler
+            const revokeAllButton = document.getElementById('revoke-all-shares-button');
+            if (revokeAllButton) {
+                revokeAllButton.addEventListener('click', async () => {
+                    // Strong confirmation
+                    const confirmMessage = 'Are you sure you want to revoke ALL your active share links?\n\n' +
+                                        'This action cannot be undone. All share links will immediately stop working.\n\n' +
+                                        'Type "REVOKE ALL" to confirm:';
+                    
+                    const userInput = prompt(confirmMessage);
+                    if (userInput !== 'REVOKE ALL') {
+                        return; // User cancelled or typed incorrectly
+                    }
+                    
+                    // Disable button during request
+                    revokeAllButton.disabled = true;
+                    const originalText = revokeAllButton.textContent;
+                    revokeAllButton.textContent = 'Revoking...';
+                    
+                    try {
+                        const response = await fetch('/api/shares/revoke_all', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok && result.status === 'success') {
+                            // Show success message
+                            const message = `Successfully revoked ${result.revoked_count} share link(s). ` +
+                                          `${result.already_revoked_count} link(s) were already revoked.`;
+                            
+                            // Show notification
+                            const notification = document.createElement('div');
+                            notification.className = 'notification-success';
+                            notification.textContent = message;
+                            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: var(--color-success); color: white; padding: var(--spacing-md); border-radius: var(--border-radius); z-index: 10000; box-shadow: var(--shadow-lg); max-width: 400px;';
+                            document.body.appendChild(notification);
+                            
+                            setTimeout(() => {
+                                if (notification.parentNode) {
+                                    notification.parentNode.removeChild(notification);
+                                }
+                            }, 5000);
+                            
+                            // Reload share activity
+                            loadShareActivity();
+                        } else {
+                            // Show error
+                            const errorDiv = document.getElementById('share-activity-error');
+                            if (errorDiv) {
+                                errorDiv.textContent = result.error || 'Failed to revoke all shares';
+                                errorDiv.style.display = 'block';
+                                
+                                setTimeout(() => {
+                                    errorDiv.style.display = 'none';
+                                }, 5000);
+                            }
+                            
+                            // Check if emergency disable is active
+                            if (result.error && result.error.includes('emergency')) {
+                                revokeAllButton.disabled = true;
+                                revokeAllButton.title = 'Mass revocation is disabled due to emergency kill-switch';
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error revoking all shares:', error);
+                        const errorDiv = document.getElementById('share-activity-error');
+                        if (errorDiv) {
+                            errorDiv.textContent = `Network error: ${error.message || 'Failed to revoke all shares'}`;
+                            errorDiv.style.display = 'block';
+                            
+                            setTimeout(() => {
+                                errorDiv.style.display = 'none';
+                            }, 5000);
+                        }
+                    } finally {
+                        revokeAllButton.disabled = false;
+                        revokeAllButton.textContent = originalText;
+                    }
+                });
+                
+                // Check emergency disable status on load
+                (async () => {
+                    try {
+                        const response = await fetch('/api/ui/share-policy');
+                        if (response.ok) {
+                            const policy = await response.json();
+                            // Note: We check emergency disable via the revoke_all endpoint response
+                            // since there's no separate emergency status endpoint
+                        }
+                    } catch (error) {
+                        console.debug('Could not check share policy:', error);
+                    }
+                })();
             }
         });
     </script>

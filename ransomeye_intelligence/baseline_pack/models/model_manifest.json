@@ -1,5 +1,5 @@
 {
-  "created": "2026-01-07T10:46:57.120412Z",
+  "created": "2026-01-07T12:09:23.314611Z",
   "manifest_version": "1.0.0",
   "models": [
     {
@@ -27,7 +27,7 @@
       "contamination": 0.01,
       "features": 128,
       "hash": "sha256:0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
-      "name": "anomaly_baseline.model",
+      "name": "anomaly_detector.model",
       "shap_file": "baseline_pack/shap/anomaly_baseline_shap.json",
       "shap_required": true,
       "training_data_hash": "sha256:866a8d70299b9cdb965e9d1aed0a4f41a1be6adae15f0ef12e3e743dff34af65",
@@ -37,8 +37,8 @@
     {
       "algorithm": "platt_scaling",
       "features": 64,
-      "hash": "sha256:cd82d5a1f8cc0f0f1ac96547e34f9b9af44056a9d8b37a05817f3fd4e679d412",
-      "name": "confidence_calibration.model",
+      "hash": "sha256:c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
+      "name": "confidence_calibrator.model",
       "shap_file": "baseline_pack/shap/confidence_calibration_shap.json",
       "shap_required": true,
       "training_data_hash": "sha256:ed1bcd2ca49221ee6f1beac20e0dfe92722869b358db2b214726591612f05744",
@@ -46,7 +46,7 @@
       "version": "1.0.0"
     }
   ],
-  "pack_hash": "sha256:0eba5a5e198e50a15e2f34c40e1fc022ef15c27af2ebd6dc4427b98e4f3dd4c9",
+  "pack_hash": "sha256:e4a5eba5fc5b74493b5fc2a19747b31efc34c08094c309e47f21367ba3c299c5",
   "pack_name": "RansomEye Baseline Intelligence Pack",
   "pack_version": "1.0.0",
   "signature": {
@@ -56,6 +56,6 @@
     "timestamp": "2025-12-31T08:30:31.247881Z"
   },
   "signer": "policy",
-  "trained_on": "2026-01-07T10:46:57.120424Z",
+  "trained_on": "2026-01-07T12:09:23.314624Z",
   "training_methodology": "synthetic_and_redteam"
 }

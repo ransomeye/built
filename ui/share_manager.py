@@ -14,6 +14,12 @@ Dashboard Share Manager:
 import secrets
 import logging
 import hashlib
+import os
+import json
+import base64
+import tempfile
+import zipfile
+from pathlib import Path
 from typing import Dict, Optional, Tuple, Any
 from datetime import datetime, timezone, timedelta
 import psycopg2
@@ -41,6 +47,16 @@ class ShareManager:
         """Ensure dashboard_share_tokens table exists (fail-soft if missing)."""
         if not self.db.table_exists("ransomeye", "dashboard_share_tokens"):
             logger.warning("dashboard_share_tokens table does not exist. Run schema migration first.")
+    
+    def is_emergency_disabled(self) -> bool:
+        """
+        Check if emergency kill-switch is active.
+        
+        Returns:
+            True if RANSOMEYE_SHARE_EMERGENCY_DISABLE is set to true
+        """
+        emergency_disable_str = os.environ.get('RANSOMEYE_SHARE_EMERGENCY_DISABLE', 'false').lower()
+        return emergency_disable_str in ('true', '1', 'yes', 'on')
     
     def generate_token(self) -> str:
         """
@@ -71,8 +87,15 @@ class ShareManager:
             expires_in_days: Optional expiration in days (None = no expiration)
             
         Returns:
-            Dict with token info or None on failure
+            Dict with token info or None on failure (including emergency disable)
         """
+        # Emergency kill-switch check (fail-closed)
+        if self.is_emergency_disabled():
+            self._audit_log('create_share', owner_user_id, dashboard_name, 
+                          success=False, error="emergency_disabled:true")
+            logger.warning(f"Share creation denied due to emergency disable for dashboard '{dashboard_name}' (owner: {owner_user_id})")
+            return None
+        
         try:
             # Generate token
             token = self.generate_token()
@@ -164,6 +187,7 @@ class ShareManager:
         
         Centralized expiry check: expired tokens are rejected (returns None).
         Expired token access attempts are audit-logged.
+        Emergency kill-switch: all access denied if RANSOMEYE_SHARE_EMERGENCY_DISABLE=true.
         
         Args:
             token: Share token to validate
@@ -172,8 +196,67 @@ class ShareManager:
             rate_limited: Whether this access was rate-limited
             
         Returns:
-            Dict with share info (including status) or None if invalid/expired/revoked
+            Dict with share info (including status) or None if invalid/expired/revoked/emergency_disabled
         """
+        # Emergency kill-switch check (fail-closed)
+        if self.is_emergency_disabled():
+            # Try to get token info for audit logging
+            try:
+                cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+                cursor.execute("SET search_path = ransomeye, public;")
+                
+                query = """
+                    SELECT token_id, dashboard_name, owner_user_id
+                    FROM dashboard_share_tokens
+                    WHERE token = %s
+                """
+                cursor.execute(query, (token,))
+                row = cursor.fetchone()
+                
+                if row:
+                    # Log access attempt with emergency flag
+                    self._log_access(
+                        cursor=cursor,
+                        token_id=str(row['token_id']),
+                        token=token,
+                        dashboard_name=row['dashboard_name'],
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        rate_limited=rate_limited,
+                        access_granted=False
+                    )
+                    
+                    # Audit log emergency denial
+                    self._audit_log('access_share', row['owner_user_id'], 
+                                  row['dashboard_name'], 
+                                  success=False, 
+                                  error="emergency_disabled:true")
+                else:
+                    # Invalid token, but still log emergency denial
+                    self._log_access(
+                        cursor=cursor,
+                        token_id=None,
+                        token=token,
+                        dashboard_name=None,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        rate_limited=rate_limited,
+                        access_granted=False
+                    )
+                
+                self.conn.commit()
+                cursor.close()
+            except Exception as e:
+                logger.error(f"Error during emergency disable check: {e}", exc_info=True)
+                if self.conn:
+                    try:
+                        self.conn.rollback()
+                    except:
+                        pass
+            
+            logger.warning(f"Share token access denied due to emergency disable: {token[:16]}...")
+            return None
+        
         try:
             cursor = self.conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute("SET search_path = ransomeye, public;")
@@ -475,8 +558,15 @@ class ShareManager:
             owner_user_id: User ID of token owner (for authorization)
             
         Returns:
-            True if revoked, False otherwise
+            True if revoked, False otherwise (including emergency disable)
         """
+        # Emergency kill-switch check (fail-closed)
+        if self.is_emergency_disabled():
+            self._audit_log('revoke_share', owner_user_id, 'unknown', 
+                          success=False, error="emergency_disabled:true")
+            logger.warning(f"Share revocation denied due to emergency disable (owner: {owner_user_id})")
+            return False
+        
         try:
             cursor = self.conn.cursor()
             cursor.execute("SET search_path = ransomeye, public;")
@@ -524,6 +614,81 @@ class ShareManager:
                           success=False, error=str(e))
             
             return False
+    
+    def revoke_all_shares(self, owner_user_id: str) -> Dict[str, int]:
+        """
+        Revoke all active share tokens owned by a user (mass revocation).
+        
+        Args:
+            owner_user_id: User ID of token owner
+            
+        Returns:
+            Dict with:
+            - revoked_count: Number of tokens revoked
+            - already_revoked_count: Number of tokens already revoked
+        """
+        # Emergency kill-switch check (fail-closed)
+        if self.is_emergency_disabled():
+            self._audit_log('revoke_all_shares', owner_user_id, 'all', 
+                          success=False, error="emergency_disabled:true")
+            logger.warning(f"Mass revocation denied due to emergency disable (owner: {owner_user_id})")
+            return {'revoked_count': 0, 'already_revoked_count': 0}
+        
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SET search_path = ransomeye, public;")
+            
+            # Count already revoked tokens
+            count_revoked_query = """
+                SELECT COUNT(*)
+                FROM dashboard_share_tokens
+                WHERE owner_user_id = %s
+                  AND revoked_at IS NOT NULL
+            """
+            cursor.execute(count_revoked_query, (owner_user_id,))
+            already_revoked_count = cursor.fetchone()[0]
+            
+            # Revoke all active tokens (atomic operation)
+            revoke_all_query = """
+                UPDATE dashboard_share_tokens
+                SET revoked_at = now()
+                WHERE owner_user_id = %s
+                  AND revoked_at IS NULL
+                RETURNING token_id, dashboard_name
+            """
+            cursor.execute(revoke_all_query, (owner_user_id,))
+            revoked_rows = cursor.fetchall()
+            revoked_count = len(revoked_rows)
+            
+            self.conn.commit()
+            cursor.close()
+            
+            # Audit log mass revocation
+            self._audit_log('revoke_all_shares', owner_user_id, 'all', 
+                          success=True, 
+                          error=f"revoked_count:{revoked_count},already_revoked_count:{already_revoked_count}")
+            
+            logger.info(f"Mass revoked {revoked_count} share tokens for owner '{owner_user_id}' "
+                       f"(already revoked: {already_revoked_count})")
+            
+            return {
+                'revoked_count': revoked_count,
+                'already_revoked_count': already_revoked_count
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in mass revocation: {e}", exc_info=True)
+            if self.conn:
+                try:
+                    self.conn.rollback()
+                except:
+                    pass
+            
+            # Audit log failure
+            self._audit_log('revoke_all_shares', owner_user_id, 'all', 
+                          success=False, error=str(e))
+            
+            return {'revoked_count': 0, 'already_revoked_count': 0}
     
     def list_shares(self, dashboard_name: str, owner_user_id: str) -> list:
         """
@@ -707,4 +872,240 @@ class ShareManager:
         except Exception as e:
             logger.debug(f"Failed to audit log share action: {e}", exc_info=True)
             # Fail-soft: don't break share operations if audit logging fails
+    
+    def get_incident_report(self, from_timestamp: datetime, to_timestamp: datetime) -> Dict[str, Any]:
+        """
+        Generate a forensic, read-only incident report for share activity in a time window.
+        
+        Args:
+            from_timestamp: Start of time window (UTC)
+            to_timestamp: End of time window (UTC)
+            
+        Returns:
+            Dict with:
+            - summary: Dict with total_shares_created, total_shares_revoked, total_access_attempts,
+                       total_rate_limited, total_expired
+            - timeline: List of ordered events (create/access/rotate/revoke/deny) with timestamp,
+                        dashboard_name, token_id (masked), outcome
+            - top_dashboards: List of dashboards sorted by access count in window
+        """
+        try:
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SET search_path = ransomeye, public;")
+            
+            # Summary: Total shares created in window
+            created_query = """
+                SELECT COUNT(*) as count
+                FROM dashboard_share_tokens
+                WHERE created_at >= %s AND created_at <= %s
+            """
+            cursor.execute(created_query, (from_timestamp, to_timestamp))
+            total_shares_created = cursor.fetchone()['count']
+            
+            # Summary: Total shares revoked in window
+            revoked_query = """
+                SELECT COUNT(*) as count
+                FROM dashboard_share_tokens
+                WHERE revoked_at >= %s AND revoked_at <= %s
+            """
+            cursor.execute(revoked_query, (from_timestamp, to_timestamp))
+            total_shares_revoked = cursor.fetchone()['count']
+            
+            # Summary: Total access attempts in window (from share_access_logs)
+            access_query = """
+                SELECT 
+                    COUNT(*) as total_attempts,
+                    COUNT(*) FILTER (WHERE rate_limited = true) as rate_limited_count,
+                    COUNT(*) FILTER (WHERE access_granted = false) as denied_count
+                FROM share_access_logs
+                WHERE accessed_at >= %s AND accessed_at <= %s
+            """
+            cursor.execute(access_query, (from_timestamp, to_timestamp))
+            access_row = cursor.fetchone()
+            total_access_attempts = access_row['total_attempts'] if access_row else 0
+            total_rate_limited = access_row['rate_limited_count'] if access_row else 0
+            
+            # Summary: Total expired (tokens that expired in window)
+            expired_query = """
+                SELECT COUNT(*) as count
+                FROM dashboard_share_tokens
+                WHERE expires_at >= %s AND expires_at <= %s
+                  AND revoked_at IS NULL
+            """
+            cursor.execute(expired_query, (from_timestamp, to_timestamp))
+            total_expired = cursor.fetchone()['count']
+            
+            # Timeline: Collect all events in window
+            timeline = []
+            
+            # 1. Share creation events
+            create_events_query = """
+                SELECT 
+                    created_at as timestamp,
+                    dashboard_name,
+                    token_id,
+                    'create' as event_type,
+                    'success' as outcome
+                FROM dashboard_share_tokens
+                WHERE created_at >= %s AND created_at <= %s
+            """
+            cursor.execute(create_events_query, (from_timestamp, to_timestamp))
+            for row in cursor.fetchall():
+                timeline.append({
+                    'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                    'dashboard_name': row['dashboard_name'],
+                    'token_id': self._mask_token_id(str(row['token_id'])),
+                    'event_type': 'create',
+                    'outcome': 'success'
+                })
+            
+            # 2. Share revocation events
+            revoke_events_query = """
+                SELECT 
+                    revoked_at as timestamp,
+                    dashboard_name,
+                    token_id,
+                    'revoke' as event_type,
+                    'success' as outcome
+                FROM dashboard_share_tokens
+                WHERE revoked_at >= %s AND revoked_at <= %s
+            """
+            cursor.execute(revoke_events_query, (from_timestamp, to_timestamp))
+            for row in cursor.fetchall():
+                timeline.append({
+                    'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                    'dashboard_name': row['dashboard_name'],
+                    'token_id': self._mask_token_id(str(row['token_id'])),
+                    'event_type': 'revoke',
+                    'outcome': 'success'
+                })
+            
+            # 3. Share rotation events (from audit log)
+            if self.db.table_exists("ransomeye", "immutable_audit_log"):
+                rotate_events_query = """
+                    SELECT 
+                        timestamp,
+                        resource_id as dashboard_name,
+                        error_message
+                    FROM immutable_audit_log
+                    WHERE action = 'share_rotate_share'
+                      AND timestamp >= %s AND timestamp <= %s
+                      AND success = true
+                """
+                cursor.execute(rotate_events_query, (from_timestamp, to_timestamp))
+                for row in cursor.fetchall():
+                    # Extract token_id from error_message (format: "old_token_id:xxx,new_token_id:yyy")
+                    token_id = None
+                    if row['error_message']:
+                        # Try to extract new_token_id
+                        parts = row['error_message'].split(',')
+                        for part in parts:
+                            if 'new_token_id:' in part:
+                                token_id = part.split('new_token_id:')[1].strip()
+                                break
+                    
+                    timeline.append({
+                        'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                        'dashboard_name': row['dashboard_name'],
+                        'token_id': self._mask_token_id(token_id) if token_id else 'unknown',
+                        'event_type': 'rotate',
+                        'outcome': 'success'
+                    })
+            
+            # 4. Access events (from share_access_logs)
+            access_events_query = """
+                SELECT 
+                    accessed_at as timestamp,
+                    dashboard_name,
+                    token_id,
+                    access_granted,
+                    rate_limited
+                FROM share_access_logs
+                WHERE accessed_at >= %s AND accessed_at <= %s
+                ORDER BY accessed_at ASC
+            """
+            cursor.execute(access_events_query, (from_timestamp, to_timestamp))
+            for row in cursor.fetchall():
+                event_type = 'access'
+                if row['rate_limited']:
+                    outcome = 'rate_limited'
+                elif not row['access_granted']:
+                    outcome = 'deny'
+                else:
+                    outcome = 'success'
+                
+                timeline.append({
+                    'timestamp': row['timestamp'].isoformat() if row['timestamp'] else None,
+                    'dashboard_name': row['dashboard_name'],
+                    'token_id': self._mask_token_id(str(row['token_id'])) if row['token_id'] else 'invalid',
+                    'event_type': event_type,
+                    'outcome': outcome
+                })
+            
+            # Sort timeline by timestamp
+            timeline.sort(key=lambda x: x['timestamp'] or '')
+            
+            # Top dashboards by access count in window
+            top_dashboards_query = """
+                SELECT 
+                    dashboard_name,
+                    COUNT(*) as access_count
+                FROM share_access_logs
+                WHERE accessed_at >= %s AND accessed_at <= %s
+                  AND dashboard_name IS NOT NULL
+                  AND access_granted = true
+                GROUP BY dashboard_name
+                ORDER BY access_count DESC
+                LIMIT 10
+            """
+            cursor.execute(top_dashboards_query, (from_timestamp, to_timestamp))
+            top_dashboards = []
+            for row in cursor.fetchall():
+                top_dashboards.append({
+                    'dashboard_name': row['dashboard_name'],
+                    'access_count': row['access_count']
+                })
+            
+            cursor.close()
+            
+            return {
+                'summary': {
+                    'total_shares_created': total_shares_created,
+                    'total_shares_revoked': total_shares_revoked,
+                    'total_access_attempts': total_access_attempts,
+                    'total_rate_limited': total_rate_limited,
+                    'total_expired': total_expired
+                },
+                'timeline': timeline,
+                'top_dashboards': top_dashboards
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating incident report: {e}", exc_info=True)
+            # Fail-soft: return empty report structure
+            return {
+                'summary': {
+                    'total_shares_created': 0,
+                    'total_shares_revoked': 0,
+                    'total_access_attempts': 0,
+                    'total_rate_limited': 0,
+                    'total_expired': 0
+                },
+                'timeline': [],
+                'top_dashboards': []
+            }
+    
+    def _mask_token_id(self, token_id: str) -> str:
+        """
+        Mask token ID for display (show first 8 chars, mask rest).
+        
+        Args:
+            token_id: Full token ID UUID string
+            
+        Returns:
+            Masked token ID (e.g., "a1b2c3d4-****")
+        """
+        if not token_id or len(token_id) < 8:
+            return '****'
+        return token_id[:8] + '-****'
 

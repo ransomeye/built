@@ -21,6 +21,7 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Tuple, Any
 from schema_helper import SchemaAwareDB
 from dashboard_engine import DashboardEngine
 from folder_manager import FolderManager
@@ -94,6 +95,82 @@ def safe_get_metric(db: SchemaAwareDB, query: str, params=None, default="Metric 
     except Exception as e:
         logger.error(f"Metric query failed: {e}", exc_info=True)
         return default
+
+
+def get_share_policy():
+    """
+    Get share policy configuration from environment variables.
+    
+    Returns:
+        Dict with:
+        - enabled: bool (True if sharing is enabled)
+        - default_expiry_days: int or None (default expiry in days)
+        - max_expiry_days: int or None (maximum allowed expiry in days)
+    """
+    # Check if sharing is enabled (default: True if not set)
+    share_enabled_str = os.environ.get('RANSOMEYE_SHARE_ENABLED', 'true').lower()
+    share_enabled = share_enabled_str in ('true', '1', 'yes', 'on')
+    
+    # Get default expiry (default: None if not set)
+    default_expiry_days = None
+    default_expiry_str = os.environ.get('RANSOMEYE_SHARE_DEFAULT_EXPIRY_DAYS')
+    if default_expiry_str:
+        try:
+            default_expiry_days = int(default_expiry_str)
+            if default_expiry_days <= 0:
+                default_expiry_days = None
+        except (ValueError, TypeError):
+            default_expiry_days = None
+    
+    # Get max expiry (default: None if not set, meaning no limit)
+    max_expiry_days = None
+    max_expiry_str = os.environ.get('RANSOMEYE_SHARE_MAX_EXPIRY_DAYS')
+    if max_expiry_str:
+        try:
+            max_expiry_days = int(max_expiry_str)
+            if max_expiry_days <= 0:
+                max_expiry_days = None
+        except (ValueError, TypeError):
+            max_expiry_days = None
+    
+    return {
+        'enabled': share_enabled,
+        'default_expiry_days': default_expiry_days,
+        'max_expiry_days': max_expiry_days
+    }
+
+
+def validate_expiry_days(expires_in_days: Optional[int], policy: Dict[str, Any]) -> Tuple[Optional[int], Optional[str]]:
+    """
+    Validate and enforce expiry days against policy.
+    
+    Args:
+        expires_in_days: Requested expiry in days (None = use default)
+        policy: Policy dict from get_share_policy()
+        
+    Returns:
+        Tuple of (validated_expiry_days, error_message)
+        - If error_message is not None, expiry is invalid
+        - If expires_in_days is None, applies default if available
+    """
+    # If no expiry specified, use default
+    if expires_in_days is None:
+        expires_in_days = policy.get('default_expiry_days')
+    
+    # If still None, no expiry (allowed)
+    if expires_in_days is None:
+        return None, None
+    
+    # Validate max expiry limit
+    max_expiry = policy.get('max_expiry_days')
+    if max_expiry is not None and expires_in_days > max_expiry:
+        return None, f"Expiry exceeds maximum allowed ({max_expiry} days)"
+    
+    # Must be positive
+    if expires_in_days <= 0:
+        return None, "Expiry must be a positive number of days"
+    
+    return expires_in_days, None
 
 
 @app.route('/')
@@ -2041,6 +2118,25 @@ def get_ui_settings():
         return jsonify(get_default_settings())
 
 
+@app.route('/api/ui/share-policy', methods=['GET'])
+def get_share_policy_info():
+    """
+    Get share policy configuration for UI display.
+    
+    Returns:
+        JSON with policy settings:
+        - enabled: bool (whether sharing is enabled)
+        - default_expiry_days: int or null (default expiry in days)
+        - max_expiry_days: int or null (maximum allowed expiry in days)
+    """
+    policy = get_share_policy()
+    return jsonify({
+        "enabled": policy['enabled'],
+        "default_expiry_days": policy['default_expiry_days'],
+        "max_expiry_days": policy['max_expiry_days']
+    })
+
+
 @app.route('/api/dashboards/<dashboard_name>/share', methods=['POST'])
 def create_dashboard_share(dashboard_name: str):
     """
@@ -2055,7 +2151,8 @@ def create_dashboard_share(dashboard_name: str):
     - Only personal dashboards can be shared (fail-closed if system dashboard)
     - Generates cryptographically strong token
     - Optional expiration (configurable via env or request)
-    - Audit-log share creation
+    - Policy enforcement: sharing enabled/disabled, default/max expiry limits
+    - Audit-log share creation and policy denials
     - Returns share link and token info
     
     Returns:
@@ -2063,6 +2160,36 @@ def create_dashboard_share(dashboard_name: str):
     """
     # Get user ID
     user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Get share policy
+    policy = get_share_policy()
+    
+    # Fail-closed: Check if sharing is enabled
+    if not policy['enabled']:
+        # Audit log policy denial
+        conn = get_db_connection()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SET search_path = ransomeye, public;")
+                share_manager = ShareManager(conn)
+                share_manager._audit_log('create_share', user_id, dashboard_name, 
+                                       success=False, error="policy_denied:sharing_disabled")
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"Error audit logging policy denial: {e}", exc_info=True)
+                if conn:
+                    try:
+                        conn.rollback()
+                        conn.close()
+                    except:
+                        pass
+        
+        return jsonify({
+            "error": "Dashboard sharing is disabled by policy",
+            "status": "failed"
+        }), 403
     
     # Check if dashboard is personal (has overlay)
     source_info = dashboard_engine.get_dashboard_source(dashboard_name)
@@ -2092,14 +2219,33 @@ def create_dashboard_share(dashboard_name: str):
                 except (ValueError, TypeError):
                     expires_in_days = None
     
-    # Check env for default expiration
-    if expires_in_days is None:
-        default_expiry = os.environ.get('RANSOMEYE_SHARE_EXPIRY_DAYS')
-        if default_expiry:
+    # Validate expiry against policy (enforces default and max limits)
+    expires_in_days, expiry_error = validate_expiry_days(expires_in_days, policy)
+    if expiry_error:
+        # Audit log policy denial
+        conn = get_db_connection()
+        if conn:
             try:
-                expires_in_days = int(default_expiry)
-            except (ValueError, TypeError):
-                pass
+                cursor = conn.cursor()
+                cursor.execute("SET search_path = ransomeye, public;")
+                share_manager = ShareManager(conn)
+                share_manager._audit_log('create_share', user_id, dashboard_name, 
+                                       success=False, error=f"policy_denied:{expiry_error}")
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"Error audit logging policy denial: {e}", exc_info=True)
+                if conn:
+                    try:
+                        conn.rollback()
+                        conn.close()
+                    except:
+                        pass
+        
+        return jsonify({
+            "error": expiry_error,
+            "status": "failed"
+        }), 400
     
     # Create share token
     conn = get_db_connection()
@@ -2167,6 +2313,7 @@ def share_dashboard_view(token: str):
     Rules:
     - Rate limiting applied per token (configurable via env)
     - Validates token (expiry, revocation)
+    - Emergency kill-switch: returns 410 Gone if RANSOMEYE_SHARE_EMERGENCY_DISABLE=true
     - Fail-closed on invalid/expired/revoked tokens
     - Fail-closed on rate limit abuse (429)
     - Captures access metadata (IP, User-Agent) best-effort
@@ -2175,6 +2322,44 @@ def share_dashboard_view(token: str):
     - Tracks access count and timestamp
     - Audit-log access event with rate-limited flag and metadata presence
     """
+    # Check emergency kill-switch first (before any DB access)
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SET search_path = ransomeye, public;")
+            share_manager = ShareManager(conn)
+            
+            if share_manager.is_emergency_disabled():
+                # Try to get token info for audit logging
+                try:
+                    query = """
+                        SELECT token_id, dashboard_name, owner_user_id
+                        FROM dashboard_share_tokens
+                        WHERE token = %s
+                    """
+                    cursor.execute(query, (token,))
+                    row = cursor.fetchone()
+                    
+                    if row:
+                        share_manager._audit_log('access_share', row[2], row[1], 
+                                              success=False, error="emergency_disabled:true")
+                except:
+                    pass
+                
+                cursor.close()
+                conn.close()
+                logger.warning(f"Share access denied due to emergency disable: {token[:16]}...")
+                return render_template('share_error.html', 
+                                     error="This share link has been disabled due to an emergency."), 410
+        except Exception as e:
+            logger.error(f"Error checking emergency disable: {e}", exc_info=True)
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+    
     # Get rate limiter
     rate_limiter = get_rate_limiter()
     
@@ -2295,7 +2480,8 @@ def rotate_share(token: str):
     - Old token immediately revoked
     - New token created with same permissions
     - Expiry preserved unless overridden
-    - Audit-log rotation (old_token_id → new_token_id)
+    - Policy enforcement: sharing enabled/disabled, default/max expiry limits
+    - Audit-log rotation (old_token_id → new_token_id) and policy denials
     - Fail-closed on validation errors
     
     Returns:
@@ -2303,6 +2489,36 @@ def rotate_share(token: str):
     """
     # Get user ID
     user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Get share policy
+    policy = get_share_policy()
+    
+    # Fail-closed: Check if sharing is enabled
+    if not policy['enabled']:
+        # Audit log policy denial
+        conn = get_db_connection()
+        if conn:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SET search_path = ransomeye, public;")
+                share_manager = ShareManager(conn)
+                share_manager._audit_log('rotate_share', user_id, 'unknown', 
+                                       success=False, error="policy_denied:sharing_disabled")
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"Error audit logging policy denial: {e}", exc_info=True)
+                if conn:
+                    try:
+                        conn.rollback()
+                        conn.close()
+                    except:
+                        pass
+        
+        return jsonify({
+            "error": "Dashboard sharing is disabled by policy",
+            "status": "failed"
+        }), 403
     
     # Parse optional new expiration
     expires_in_days = None
@@ -2317,6 +2533,35 @@ def rotate_share(token: str):
                         expires_in_days = None
                 except (ValueError, TypeError):
                     expires_in_days = None
+    
+    # If new expiry specified, validate against policy
+    if expires_in_days is not None:
+        expires_in_days, expiry_error = validate_expiry_days(expires_in_days, policy)
+        if expiry_error:
+            # Audit log policy denial
+            conn = get_db_connection()
+            if conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("SET search_path = ransomeye, public;")
+                    share_manager = ShareManager(conn)
+                    share_manager._audit_log('rotate_share', user_id, 'unknown', 
+                                           success=False, error=f"policy_denied:{expiry_error}")
+                    cursor.close()
+                    conn.close()
+                except Exception as e:
+                    logger.error(f"Error audit logging policy denial: {e}", exc_info=True)
+                    if conn:
+                        try:
+                            conn.rollback()
+                            conn.close()
+                        except:
+                            pass
+            
+            return jsonify({
+                "error": expiry_error,
+                "status": "failed"
+            }), 400
     
     # Rotate token
     conn = get_db_connection()
@@ -2506,6 +2751,12 @@ def share_activity_view():
     return render_template('share_activity.html')
 
 
+@app.route('/shares/incident-report')
+def incident_report_view():
+    """Serve Share Incident Report page (forensic, read-only)."""
+    return render_template('incident_report.html')
+
+
 @app.route('/api/shares/activity', methods=['GET'])
 def get_share_activity():
     """
@@ -2548,6 +2799,64 @@ def get_share_activity():
         
     except Exception as e:
         logger.error(f"Error getting share activity: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/api/shares/revoke_all', methods=['POST'])
+def revoke_all_shares():
+    """
+    Revoke all active share tokens owned by the current user (mass revocation).
+    
+    Rules:
+    - Only revokes tokens owned by current user (owner-scoped)
+    - Atomic operation (all or nothing)
+    - Idempotent (safe to re-run)
+    - Emergency disable check (fail-closed if emergency active)
+    - Audit-log mass revocation
+    - Returns summary with revoked_count and already_revoked_count
+    
+    Returns:
+        JSON with revocation summary
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        result = share_manager.revoke_all_shares(user_id)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "revoked_count": result['revoked_count'],
+            "already_revoked_count": result['already_revoked_count'],
+            "message": f"Revoked {result['revoked_count']} share token(s). "
+                      f"{result['already_revoked_count']} token(s) were already revoked."
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in mass revocation: {e}", exc_info=True)
         if conn:
             try:
                 conn.rollback()
@@ -2611,6 +2920,132 @@ def cleanup_expired_shares():
                 conn.close()
             except:
                 pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/api/shares/incident-report', methods=['GET'])
+def get_incident_report():
+    """
+    Generate a forensic, read-only incident report for share activity in a time window.
+    
+    Query Params:
+        from: ISO timestamp (required, e.g., "2024-01-01T00:00:00Z")
+        to: ISO timestamp (required, e.g., "2024-01-31T23:59:59Z")
+    
+    Returns:
+        JSON with:
+        - summary: Dict with total_shares_created, total_shares_revoked, total_access_attempts,
+                   total_rate_limited, total_expired
+        - timeline: List of ordered events (create/access/rotate/revoke/deny) with timestamp,
+                    dashboard_name, token_id (masked), outcome
+        - top_dashboards: List of dashboards sorted by access count in window
+    
+    Rules:
+        - Validate time range (fail-closed on invalid params)
+        - Fail-soft if no data (returns empty structure)
+        - Audit-log report generation
+        - No mutations (read-only)
+    """
+    # Get query params
+    from_str = request.args.get('from')
+    to_str = request.args.get('to')
+    
+    # Fail-closed: Validate required params
+    if not from_str or not to_str:
+        return jsonify({
+            "error": "Missing required query parameters: 'from' and 'to' (ISO timestamps)",
+            "status": "failed"
+        }), 400
+    
+    # Parse timestamps (fail-closed on invalid format)
+    try:
+        from_timestamp = datetime.fromisoformat(from_str.replace('Z', '+00:00'))
+        to_timestamp = datetime.fromisoformat(to_str.replace('Z', '+00:00'))
+        
+        # Ensure timezone-aware
+        if from_timestamp.tzinfo is None:
+            from_timestamp = from_timestamp.replace(tzinfo=timezone.utc)
+        if to_timestamp.tzinfo is None:
+            to_timestamp = to_timestamp.replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError) as e:
+        return jsonify({
+            "error": f"Invalid timestamp format: {str(e)}. Expected ISO format (e.g., '2024-01-01T00:00:00Z')",
+            "status": "failed"
+        }), 400
+    
+    # Validate time range (fail-closed: from must be before to)
+    if from_timestamp >= to_timestamp:
+        return jsonify({
+            "error": "Invalid time range: 'from' must be before 'to'",
+            "status": "failed"
+        }), 400
+    
+    # Validate reasonable time range (fail-closed: max 1 year)
+    max_range = timedelta(days=365)
+    if (to_timestamp - from_timestamp) > max_range:
+        return jsonify({
+            "error": "Time range exceeds maximum allowed (365 days)",
+            "status": "failed"
+        }), 400
+    
+    # Get database connection
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        report = share_manager.get_incident_report(from_timestamp, to_timestamp)
+        
+        # Audit log report generation
+        user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+        share_manager._audit_log('incident_report', user_id, 'all', 
+                               success=True, 
+                               error=f"from:{from_timestamp.isoformat()},to:{to_timestamp.isoformat()}")
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "report": report,
+            "time_range": {
+                "from": from_timestamp.isoformat(),
+                "to": to_timestamp.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating incident report: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        
+        # Audit log failure (if connection still available)
+        if conn:
+            try:
+                user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+                cursor = conn.cursor()
+                cursor.execute("SET search_path = ransomeye, public;")
+                share_manager = ShareManager(conn)
+                share_manager._audit_log('incident_report', user_id, 'all', 
+                                       success=False, error=str(e))
+                cursor.close()
+            except:
+                pass
+        
         return jsonify({
             "error": "Internal server error",
             "status": "failed"

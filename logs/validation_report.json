@@ -11,16 +11,28 @@
             "size_bytes": 3108596,
             "size_mb": 2.96,
             "hash": "5210a7c441a2d768b417a69848009f5d70bdc6a6390a7a61923f69ea3084c893",
-            "modified": "2026-01-07T15:23:03.054846"
+            "modified": "2026-01-07T17:38:59.770442"
           }
         },
         "anomaly_detector.model": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_intelligence/baseline_pack/models/anomaly_detector.model",
+            "size_bytes": 1001196,
+            "size_mb": 0.95,
+            "hash": "0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
+            "modified": "2026-01-07T17:39:01.645743"
+          }
         },
         "confidence_calibrator.model": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_intelligence/baseline_pack/models/confidence_calibrator.model",
+            "size_bytes": 9922981,
+            "size_mb": 9.46,
+            "hash": "c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
+            "modified": "2026-01-07T17:39:23.158212"
+          }
         }
       },
       "shap_files": {
@@ -40,7 +52,7 @@
       "metadata": {
         "exists": true,
         "info": {
-          "created": "2026-01-07T09:53:25.558979Z",
+          "created": "2026-01-07T12:09:23.314611Z",
           "manifest_version": "1.0.0",
           "models": [
             {
@@ -68,7 +80,7 @@
               "contamination": 0.01,
               "features": 128,
               "hash": "sha256:0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
-              "name": "anomaly_baseline.model",
+              "name": "anomaly_detector.model",
               "shap_file": "baseline_pack/shap/anomaly_baseline_shap.json",
               "shap_required": true,
               "training_data_hash": "sha256:866a8d70299b9cdb965e9d1aed0a4f41a1be6adae15f0ef12e3e743dff34af65",
@@ -78,8 +90,8 @@
             {
               "algorithm": "platt_scaling",
               "features": 64,
-              "hash": "sha256:bccd10e493571432d4617e047fd580d11ebb5165ad0c537d4b0ec26ed094ee13",
-              "name": "confidence_calibration.model",
+              "hash": "sha256:c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
+              "name": "confidence_calibrator.model",
               "shap_file": "baseline_pack/shap/confidence_calibration_shap.json",
               "shap_required": true,
               "training_data_hash": "sha256:ed1bcd2ca49221ee6f1beac20e0dfe92722869b358db2b214726591612f05744",
@@ -87,7 +99,7 @@
               "version": "1.0.0"
             }
           ],
-          "pack_hash": "sha256:ce0cb43fade8fca500e4d2f94b9cad330722543ddf530ce4d7700a098d45f78f",
+          "pack_hash": "sha256:e4a5eba5fc5b74493b5fc2a19747b31efc34c08094c309e47f21367ba3c299c5",
           "pack_name": "RansomEye Baseline Intelligence Pack",
           "pack_version": "1.0.0",
           "signature": {
@@ -97,19 +109,25 @@
             "timestamp": "2025-12-31T08:30:31.247881Z"
           },
           "signer": "policy",
-          "trained_on": "2026-01-07T09:53:25.558991Z",
+          "trained_on": "2026-01-07T12:09:23.314624Z",
           "training_methodology": "synthetic_and_redteam"
         }
       },
-      "status": "partial"
+      "status": "complete"
     },
     "risk_model": {
       "module_name": "risk_model",
-      "path_exists": false,
+      "path_exists": true,
       "models": {
         "risk_predictor.model": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_ai_core/models/risk_predictor.model",
+            "size_bytes": 1055801,
+            "size_mb": 1.01,
+            "hash": "0c749aef49acec9772356816b52084a85ca41110795610c321dd737a058af455",
+            "modified": "2026-01-07T17:39:24.313842"
+          }
         }
       },
       "shap_files": {
@@ -122,7 +140,7 @@
         "exists": false,
         "info": null
       },
-      "status": "missing"
+      "status": "complete"
     },
     "threat_correlation": {
       "module_name": "threat_correlation",
@@ -135,7 +153,7 @@
             "size_bytes": 477355,
             "size_mb": 0.46,
             "hash": "43d281bccab9288a83a35dbc4ae8564da16238193e6b92f31a1b6d2c5093f602",
-            "modified": "2026-01-07T15:28:37.745423"
+            "modified": "2026-01-07T17:44:27.868785"
           }
         }
       },
@@ -162,7 +180,7 @@
             "size_bytes": 55615,
             "size_mb": 0.05,
             "hash": "a2fa5b5a11d968bbbe500c90109a36eda7b8bfce419192082df3d9dd771feb98",
-            "modified": "2026-01-07T15:28:40.716561"
+            "modified": "2026-01-07T17:44:30.566851"
           }
         }
       },
@@ -189,7 +207,7 @@
             "size_bytes": 479947,
             "size_mb": 0.46,
             "hash": "646b4d5a90d2c88afe56c9f21b34bdc6a46311a2b3c5cf3435f96acce9e88c25",
-            "modified": "2026-01-07T14:14:17.400969"
+            "modified": "2026-01-07T17:47:30.866237"
           }
         },
         "ioc_clusterer.model": {
@@ -199,7 +217,7 @@
             "size_bytes": 80511,
             "size_mb": 0.08,
             "hash": "cc635aa04382492dc9d0f9c8b095ace0017cc93cd4e24484bc049ab59160acad",
-            "modified": "2026-01-07T14:14:22.645288"
+            "modified": "2026-01-07T17:47:35.376729"
           }
         }
       },
@@ -221,7 +239,7 @@
             "model_version": "1.0.0",
             "model_hash": "646b4d5a90d2c88afe56c9f21b34bdc6a46311a2b3c5cf3435f96acce9e88c25",
             "model_size_bytes": 479947,
-            "trained_on": "2026-01-07T08:44:22.645975Z",
+            "trained_on": "2026-01-07T12:17:35.377061Z",
             "model_type": "GradientBoostingRegressor",
             "mse": 0.0008992959699707035,
             "r2_score": 0.9515676033402434
@@ -231,7 +249,7 @@
             "model_version": "1.0.0",
             "model_hash": "cc635aa04382492dc9d0f9c8b095ace0017cc93cd4e24484bc049ab59160acad",
             "model_size_bytes": 80511,
-            "trained_on": "2026-01-07T08:44:22.645995Z",
+            "trained_on": "2026-01-07T12:17:35.377074Z",
             "model_type": "DBSCAN"
           }
         }
@@ -240,11 +258,17 @@
     },
     "dpi_probe_classifier": {
       "module_name": "dpi_probe_classifier",
-      "path_exists": false,
+      "path_exists": true,
       "models": {
         "asset_classifier.model": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_dpi_probe/models/asset_classifier.model",
+            "size_bytes": 65084639,
+            "size_mb": 62.07,
+            "hash": "831fa4e5f006d21c6c5178665d1c2d76251940c3c14154872232d9d9621ab269",
+            "modified": "2026-01-07T16:03:54.941732"
+          }
         }
       },
       "shap_files": {
@@ -257,7 +281,7 @@
         "exists": false,
         "info": null
       },
-      "status": "missing"
+      "status": "complete"
     },
     "threat_classifier_continuous": {
       "module_name": "threat_classifier_continuous",
@@ -296,23 +320,39 @@
     },
     "rag_index": {
       "module_name": "rag_index",
-      "path_exists": false,
+      "path_exists": true,
       "models": {
         "index.faiss": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_ai_assistant/rag_index/index.faiss",
+            "size_bytes": 3072045,
+            "size_mb": 2.93,
+            "hash": "5e007530070ecb7e6c5e3585f864965a581fc7a2ced000abb6203e9362dcda66",
+            "modified": "2026-01-07T17:48:30.490736"
+          }
         },
         "index.pkl": {
-          "exists": false,
-          "info": null
+          "exists": true,
+          "info": {
+            "path": "/home/ransomeye/rebuild/ransomeye_ai_assistant/rag_index/index.pkl",
+            "size_bytes": 118,
+            "size_mb": 0.0,
+            "hash": "ceddb87e814e0348c7b8cf1396e7ce629b8aa5ea35054f1df378321a476780e7",
+            "modified": "2026-01-07T17:48:30.492512"
+          }
         }
       },
       "shap_files": {},
       "metadata": {
-        "exists": false,
-        "info": null
+        "exists": true,
+        "info": {
+          "index_version": "1.0.0",
+          "created": "2026-01-07T12:18:30.492675Z",
+          "faiss_available": true
+        }
       },
-      "status": "missing"
+      "status": "complete"
     }
   },
   "systemd": {
@@ -389,16 +429,16 @@
   "summary": {
     "modules": {
       "total": 8,
-      "complete": 4,
-      "partial": 1,
-      "missing": 3,
-      "completion_percent": 50.0
+      "complete": 8,
+      "partial": 0,
+      "missing": 0,
+      "completion_percent": 100.0
     },
     "models": {
       "total": 12,
-      "existing": 6,
-      "missing": 6,
-      "completion_percent": 50.0
+      "existing": 12,
+      "missing": 0,
+      "completion_percent": 100.0
     },
     "systemd": {
       "total": 6,

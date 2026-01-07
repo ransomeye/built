@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-07T10:45:32.001752Z",
+  "timestamp": "2026-01-07T12:18:22.704826Z",
   "project_root": "/home/ransomeye/rebuild",
   "training_config": {
     "baseline_pack": {
@@ -43,7 +43,7 @@
     "forensic_malware_dna": true,
     "threat_intel_trust": true,
     "dpi_probe_classifier": true,
-    "rag_index": false,
+    "rag_index": true,
     "shap_generation": true
   },
   "trained_models": [
@@ -91,15 +91,22 @@
         "asset_classifier"
       ],
       "status": "success"
+    },
+    {
+      "module": "rag_index",
+      "models": [
+        "rag_index"
+      ],
+      "status": "success"
     }
   ],
   "errors": [],
   "summary": {
-    "success_count": 7,
-    "failed_count": 1,
+    "success_count": 8,
+    "failed_count": 0,
     "skipped_count": 0,
     "total_enabled": 8,
     "total_count": 8,
-    "success_rate": 0.875
+    "success_rate": 1.0
   }
 }

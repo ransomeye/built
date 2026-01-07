@@ -32,7 +32,7 @@ BASELINE_PACK_DIR = Path("/home/ransomeye/rebuild/ransomeye_intelligence/baselin
 MODELS_DIR = BASELINE_PACK_DIR / "models"
 
 
-def generate_synthetic_ransomware_data(n_samples: int = 100000, n_features: int = 256) -> Tuple[np.ndarray, np.ndarray]:
+def generate_synthetic_ransomware_data(n_samples: int = 2000000, n_features: int = 512) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate synthetic ransomware behavior data.
     
@@ -82,7 +82,7 @@ def generate_synthetic_ransomware_data(n_samples: int = 100000, n_features: int 
     return X, y
 
 
-def generate_synthetic_anomaly_data(n_samples: int = 100000, n_features: int = 128) -> np.ndarray:
+def generate_synthetic_anomaly_data(n_samples: int = 2000000, n_features: int = 512) -> np.ndarray:
     """
     Generate synthetic anomaly detection baseline data.
     Normal operations with occasional anomalies.
@@ -112,14 +112,16 @@ def train_ransomware_behavior_model(X: np.ndarray, y: np.ndarray) -> Tuple[Rando
         X, y, test_size=0.2, random_state=RANDOM_SEED, stratify=y
     )
     
-    # Train Random Forest
+    # Train Random Forest with increased complexity for larger model size
     model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=20,
-        min_samples_split=5,
-        min_samples_leaf=2,
+        n_estimators=500,
+        max_depth=50,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
         random_state=RANDOM_SEED,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=1
     )
     
     model.fit(X_train, y_train)
@@ -149,10 +151,12 @@ def train_anomaly_baseline_model(X: np.ndarray) -> IsolationForest:
         Isolation Forest model
     """
     model = IsolationForest(
+        n_estimators=500,
         contamination=0.01,
+        max_features=1.0,
         random_state=RANDOM_SEED,
-        n_estimators=100,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=1
     )
     
     model.fit(X)
@@ -172,12 +176,16 @@ def train_confidence_calibration_model(X: np.ndarray, y: np.ndarray) -> Tuple[Ca
         X, y, test_size=0.2, random_state=RANDOM_SEED, stratify=y
     )
     
-    # Base classifier
+    # Base classifier with increased complexity
     base_model = RandomForestClassifier(
-        n_estimators=50,
-        max_depth=10,
+        n_estimators=500,
+        max_depth=50,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
         random_state=RANDOM_SEED,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=1
     )
     
     # Calibrate using Platt scaling
@@ -261,17 +269,17 @@ def main():
         try:
             from enhance_training_with_feeds import generate_enhanced_ransomware_data
             X_ransomware, y_ransomware = generate_enhanced_ransomware_data(
-                n_samples=100000,
-                n_features=256,
+                n_samples=2000000,
+                n_features=512,
                 use_feeds=True
             )
             print("  ✓ Using enhanced training data with threat intelligence feeds")
         except Exception as e:
             print(f"  ⚠ Warning: Failed to load threat intelligence feeds: {e}")
             print("  Falling back to synthetic data only")
-            X_ransomware, y_ransomware = generate_synthetic_ransomware_data(n_samples=100000, n_features=256)
+            X_ransomware, y_ransomware = generate_synthetic_ransomware_data(n_samples=2000000, n_features=512)
     else:
-        X_ransomware, y_ransomware = generate_synthetic_ransomware_data(n_samples=100000, n_features=256)
+        X_ransomware, y_ransomware = generate_synthetic_ransomware_data(n_samples=2000000, n_features=512)
     
     model_ransomware, metrics_ransomware = train_ransomware_behavior_model(X_ransomware, y_ransomware)
     
@@ -289,7 +297,7 @@ def main():
     
     # 2. Train Anomaly Baseline Model
     print("Training anomaly detection baseline...")
-    X_anomaly = generate_synthetic_anomaly_data(n_samples=100000, n_features=128)
+    X_anomaly = generate_synthetic_anomaly_data(n_samples=2000000, n_features=512)
     model_anomaly = train_anomaly_baseline_model(X_anomaly)
     
     # Save with expected name for validation
@@ -311,8 +319,8 @@ def main():
     # 3. Train Confidence Calibration Model
     print("Training confidence calibration model...")
     # Use subset of ransomware data for calibration
-    X_calibration = X_ransomware[:50000, :64]  # Use first 64 features
-    y_calibration = y_ransomware[:50000]
+    X_calibration = X_ransomware[:1000000, :512]  # Use all 512 features
+    y_calibration = y_ransomware[:1000000]
     model_calibration, metrics_calibration = train_confidence_calibration_model(X_calibration, y_calibration)
     
     # Save with expected name for validation

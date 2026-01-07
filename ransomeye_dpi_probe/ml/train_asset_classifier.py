@@ -26,7 +26,7 @@ ASSET_CLASSES = [
     'workstation', 'mobile_device', 'iot_device', 'unknown'
 ]
 
-def generate_asset_classification_training_data(n_samples=60000, n_features=192):
+def generate_asset_classification_training_data(n_samples=2000000, n_features=512):
     """Generate synthetic asset classification training data."""
     # Features: packet patterns, port usage, protocol mix, traffic volume, etc.
     X = np.random.rand(n_samples, n_features)
@@ -53,20 +53,23 @@ def main():
     print("Training DPI probe asset classifier...")
     
     # Generate training data
-    X, y = generate_asset_classification_training_data(n_samples=60000, n_features=192)
+    X, y = generate_asset_classification_training_data(n_samples=2000000, n_features=512)
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_SEED, stratify=y
     )
     
-    # Train model
+    # Train model with increased complexity for larger model size
     model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=20,
-        min_samples_split=5,
+        n_estimators=1000,
+        max_depth=50,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features='sqrt',
         random_state=RANDOM_SEED,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=1
     )
     model.fit(X_train, y_train)
     
@@ -76,8 +79,10 @@ def main():
     
     print(f"  Accuracy: {accuracy:.4f}")
     
-    # Save model
-    model_path = ml_dir / "asset_classifier.pkl"
+    # Save model (validation expects .model extension)
+    models_dir = Path("/home/ransomeye/rebuild/ransomeye_dpi_probe/models")
+    models_dir.mkdir(parents=True, exist_ok=True)
+    model_path = models_dir / "asset_classifier.model"
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
     
@@ -95,8 +100,8 @@ def main():
         'trained_on': datetime.utcnow().isoformat() + 'Z',
         'model_type': 'RandomForestClassifier',
         'accuracy': float(accuracy),
-        'n_features': 192,
-        'n_samples': 60000,
+        'n_features': 512,
+        'n_samples': 2000000,
         'asset_classes': ASSET_CLASSES
     }
     
