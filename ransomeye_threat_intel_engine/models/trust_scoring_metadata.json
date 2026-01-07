@@ -4,7 +4,7 @@
     "model_version": "1.0.0",
     "model_hash": "646b4d5a90d2c88afe56c9f21b34bdc6a46311a2b3c5cf3435f96acce9e88c25",
     "model_size_bytes": 479947,
-    "trained_on": "2026-01-07T08:44:22.645975Z",
+    "trained_on": "2026-01-07T10:29:19.711652Z",
     "model_type": "GradientBoostingRegressor",
     "mse": 0.0008992959699707035,
     "r2_score": 0.9515676033402434
@@ -14,7 +14,7 @@
     "model_version": "1.0.0",
     "model_hash": "cc635aa04382492dc9d0f9c8b095ace0017cc93cd4e24484bc049ab59160acad",
     "model_size_bytes": 80511,
-    "trained_on": "2026-01-07T08:44:22.645995Z",
+    "trained_on": "2026-01-07T10:29:19.711664Z",
     "model_type": "DBSCAN"
   }
 }

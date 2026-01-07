@@ -280,6 +280,16 @@
                     </button>
                     <button 
                         type="button" 
+                        id="share-dashboard-button" 
+                        class="share-dashboard-button"
+                        aria-label="Share dashboard"
+                        title="Share this personal dashboard (read-only link)"
+                        style="display: none;">
+                        <span class="share-dashboard-icon">🔗</span>
+                        <span class="share-dashboard-label">Share</span>
+                    </button>
+                    <button 
+                        type="button" 
                         id="import-dashboard-button-header" 
                         class="import-dashboard-button"
                         aria-label="Import dashboard"
@@ -657,6 +667,105 @@
                         <div class="restore-confirm-footer">
                             <button type="button" class="button-secondary" id="restore-confirm-cancel">Cancel</button>
                             <button type="button" class="button-primary" id="restore-confirm-submit" disabled>Restore Dashboard</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Share Dashboard Modal -->
+                <div class="share-dashboard-modal" id="share-dashboard-modal" role="dialog" aria-labelledby="share-dashboard-title" aria-hidden="true">
+                    <div class="share-dashboard-overlay"></div>
+                    <div class="share-dashboard-dialog">
+                        <div class="share-dashboard-header">
+                            <h2 id="share-dashboard-title">Share Dashboard</h2>
+                            <button type="button" class="share-dashboard-close" id="share-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="share-dashboard-content">
+                            <div id="share-dashboard-loading" class="share-loading" style="display: none;">
+                                <p>Creating share link...</p>
+                            </div>
+                            <div id="share-dashboard-error" class="form-error" style="display: none;"></div>
+                            <div id="share-dashboard-success" style="display: none;">
+                                <div class="share-link-section">
+                                    <label for="share-link-input">Share Link (Read-Only)</label>
+                                    <div class="share-link-input-group">
+                                        <input 
+                                            type="text" 
+                                            id="share-link-input" 
+                                            readonly 
+                                            class="share-link-input"
+                                            aria-describedby="share-link-help"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            id="copy-share-link-button" 
+                                            class="button-secondary"
+                                            aria-label="Copy share link to clipboard"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                    <small id="share-link-help" class="form-help">
+                                        Anyone with this link can view the dashboard in read-only mode. Editing, saving, and other modifications are disabled.
+                                    </small>
+                                </div>
+                                <div class="share-info-section">
+                                    <div class="share-info-item">
+                                        <strong>Status:</strong>
+                                        <span id="share-status-badge" class="status-badge status-active">Active</span>
+                                    </div>
+                                    <div class="share-info-item">
+                                        <strong>Access Count:</strong>
+                                        <span id="share-access-count">0</span>
+                                    </div>
+                                    <div class="share-info-item">
+                                        <strong>Created:</strong>
+                                        <span id="share-created-at">-</span>
+                                    </div>
+                                    <div class="share-info-item">
+                                        <strong>Expires:</strong>
+                                        <span id="share-expires-at">Never</span>
+                                    </div>
+                                </div>
+                                <div class="share-actions-section">
+                                    <button 
+                                        type="button" 
+                                        id="rotate-share-button" 
+                                        class="button-secondary"
+                                        aria-label="Rotate share link"
+                                    >
+                                        Rotate Link
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        id="revoke-share-button" 
+                                        class="button-danger"
+                                        aria-label="Revoke share link"
+                                    >
+                                        Revoke Share Link
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="share-dashboard-form" style="display: none;">
+                                <form id="create-share-form">
+                                    <div class="form-group">
+                                        <label for="share-expires-in">Expiration (Optional)</label>
+                                        <select id="share-expires-in" name="expires_in_days">
+                                            <option value="">No expiration</option>
+                                            <option value="7">7 days</option>
+                                            <option value="30">30 days</option>
+                                            <option value="90">90 days</option>
+                                            <option value="365">1 year</option>
+                                        </select>
+                                        <small class="form-help">
+                                            Share link will expire after the selected period. Leave blank for no expiration.
+                                        </small>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="button" class="button-secondary" id="share-dashboard-cancel">Cancel</button>
+                                        <button type="submit" class="button-primary" id="share-dashboard-submit">Create Share Link</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2118,6 +2227,16 @@
                     deleteBtn.style.display = 'none';
                 }
             }
+            
+            // Show/hide "Share Dashboard" button (only for personal dashboards)
+            const shareBtn = document.getElementById('share-dashboard-button');
+            if (shareBtn) {
+                if (has_overlay && (source === 'user' || source === 'merged')) {
+                    shareBtn.style.display = 'inline-flex';
+                } else {
+                    shareBtn.style.display = 'none';
+                }
+            }
         }
         
         // Load source info on page load (non-blocking)
@@ -3012,6 +3131,382 @@
         
         // Initialize import dashboard
         initImportDashboard();
+        
+        // ============================================================
+        // SHARE DASHBOARD
+        // ============================================================
+        
+        function initShareDashboard() {
+            const shareButton = document.getElementById('share-dashboard-button');
+            const modal = document.getElementById('share-dashboard-modal');
+            const closeButton = document.getElementById('share-dashboard-close');
+            const cancelButton = document.getElementById('share-dashboard-cancel');
+            const form = document.getElementById('create-share-form');
+            const errorDiv = document.getElementById('share-dashboard-error');
+            const loadingDiv = document.getElementById('share-dashboard-loading');
+            const successDiv = document.getElementById('share-dashboard-success');
+            const formDiv = document.getElementById('share-dashboard-form');
+            const shareLinkInput = document.getElementById('share-link-input');
+            const copyButton = document.getElementById('copy-share-link-button');
+            const rotateButton = document.getElementById('rotate-share-button');
+            const revokeButton = document.getElementById('revoke-share-button');
+            const submitButton = document.getElementById('share-dashboard-submit');
+            
+            if (!modal || !shareButton || !dashboardName) return;
+            
+            let currentShareToken = null;
+            
+            // Show modal
+            function openModal() {
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Reset state
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+                loadingDiv.style.display = 'none';
+                successDiv.style.display = 'none';
+                formDiv.style.display = 'block';
+                form.reset();
+                currentShareToken = null;
+                
+                // Check for existing shares
+                loadExistingShares();
+            }
+            
+            // Close modal
+            function closeModal() {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+                // Reset state
+                errorDiv.style.display = 'none';
+                loadingDiv.style.display = 'none';
+                successDiv.style.display = 'none';
+                formDiv.style.display = 'block';
+                currentShareToken = null;
+            }
+            
+            // Load existing shares
+            async function loadExistingShares() {
+                try {
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/shares`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const shares = data.shares || [];
+                        
+                        if (shares.length > 0) {
+                            // Show existing share
+                            const share = shares[0]; // Show first active share
+                            currentShareToken = share.token;
+                            displayShareInfo(share);
+                        } else {
+                            // Show form to create new share
+                            formDiv.style.display = 'block';
+                            successDiv.style.display = 'none';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading shares:', error);
+                    // Fail-soft: show form anyway
+                }
+            }
+            
+            // Display share info
+            function displayShareInfo(share) {
+                if (!shareLinkInput) return;
+                
+                // Build full URL
+                const shareUrl = `${window.location.origin}/share/${share.token}`;
+                shareLinkInput.value = shareUrl;
+                
+                // Determine status (from API or compute)
+                const status = share.status || (share.expires_at && new Date(share.expires_at) < new Date() ? 'expired' : 'active');
+                
+                // Update status badge
+                const statusBadgeEl = document.getElementById('share-status-badge');
+                if (statusBadgeEl) {
+                    statusBadgeEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                    statusBadgeEl.className = 'status-badge';
+                    if (status === 'active') {
+                        statusBadgeEl.classList.add('status-active');
+                    } else if (status === 'expired') {
+                        statusBadgeEl.classList.add('status-expired');
+                    } else if (status === 'revoked') {
+                        statusBadgeEl.classList.add('status-revoked');
+                    }
+                }
+                
+                // Update info
+                const accessCountEl = document.getElementById('share-access-count');
+                const createdAtEl = document.getElementById('share-created-at');
+                const expiresAtEl = document.getElementById('share-expires-at');
+                
+                if (accessCountEl) accessCountEl.textContent = share.access_count || 0;
+                if (createdAtEl) {
+                    const created = share.created_at ? new Date(share.created_at).toLocaleString() : '-';
+                    createdAtEl.textContent = created;
+                }
+                if (expiresAtEl) {
+                    const expires = share.expires_at ? new Date(share.expires_at).toLocaleString() : 'Never';
+                    expiresAtEl.textContent = expires;
+                }
+                
+                // Disable actions for expired/revoked tokens
+                const isExpired = status === 'expired' || status === 'revoked';
+                if (rotateButton) {
+                    rotateButton.disabled = isExpired;
+                    if (isExpired) {
+                        rotateButton.title = 'Cannot rotate expired or revoked share link';
+                    } else {
+                        rotateButton.title = '';
+                    }
+                }
+                if (revokeButton) {
+                    // Revoke can still work for expired tokens (to clean up), but disable for revoked
+                    revokeButton.disabled = status === 'revoked';
+                    if (status === 'revoked') {
+                        revokeButton.title = 'Share link is already revoked';
+                    } else {
+                        revokeButton.title = '';
+                    }
+                }
+                
+                // Show success div, hide form
+                successDiv.style.display = 'block';
+                formDiv.style.display = 'none';
+            }
+            
+            // Handle form submission
+            async function handleCreateShare(e) {
+                e.preventDefault();
+                if (!form || !dashboardName) return;
+                
+                // Get expiration
+                const expiresInDays = form.querySelector('#share-expires-in').value;
+                const expiresInDaysNum = expiresInDays ? parseInt(expiresInDays) : null;
+                
+                // Show loading
+                loadingDiv.style.display = 'block';
+                errorDiv.style.display = 'none';
+                formDiv.style.display = 'none';
+                submitButton.disabled = true;
+                
+                try {
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/share`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            expires_in_days: expiresInDaysNum
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - display share info
+                        currentShareToken = result.share.token;
+                        displayShareInfo(result.share);
+                        loadingDiv.style.display = 'none';
+                    } else {
+                        // Error
+                        errorDiv.textContent = result.error || 'Failed to create share link';
+                        errorDiv.style.display = 'block';
+                        loadingDiv.style.display = 'none';
+                        formDiv.style.display = 'block';
+                        submitButton.disabled = false;
+                    }
+                } catch (error) {
+                    errorDiv.textContent = `Network error: ${error.message || 'Failed to create share link'}`;
+                    errorDiv.style.display = 'block';
+                    loadingDiv.style.display = 'none';
+                    formDiv.style.display = 'block';
+                    submitButton.disabled = false;
+                }
+            }
+            
+            // Handle copy to clipboard
+            async function handleCopyLink() {
+                if (!shareLinkInput) return;
+                
+                try {
+                    await navigator.clipboard.writeText(shareLinkInput.value);
+                    // Visual feedback
+                    const originalText = copyButton.textContent;
+                    copyButton.textContent = 'Copied!';
+                    copyButton.disabled = true;
+                    setTimeout(() => {
+                        copyButton.textContent = originalText;
+                        copyButton.disabled = false;
+                    }, 2000);
+                } catch (error) {
+                    // Fallback: select text
+                    shareLinkInput.select();
+                    shareLinkInput.setSelectionRange(0, 99999);
+                    document.execCommand('copy');
+                    alert('Share link copied to clipboard');
+                }
+            }
+            
+            // Handle rotate
+            async function handleRotate() {
+                if (!currentShareToken || !dashboardName) return;
+                
+                if (!confirm('Rotate this share link? The old link will stop working and a new link will be created.')) {
+                    return;
+                }
+                
+                rotateButton.disabled = true;
+                const originalText = rotateButton.textContent;
+                rotateButton.textContent = 'Rotating...';
+                errorDiv.style.display = 'none';
+                
+                try {
+                    const response = await fetch(`/api/shares/${encodeURIComponent(currentShareToken)}/rotate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({})  // Preserve existing expiry
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - update with new token
+                        currentShareToken = result.share.token;
+                        displayShareInfo(result.share);
+                        
+                        // Show confirmation message
+                        const confirmationMsg = document.createElement('div');
+                        confirmationMsg.className = 'form-success';
+                        confirmationMsg.textContent = 'Share link rotated successfully. Old link is now invalid.';
+                        successDiv.insertBefore(confirmationMsg, successDiv.firstChild);
+                        
+                        // Remove confirmation message after 5 seconds
+                        setTimeout(() => {
+                            if (confirmationMsg.parentNode) {
+                                confirmationMsg.parentNode.removeChild(confirmationMsg);
+                            }
+                        }, 5000);
+                        
+                        // Auto-copy new link to clipboard
+                        if (shareLinkInput) {
+                            try {
+                                await navigator.clipboard.writeText(shareLinkInput.value);
+                                // Visual feedback on copy button
+                                const originalCopyText = copyButton.textContent;
+                                copyButton.textContent = 'Copied!';
+                                setTimeout(() => {
+                                    copyButton.textContent = originalCopyText;
+                                }, 2000);
+                            } catch (err) {
+                                // Fail-soft: clipboard copy failed, but rotation succeeded
+                            }
+                        }
+                    } else {
+                        // Error
+                        errorDiv.textContent = result.error || 'Failed to rotate share link';
+                        errorDiv.style.display = 'block';
+                    }
+                } catch (error) {
+                    errorDiv.textContent = `Network error: ${error.message || 'Failed to rotate share link'}`;
+                    errorDiv.style.display = 'block';
+                } finally {
+                    rotateButton.disabled = false;
+                    rotateButton.textContent = originalText;
+                }
+            }
+            
+            // Handle revoke
+            async function handleRevoke() {
+                if (!currentShareToken || !dashboardName) return;
+                
+                if (!confirm('Are you sure you want to revoke this share link? It will no longer be accessible.')) {
+                    return;
+                }
+                
+                revokeButton.disabled = true;
+                revokeButton.textContent = 'Revoking...';
+                
+                try {
+                    const response = await fetch(`/api/shares/${encodeURIComponent(currentShareToken)}`, {
+                        method: 'DELETE',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - show form to create new share
+                        currentShareToken = null;
+                        successDiv.style.display = 'none';
+                        formDiv.style.display = 'block';
+                        form.reset();
+                    } else {
+                        alert(result.error || 'Failed to revoke share link');
+                        revokeButton.disabled = false;
+                        revokeButton.textContent = 'Revoke Share Link';
+                    }
+                } catch (error) {
+                    alert(`Network error: ${error.message || 'Failed to revoke share link'}`);
+                    revokeButton.disabled = false;
+                    revokeButton.textContent = 'Revoke Share Link';
+                }
+            }
+            
+            // Attach event listeners
+            if (shareButton) {
+                shareButton.addEventListener('click', openModal);
+            }
+            
+            if (closeButton) {
+                closeButton.addEventListener('click', closeModal);
+            }
+            
+            if (cancelButton) {
+                cancelButton.addEventListener('click', closeModal);
+            }
+            
+            if (modal.querySelector('.share-dashboard-overlay')) {
+                modal.querySelector('.share-dashboard-overlay').addEventListener('click', closeModal);
+            }
+            
+            if (form) {
+                form.addEventListener('submit', handleCreateShare);
+            }
+            
+            if (copyButton) {
+                copyButton.addEventListener('click', handleCopyLink);
+            }
+            
+            if (rotateButton) {
+                rotateButton.addEventListener('click', handleRotate);
+            }
+            
+            if (revokeButton) {
+                revokeButton.addEventListener('click', handleRevoke);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+        }
+        
+        // Initialize share dashboard
+        initShareDashboard();
         
         // ============================================================
         // VERSION HISTORY

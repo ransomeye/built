@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-01-07T08:45:16.144022Z",
+  "timestamp": "2026-01-07T10:30:09.308580Z",
   "project_root": "/home/ransomeye/rebuild",
   "training_config": {
     "baseline_pack": {
-      "enabled": false,
+      "enabled": true,
       "use_feeds": true,
       "n_samples": 100000
     },
@@ -28,7 +28,7 @@
       "n_samples": 60000
     },
     "rag_index": {
-      "enabled": false,
+      "enabled": true,
       "rebuild": true
     },
     "shap_generation": {
@@ -37,16 +37,25 @@
     }
   },
   "results": {
-    "baseline_pack": "skipped",
+    "baseline_pack": true,
     "risk_model": true,
     "threat_correlation": true,
     "forensic_malware_dna": true,
     "threat_intel_trust": true,
     "dpi_probe_classifier": true,
-    "rag_index": "skipped",
+    "rag_index": false,
     "shap_generation": true
   },
   "trained_models": [
+    {
+      "module": "baseline_pack",
+      "models": [
+        "ransomware_behavior",
+        "anomaly_baseline",
+        "confidence_calibration"
+      ],
+      "status": "success"
+    },
     {
       "module": "risk_model",
       "models": [
@@ -86,11 +95,11 @@
   ],
   "errors": [],
   "summary": {
-    "success_count": 6,
-    "failed_count": 0,
-    "skipped_count": 2,
-    "total_enabled": 6,
+    "success_count": 7,
+    "failed_count": 1,
+    "skipped_count": 0,
+    "total_enabled": 8,
     "total_count": 8,
-    "success_rate": 1.0
+    "success_rate": 0.875
   }
 }

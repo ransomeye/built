@@ -27,6 +27,8 @@ from folder_manager import FolderManager
 from settings_manager import SettingsManager
 from settings import SettingsValidationError
 from version_manager import VersionManager
+from share_manager import ShareManager
+from rate_limiter import get_rate_limiter
 
 # Configure logging - errors logged, not exposed to UI
 logging.basicConfig(
@@ -2037,6 +2039,522 @@ def get_ui_settings():
         # Fail-soft: return defaults on error
         from settings import get_default_settings
         return jsonify(get_default_settings())
+
+
+@app.route('/api/dashboards/<dashboard_name>/share', methods=['POST'])
+def create_dashboard_share(dashboard_name: str):
+    """
+    Create a read-only share link for a personal dashboard.
+    
+    Request body (JSON, optional):
+        {
+            "expires_in_days": 30  # Optional, number of days until expiration (None = no expiration)
+        }
+    
+    Rules:
+    - Only personal dashboards can be shared (fail-closed if system dashboard)
+    - Generates cryptographically strong token
+    - Optional expiration (configurable via env or request)
+    - Audit-log share creation
+    - Returns share link and token info
+    
+    Returns:
+        JSON with share token, share link URL, and metadata
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if dashboard is personal (has overlay)
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can be shared
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot be shared"
+        }), 403
+    
+    # Validate dashboard exists
+    dashboard = dashboard_engine.load_dashboard(dashboard_name)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    # Parse optional expiration
+    expires_in_days = None
+    if request.is_json:
+        data = request.get_json()
+        if data and 'expires_in_days' in data:
+            expires_in_days = data.get('expires_in_days')
+            if expires_in_days is not None:
+                try:
+                    expires_in_days = int(expires_in_days)
+                    if expires_in_days <= 0:
+                        expires_in_days = None
+                except (ValueError, TypeError):
+                    expires_in_days = None
+    
+    # Check env for default expiration
+    if expires_in_days is None:
+        default_expiry = os.environ.get('RANSOMEYE_SHARE_EXPIRY_DAYS')
+        if default_expiry:
+            try:
+                expires_in_days = int(default_expiry)
+            except (ValueError, TypeError):
+                pass
+    
+    # Create share token
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        share_info = share_manager.create_share(
+            dashboard_name=dashboard_name,
+            owner_user_id=user_id,
+            expires_in_days=expires_in_days
+        )
+        
+        cursor.close()
+        conn.close()
+        
+        if not share_info:
+            return jsonify({
+                "error": "Failed to create share token",
+                "status": "failed"
+            }), 500
+        
+        # Build share link URL
+        share_link = f"/share/{share_info['token']}"
+        
+        return jsonify({
+            "status": "success",
+            "share": {
+                "token": share_info['token'],
+                "share_link": share_link,
+                "dashboard_name": share_info['dashboard_name'],
+                "permissions": share_info['permissions'],
+                "expires_at": share_info['expires_at'],
+                "created_at": share_info['created_at'],
+                "access_count": share_info['access_count']
+            }
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating share: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/share/<token>')
+def share_dashboard_view(token: str):
+    """
+    Serve read-only dashboard view via share token.
+    
+    Rules:
+    - Rate limiting applied per token (configurable via env)
+    - Validates token (expiry, revocation)
+    - Fail-closed on invalid/expired/revoked tokens
+    - Fail-closed on rate limit abuse (429)
+    - Captures access metadata (IP, User-Agent) best-effort
+    - Logs all access attempts to share_access_logs (append-only)
+    - Serves read-only template (no edit/save capabilities)
+    - Tracks access count and timestamp
+    - Audit-log access event with rate-limited flag and metadata presence
+    """
+    # Get rate limiter
+    rate_limiter = get_rate_limiter()
+    
+    # Check rate limit (before database access for efficiency)
+    is_allowed, rate_limit_reason = rate_limiter.is_allowed(token)
+    
+    # Capture access metadata (best-effort)
+    ip_address = None
+    user_agent = None
+    
+    # Get IP address (best-effort, may be None behind proxies)
+    if request.headers.get('X-Forwarded-For'):
+        # Use first IP in X-Forwarded-For chain
+        ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-Ip'):
+        ip_address = request.headers.get('X-Real-Ip')
+    else:
+        ip_address = request.remote_addr
+    
+    # Get User-Agent (best-effort)
+    user_agent = request.headers.get('User-Agent')
+    
+    # Validate token
+    conn = get_db_connection()
+    if not conn:
+        return render_template('share_error.html', error="Database unavailable"), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        
+        # Check token status first to determine if expired (for 410 response)
+        # Query token to check expiry status
+        from psycopg2.extras import RealDictCursor
+        status_cursor = conn.cursor(cursor_factory=RealDictCursor)
+        status_cursor.execute("SET search_path = ransomeye, public;")
+        status_query = """
+            SELECT expires_at, revoked_at
+            FROM dashboard_share_tokens
+            WHERE token = %s
+        """
+        status_cursor.execute(status_query, (token,))
+        status_row = status_cursor.fetchone()
+        status_cursor.close()
+        
+        # If token exists and is expired (not revoked), return 410 Gone
+        if status_row and status_row['revoked_at'] is None:
+            if status_row['expires_at']:
+                if status_row['expires_at'] < datetime.now(timezone.utc):
+                    # Token is expired - return 410 Gone
+                    # Still log the access attempt via validate_token
+                    share_manager.validate_token(
+                        token=token,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        rate_limited=not is_allowed
+                    )
+                    conn.close()
+                    logger.warning(f"Expired share token access attempt: {token[:16]}... (IP: {ip_address})")
+                    return render_template('share_error.html', 
+                                         error="This share link has expired."), 410
+        
+        # Validate token with metadata and rate-limited flag
+        share_info = share_manager.validate_token(
+            token=token,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            rate_limited=not is_allowed
+        )
+        
+        cursor.close()
+        conn.close()
+        
+        # If rate-limited, return 429
+        if not is_allowed:
+            logger.warning(f"Rate limit exceeded for share token: {token[:16]}... (IP: {ip_address})")
+            return render_template('share_error.html', 
+                                 error="Rate limit exceeded. Please try again later."), 429
+        
+        if not share_info:
+            return render_template('share_error.html', error="Invalid share link"), 404
+        
+        # Load dashboard
+        dashboard = dashboard_engine.load_dashboard(share_info['dashboard_name'], include_overlay=True)
+        if not dashboard:
+            return render_template('share_error.html', error="Dashboard not found"), 404
+        
+        # Render read-only template
+        return render_template('dashboard_share.html', 
+                             dashboard=dashboard, 
+                             share_info=share_info)
+        
+    except Exception as e:
+        logger.error(f"Error serving share view: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return render_template('share_error.html', error="Internal server error"), 500
+
+
+@app.route('/api/shares/<token>/rotate', methods=['POST'])
+def rotate_share(token: str):
+    """
+    Rotate a share token: revoke old token and create new one.
+    
+    Request body (JSON, optional):
+        {
+            "expires_in_days": 30  # Optional, new expiration in days (None = preserve old expiry)
+        }
+    
+    Rules:
+    - Only token owner can rotate (fail-closed on unauthorized)
+    - Old token immediately revoked
+    - New token created with same permissions
+    - Expiry preserved unless overridden
+    - Audit-log rotation (old_token_id → new_token_id)
+    - Fail-closed on validation errors
+    
+    Returns:
+        JSON with new share token info
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Parse optional new expiration
+    expires_in_days = None
+    if request.is_json:
+        data = request.get_json()
+        if data and 'expires_in_days' in data:
+            expires_in_days = data.get('expires_in_days')
+            if expires_in_days is not None:
+                try:
+                    expires_in_days = int(expires_in_days)
+                    if expires_in_days <= 0:
+                        expires_in_days = None
+                except (ValueError, TypeError):
+                    expires_in_days = None
+    
+    # Rotate token
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        new_share_info = share_manager.rotate_token(token, user_id, expires_in_days)
+        
+        cursor.close()
+        conn.close()
+        
+        if not new_share_info:
+            return jsonify({
+                "error": "Token not found or unauthorized",
+                "status": "failed"
+            }), 404
+        
+        # Build share link URL
+        share_link = f"/share/{new_share_info['token']}"
+        
+        return jsonify({
+            "status": "success",
+            "message": "Share token rotated successfully",
+            "share": {
+                "token": new_share_info['token'],
+                "share_link": share_link,
+                "dashboard_name": new_share_info['dashboard_name'],
+                "permissions": new_share_info['permissions'],
+                "expires_at": new_share_info['expires_at'],
+                "created_at": new_share_info['created_at'],
+                "access_count": new_share_info['access_count']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rotating share: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/api/shares/<token>', methods=['DELETE'])
+def revoke_share(token: str):
+    """
+    Revoke a share token.
+    
+    Rules:
+    - Only token owner can revoke
+    - Soft delete (sets revoked_at timestamp)
+    - Audit-log revocation
+    - Fail-closed on unauthorized access
+    
+    Returns:
+        JSON with success status
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Revoke token
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        success = share_manager.revoke_token(token, user_id)
+        
+        cursor.close()
+        conn.close()
+        
+        if not success:
+            return jsonify({
+                "error": "Token not found or unauthorized",
+                "status": "failed"
+            }), 404
+        
+        return jsonify({
+            "status": "success",
+            "message": "Share token revoked successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error revoking share: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/api/dashboards/<dashboard_name>/shares', methods=['GET'])
+def list_dashboard_shares(dashboard_name: str):
+    """
+    List all active shares for a dashboard.
+    
+    Rules:
+    - Only dashboard owner can list shares
+    - Returns active (non-revoked) shares only
+    - Includes access counts and timestamps
+    
+    Returns:
+        JSON array of share info
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if dashboard is personal (has overlay)
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can have shares
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot have shares"
+        }), 403
+    
+    # List shares
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        shares = share_manager.list_shares(dashboard_name, user_id)
+        
+        cursor.close()
+        conn.close()
+        
+        # Build share links
+        for share in shares:
+            share['share_link'] = f"/share/{share['token']}"
+        
+        return jsonify({
+            "status": "success",
+            "shares": shares,
+            "count": len(shares)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing shares: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
+@app.route('/api/shares/cleanup', methods=['POST'])
+def cleanup_expired_shares():
+    """
+    Background-safe cleanup helper: check expired tokens (env-gated).
+    
+    Rules:
+    - Only enabled if RANSOMEYE_SHARE_CLEANUP_ENABLED=true
+    - Read-only operation (no deletion, status computed dynamically)
+    - Returns counts of expired tokens
+    
+    Returns:
+        JSON with cleanup statistics
+    """
+    # Check if cleanup is enabled via env
+    cleanup_enabled = os.environ.get('RANSOMEYE_SHARE_CLEANUP_ENABLED', 'false').lower() == 'true'
+    if not cleanup_enabled:
+        return jsonify({
+            "error": "Share cleanup is disabled",
+            "status": "disabled"
+        }), 403
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        cleanup_stats = share_manager.cleanup_expired_tokens()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "cleanup": cleanup_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in cleanup_expired_shares: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
 
 
 @app.route('/api/ui/settings', methods=['POST'])

@@ -1,0 +1,301 @@
+<!-- Path and File Name : /home/ransomeye/rebuild/ui/templates/dashboard_share.html -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU -->
+<!-- Details: Read-only dashboard view template for shared dashboards - no edit/save capabilities -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }} - RansomEye (Shared)</title>
+    <link rel="stylesheet" href="/static/theme.css">
+    <style>
+        /* Read-only mode styles */
+        .read-only-banner {
+            background: var(--bg-card, #1e1e1e);
+            color: var(--text-primary, #ffffff);
+            padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
+            border-bottom: 1px solid var(--border-primary, #333);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .read-only-banner-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs, 4px);
+        }
+        .read-only-banner-title {
+            font-size: var(--font-size-base, 1rem);
+            font-weight: 600;
+            color: var(--text-primary, #ffffff);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm, 8px);
+            flex-wrap: wrap;
+        }
+        .read-only-banner-title .badge {
+            background: var(--status-bg-info, rgba(33, 150, 243, 0.2));
+            color: var(--status-info, #2196F3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: var(--font-size-xs, 0.75rem);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .read-only-banner-subtitle {
+            color: var(--text-secondary, #aaa);
+            font-size: var(--font-size-sm, 0.875rem);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md, 16px);
+            flex-wrap: wrap;
+        }
+        .read-only-banner-subtitle .separator {
+            color: var(--text-muted, #666);
+        }
+        
+        /* Watermark for shared views */
+        body.shared-view {
+            position: relative;
+        }
+        body.shared-view::before {
+            content: 'RansomEye — Shared View';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.03;
+            font-size: 8rem;
+            font-weight: 700;
+            color: var(--text-primary, #ffffff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(-45deg);
+            white-space: nowrap;
+            font-family: var(--font-family-base, sans-serif);
+            letter-spacing: 0.1em;
+        }
+        body.shared-view > * {
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .read-only-banner {
+                padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+            }
+            .read-only-banner-title {
+                font-size: var(--font-size-sm, 0.875rem);
+            }
+            .read-only-banner-subtitle {
+                font-size: var(--font-size-xs, 0.75rem);
+                gap: var(--spacing-sm, 8px);
+            }
+            body.shared-view::before {
+                font-size: 4rem;
+            }
+        }
+    </style>
+    <script>
+        // Apply default UI settings (same as dashboard.html)
+        (function() {
+            const defaults = {
+                theme: 'soc_dark',
+                density: 'comfortable',
+                font_size: 'medium'
+            };
+            
+            const fontScaleMap = {
+                'small': 0.875,
+                'medium': 1.0,
+                'large': 1.125
+            };
+            
+            function applySettings(settings) {
+                const html = document.documentElement;
+                const body = document.body;
+                
+                const theme = settings.theme || defaults.theme;
+                html.setAttribute('data-theme', theme);
+                
+                const density = settings.density || defaults.density;
+                body.classList.remove('density-compact', 'density-comfortable');
+                body.classList.add(`density-${density}`);
+                
+                const fontSize = settings.font_size || defaults.font_size;
+                const scale = fontScaleMap[fontSize] || fontScaleMap.medium;
+                document.documentElement.style.setProperty('--font-scale', scale.toString());
+            }
+            
+            async function loadSettings() {
+                try {
+                    const response = await fetch('/api/ui/settings', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const settings = await response.json();
+                        applySettings(settings);
+                    } else {
+                        applySettings(defaults);
+                    }
+                } catch (error) {
+                    console.debug('UI settings fetch failed, using defaults:', error);
+                    applySettings(defaults);
+                }
+            }
+            
+            applySettings(defaults);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadSettings);
+            } else {
+                loadSettings();
+            }
+        })();
+    </script>
+</head>
+<body class="shared-view">
+    <!-- Read-only Banner -->
+    <div class="read-only-banner" role="banner" aria-label="Read-only shared dashboard information">
+        <div class="read-only-banner-content">
+            <div class="read-only-banner-title">
+                <span class="badge">Read-Only Shared Dashboard</span>
+                <span>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</span>
+            </div>
+            <div class="read-only-banner-subtitle">
+                <span>Editing, saving, and modifications are disabled</span>
+                <span class="separator">•</span>
+                <span>Access count: {{ share_info.access_count | default(0) }}</span>
+                {% if share_info.expires_at %}
+                <span class="separator">•</span>
+                <span>Expires: {{ share_info.expires_at[:10] }}</span>
+                {% else %}
+                <span class="separator">•</span>
+                <span>No expiration</span>
+                {% endif %}
+                {% if share_info.owner_user_id %}
+                <span class="separator">•</span>
+                <span>Owner: {{ share_info.owner_user_id[:8] }}***</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="app-layout">
+        <!-- Main Content Area (No Sidebar in Read-Only Mode) -->
+        <main class="main-content" style="margin-left: 0;">
+            <!-- Header (Simplified, No Edit Controls) -->
+            <header class="main-content-header">
+                <div class="header-brand">
+                    <h1>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</h1>
+                    <span class="dashboard-source-badge" style="background: var(--color-info, #2196F3); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">
+                        Shared (Read-Only)
+                    </span>
+                </div>
+                <div class="header-status-group">
+                    <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
+                </div>
+            </header>
+            
+            <!-- Dashboard Content -->
+            <div class="main-content-body">
+                <div class="dashboard-container">
+                    {% if dashboard.description %}
+                    <div style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
+                        {{ dashboard.description }}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Dashboard Grid -->
+                    <div class="dashboard-grid" id="dashboard-grid">
+                        <div class="panel-loading">Loading dashboard panels...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Dashboard Data (Embedded JSON) -->
+    <script>
+        // Dashboard definition (read-only)
+        const dashboardData = {{ dashboard | tojson }};
+        const isReadOnly = true; // Always true for shared views
+        const isSharedView = true;
+        
+        // Panel rendering script (same as dashboard.html but without edit capabilities)
+        (function() {
+            const dashboardGrid = document.getElementById('dashboard-grid');
+            if (!dashboardGrid || !dashboardData || !dashboardData.panels) {
+                dashboardGrid.innerHTML = '<div class="panel-error">Failed to load dashboard panels.</div>';
+                return;
+            }
+            
+            // Clear loading message
+            dashboardGrid.innerHTML = '';
+            
+            // Render panels
+            dashboardData.panels.forEach(panel => {
+                const panelEl = document.createElement('div');
+                panelEl.className = 'panel';
+                panelEl.id = `panel-${panel.id}`;
+                panelEl.style.gridColumn = `span ${panel.w || 12}`;
+                panelEl.style.gridRow = `span ${panel.h || 1}`;
+                
+                // Panel header
+                const header = document.createElement('div');
+                header.className = 'panel-header';
+                header.innerHTML = `<h3>${panel.title || 'Panel'}</h3>`;
+                panelEl.appendChild(header);
+                
+                // Panel content
+                const content = document.createElement('div');
+                content.className = 'panel-content';
+                
+                // Panel type-specific rendering
+                if (panel.type === 'metric') {
+                    content.innerHTML = `<div class="metric-value">${panel.value || 'N/A'}</div>`;
+                    if (panel.label) {
+                        content.innerHTML += `<div class="metric-label">${panel.label}</div>`;
+                    }
+                } else if (panel.type === 'chart') {
+                    content.innerHTML = '<div class="chart-placeholder">Chart visualization (read-only)</div>';
+                } else if (panel.type === 'table') {
+                    content.innerHTML = '<div class="table-placeholder">Table data (read-only)</div>';
+                } else if (panel.type === 'query') {
+                    // For query panels, fetch data from API
+                    if (panel.query_endpoint) {
+                        fetch(panel.query_endpoint)
+                            .then(res => res.json())
+                            .then(data => {
+                                content.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                            })
+                            .catch(err => {
+                                content.innerHTML = `<div class="panel-error">Failed to load data: ${err.message}</div>`;
+                            });
+                    } else {
+                        content.innerHTML = '<div class="panel-placeholder">Query panel (no endpoint specified)</div>';
+                    }
+                } else {
+                    content.innerHTML = `<div class="panel-placeholder">${panel.type || 'Unknown'} panel</div>`;
+                }
+                
+                panelEl.appendChild(content);
+                dashboardGrid.appendChild(panelEl);
+            });
+        })();
+    </script>
+</body>
+</html>
+

@@ -1,5 +1,5 @@
 {
-  "created": "2026-01-07T07:51:04.215285Z",
+  "created": "2026-01-07T10:36:28.835088Z",
   "manifest_version": "1.0.0",
   "models": [
     {
@@ -37,7 +37,7 @@
     {
       "algorithm": "platt_scaling",
       "features": 64,
-      "hash": "sha256:a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
+      "hash": "sha256:d0fcff411398ea3ebce8395183908c6a4a31e889f59ef0d3e4c0ee0cc0a1682f",
       "name": "confidence_calibration.model",
       "shap_file": "baseline_pack/shap/confidence_calibration_shap.json",
       "shap_required": true,
@@ -46,7 +46,7 @@
       "version": "1.0.0"
     }
   ],
-  "pack_hash": "sha256:6f23052b35ac988a14a64fa2e453c023dc6b85167109191f333c98006d1e8e1c",
+  "pack_hash": "sha256:7c5b4d006a2b852720b9094a11a2e0a4816167ed6093dee0cfd7b39028b6aafb",
   "pack_name": "RansomEye Baseline Intelligence Pack",
   "pack_version": "1.0.0",
   "signature": {
@@ -56,6 +56,6 @@
     "timestamp": "2025-12-31T08:30:31.247881Z"
   },
   "signer": "policy",
-  "trained_on": "2026-01-07T07:51:04.215297Z",
+  "trained_on": "2026-01-07T10:36:28.835101Z",
   "training_methodology": "synthetic_and_redteam"
 }
