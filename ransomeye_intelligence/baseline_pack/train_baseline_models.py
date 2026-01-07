@@ -292,9 +292,16 @@ def main():
     X_anomaly = generate_synthetic_anomaly_data(n_samples=100000, n_features=128)
     model_anomaly = train_anomaly_baseline_model(X_anomaly)
     
-    model_path = MODELS_DIR / "anomaly_baseline.model"
+    # Save with expected name for validation
+    model_path = MODELS_DIR / "anomaly_detector.model"
     model_hash = save_model(model_anomaly, model_path, {})
     training_data_hashes['anomaly_baseline'] = hashlib.sha256(X_anomaly.tobytes()).hexdigest()
+    
+    # Also create symlink for backward compatibility
+    compat_path = MODELS_DIR / "anomaly_baseline.model"
+    if compat_path.exists():
+        compat_path.unlink()
+    compat_path.symlink_to("anomaly_detector.model")
     
     print(f"  ✓ Model saved: {model_path}")
     print(f"    Contamination: 0.01")
@@ -308,9 +315,16 @@ def main():
     y_calibration = y_ransomware[:50000]
     model_calibration, metrics_calibration = train_confidence_calibration_model(X_calibration, y_calibration)
     
-    model_path = MODELS_DIR / "confidence_calibration.model"
+    # Save with expected name for validation
+    model_path = MODELS_DIR / "confidence_calibrator.model"
     model_hash = save_model(model_calibration, model_path, metrics_calibration)
     training_data_hashes['confidence_calibration'] = hashlib.sha256(X_calibration.tobytes()).hexdigest()
+    
+    # Also create symlink for backward compatibility
+    compat_path = MODELS_DIR / "confidence_calibration.model"
+    if compat_path.exists():
+        compat_path.unlink()
+    compat_path.symlink_to("confidence_calibrator.model")
     
     print(f"  ✓ Model saved: {model_path}")
     print(f"    Accuracy: {metrics_calibration['accuracy']:.4f}")
@@ -336,14 +350,26 @@ def main():
             model_info['precision'] = metrics_ransomware['precision']
             model_info['recall'] = metrics_ransomware['recall']
             model_info['f1_score'] = metrics_ransomware['f1_score']
-        elif model_name == "anomaly_baseline.model":
-            model_path = MODELS_DIR / model_name
+        elif model_name in ["anomaly_baseline.model", "anomaly_detector.model"]:
+            # Check for new name first, then fall back to old name
+            model_path = MODELS_DIR / "anomaly_detector.model"
+            if not model_path.exists():
+                model_path = MODELS_DIR / "anomaly_baseline.model"
             model_info['hash'] = f"sha256:{compute_file_hash(model_path)}"
             model_info['training_data_hash'] = f"sha256:{training_data_hashes['anomaly_baseline']}"
-        elif model_name == "confidence_calibration.model":
-            model_path = MODELS_DIR / model_name
+            # Update name in manifest if it's the old name
+            if model_name == "anomaly_baseline.model":
+                model_info['name'] = "anomaly_detector.model"
+        elif model_name in ["confidence_calibration.model", "confidence_calibrator.model"]:
+            # Check for new name first, then fall back to old name
+            model_path = MODELS_DIR / "confidence_calibrator.model"
+            if not model_path.exists():
+                model_path = MODELS_DIR / "confidence_calibration.model"
             model_info['hash'] = f"sha256:{compute_file_hash(model_path)}"
             model_info['training_data_hash'] = f"sha256:{training_data_hashes['confidence_calibration']}"
+            # Update name in manifest if it's the old name
+            if model_name == "confidence_calibration.model":
+                model_info['name'] = "confidence_calibrator.model"
     
     # Update pack hash
     pack_hash = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()

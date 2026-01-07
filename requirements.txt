@@ -13,8 +13,8 @@ requests>=2.31.0
 # Cryptography dependencies
 cryptography>=41.0.0
 
-# Optional: For enhanced features
-# sentence-transformers>=2.2.0  # For RAG embeddings (optional)
-# faiss-cpu>=1.7.4  # For vector search (optional)
+# RAG dependencies (required for SOC Copilot)
+sentence-transformers>=2.2.0  # For RAG embeddings
+faiss-cpu>=1.7.4  # For vector search
 
 psycopg2-binary

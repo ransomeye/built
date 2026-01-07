@@ -578,6 +578,55 @@ class ShareManager:
             logger.error(f"Error listing shares: {e}", exc_info=True)
             return []
     
+    def get_all_share_activity(self) -> list:
+        """
+        Get all share tokens with activity data (read-only audit view).
+        
+        Returns:
+            List of share info dicts with status field, sorted by last_accessed_at DESC
+        """
+        try:
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SET search_path = ransomeye, public;")
+            
+            # Get all tokens (including revoked) sorted by last_accessed_at DESC
+            query = """
+                SELECT token_id, token, dashboard_name, owner_user_id, permissions,
+                       expires_at, created_at, revoked_at, access_count, last_accessed_at
+                FROM dashboard_share_tokens
+                ORDER BY 
+                    CASE WHEN last_accessed_at IS NULL THEN created_at ELSE last_accessed_at END DESC,
+                    created_at DESC
+            """
+            
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            cursor.close()
+            
+            shares = []
+            for row in rows:
+                status = self._get_token_status(row['expires_at'], row['revoked_at'])
+                share_info = {
+                    'token_id': str(row['token_id']),
+                    'token': row['token'],
+                    'dashboard_name': row['dashboard_name'],
+                    'owner_user_id': row['owner_user_id'],
+                    'permissions': row['permissions'],
+                    'expires_at': row['expires_at'].isoformat() if row['expires_at'] else None,
+                    'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+                    'revoked_at': row['revoked_at'].isoformat() if row['revoked_at'] else None,
+                    'access_count': row['access_count'],
+                    'last_accessed_at': row['last_accessed_at'].isoformat() if row['last_accessed_at'] else None,
+                    'status': status
+                }
+                shares.append(share_info)
+            
+            return shares
+            
+        except Exception as e:
+            logger.error(f"Error getting share activity: {e}", exc_info=True)
+            return []
+    
     def cleanup_expired_tokens(self) -> Dict[str, int]:
         """
         Background-safe cleanup helper: mark expired tokens (no deletion).

@@ -1,0 +1,727 @@
+<!-- Path and File Name : /home/ransomeye/rebuild/ui/templates/share_activity.html -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU -->
+<!-- Details: Share Activity & Audit Dashboard - read-only view of all dashboard share activity -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Dashboards - RansomEye</title>
+    <link rel="stylesheet" href="/static/theme.css">
+    <script>
+        // ============================================================
+        // UI SETTINGS APPLICATION (Non-blocking, Fail-Soft)
+        // ============================================================
+        (function() {
+            const defaults = {
+                theme: 'soc_dark',
+                density: 'comfortable',
+                font_size: 'medium'
+            };
+            
+            const fontScaleMap = {
+                'small': 0.875,
+                'medium': 1.0,
+                'large': 1.125
+            };
+            
+            function applySettings(settings) {
+                const html = document.documentElement;
+                const body = document.body;
+                
+                const theme = settings.theme || defaults.theme;
+                html.setAttribute('data-theme', theme);
+                
+                const density = settings.density || defaults.density;
+                body.classList.remove('density-compact', 'density-comfortable');
+                body.classList.add(`density-${density}`);
+                
+                const fontSize = settings.font_size || defaults.font_size;
+                const scale = fontScaleMap[fontSize] || fontScaleMap.medium;
+                document.documentElement.style.setProperty('--font-scale', scale.toString());
+            }
+            
+            async function loadSettings() {
+                try {
+                    const response = await fetch('/api/ui/settings', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-cache'
+                    });
+                    
+                    if (response.ok) {
+                        const settings = await response.json();
+                        applySettings(settings);
+                        try {
+                            sessionStorage.setItem('ransomeye_ui_settings', JSON.stringify(settings));
+                        } catch (e) {}
+                    } else {
+                        applySettings(defaults);
+                    }
+                } catch (error) {
+                    console.debug('UI settings fetch failed, using defaults:', error);
+                    applySettings(defaults);
+                    try {
+                        const cached = sessionStorage.getItem('ransomeye_ui_settings');
+                        if (cached) {
+                            const settings = JSON.parse(cached);
+                            applySettings(settings);
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            applySettings(defaults);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadSettings);
+            } else {
+                loadSettings();
+            }
+        })();
+    </script>
+    <style>
+        .share-activity-container {
+            padding: var(--spacing-lg);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .share-activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
+        }
+        
+        .share-activity-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .share-activity-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+        
+        .share-activity-table-container {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        
+        .share-activity-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .share-activity-table thead {
+            background: var(--bg-tertiary);
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .share-activity-table th {
+            padding: var(--spacing-md);
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+        
+        .share-activity-table td {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .share-activity-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .share-activity-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+        
+        .share-activity-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .share-activity-empty {
+            padding: var(--spacing-xl);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        .share-activity-loading {
+            padding: var(--spacing-xl);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        .share-activity-error {
+            padding: var(--spacing-md);
+            background: var(--bg-error);
+            border: 1px solid var(--border-error);
+            border-radius: var(--border-radius);
+            color: var(--text-error);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .status-badge.status-active {
+            background: var(--status-active-bg, rgba(34, 197, 94, 0.1));
+            color: var(--status-active-text, #22c55e);
+        }
+        
+        .status-badge.status-expired {
+            background: var(--status-warning-bg, rgba(234, 179, 8, 0.1));
+            color: var(--status-warning-text, #eab308);
+        }
+        
+        .status-badge.status-revoked {
+            background: var(--status-critical-bg, rgba(239, 68, 68, 0.1));
+            color: var(--status-critical-text, #ef4444);
+        }
+        
+        .share-activity-table .dashboard-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .share-activity-table .timestamp {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .share-activity-table .access-count {
+            text-align: right;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Toggle (Mobile Only) -->
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            ☰
+        </button>
+        
+        <!-- Left Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar Branding -->
+            <div class="sidebar-brand">
+                <a href="/" class="sidebar-brand-link">
+                    <img src="/logo.png" alt="RansomEye" class="sidebar-logo">
+                </a>
+            </div>
+            
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- Dashboards section will be populated by JavaScript -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Dashboards</div>
+                    <ul class="sidebar-nav-list" id="dashboard-list">
+                        <li class="sidebar-nav-item">
+                            <a href="/" class="sidebar-nav-link">SOC Dashboard</a>
+                        </li>
+                        <li class="sidebar-nav-item">
+                            <span class="sidebar-nav-link" style="color: var(--text-muted);">Loading...</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Divider -->
+                <hr class="sidebar-divider">
+                
+                <!-- Administration -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Administration</div>
+                    <ul class="sidebar-nav-list">
+                        <li class="sidebar-nav-item">
+                            <a href="/shares/activity" class="sidebar-nav-link active">Shared Dashboards</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-content-header">
+                <div class="header-brand">
+                    <h1>Shared Dashboards</h1>
+                </div>
+            </header>
+            
+            <!-- Main Container -->
+            <div class="main-content-body">
+                <div class="share-activity-container">
+                    <div class="share-activity-header">
+                        <h2 class="share-activity-title">Share Activity & Audit</h2>
+                        <div class="share-activity-actions">
+                            <button 
+                                type="button" 
+                                id="export-csv-button" 
+                                class="button-secondary"
+                                aria-label="Export to CSV"
+                            >
+                                Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="share-activity-error" class="share-activity-error" style="display: none;"></div>
+                    
+                    <div class="share-activity-table-container">
+                        <table class="share-activity-table" id="share-activity-table">
+                            <thead>
+                                <tr>
+                                    <th>Dashboard</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Expires</th>
+                                    <th style="text-align: right;">Access Count</th>
+                                    <th>Last Accessed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="share-activity-tbody">
+                                <tr>
+                                    <td colspan="6" class="share-activity-loading">Loading share activity...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Share Dashboard Modal (reused from dashboard.html, read-only context) -->
+    <div class="share-dashboard-modal" id="share-dashboard-modal" role="dialog" aria-labelledby="share-dashboard-title" aria-hidden="true" style="display: none;">
+        <div class="share-dashboard-overlay"></div>
+        <div class="share-dashboard-dialog">
+            <div class="share-dashboard-header">
+                <h2 id="share-dashboard-title">Share Dashboard</h2>
+                <button type="button" class="share-dashboard-close" id="share-dashboard-close" aria-label="Close">✕</button>
+            </div>
+            <div class="share-dashboard-content">
+                <div id="share-dashboard-loading" class="share-loading" style="display: none;">
+                    <p>Loading share information...</p>
+                </div>
+                <div id="share-dashboard-error" class="form-error" style="display: none;"></div>
+                <div id="share-dashboard-success" style="display: none;">
+                    <div class="share-link-section">
+                        <label for="share-link-input">Share Link (Read-Only)</label>
+                        <div class="share-link-input-group">
+                            <input 
+                                type="text" 
+                                id="share-link-input" 
+                                readonly 
+                                class="share-link-input"
+                                aria-describedby="share-link-help"
+                            />
+                            <button 
+                                type="button" 
+                                id="copy-share-link-button" 
+                                class="button-secondary"
+                                aria-label="Copy share link to clipboard"
+                            >
+                                Copy
+                            </button>
+                        </div>
+                        <small id="share-link-help" class="form-help">
+                            Anyone with this link can view the dashboard in read-only mode. Editing, saving, and other modifications are disabled.
+                        </small>
+                    </div>
+                    <div class="share-info-section">
+                        <div class="share-info-item">
+                            <strong>Status:</strong>
+                            <span id="share-status-badge" class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="share-info-item">
+                            <strong>Access Count:</strong>
+                            <span id="share-access-count">0</span>
+                        </div>
+                        <div class="share-info-item">
+                            <strong>Created:</strong>
+                            <span id="share-created-at">-</span>
+                        </div>
+                        <div class="share-info-item">
+                            <strong>Expires:</strong>
+                            <span id="share-expires-at">-</span>
+                        </div>
+                        <div class="share-info-item">
+                            <strong>Last Accessed:</strong>
+                            <span id="share-last-accessed-at">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ============================================================
+        // SHARE ACTIVITY DASHBOARD
+        // ============================================================
+        
+        let shareActivityData = [];
+        
+        // Load sidebar dashboards
+        async function loadSidebarDashboards() {
+            const dashboardListEl = document.getElementById('dashboard-list');
+            if (!dashboardListEl) return;
+            
+            try {
+                const [foldersResponse, dashboardsResponse] = await Promise.all([
+                    fetch('/api/dashboard-folders'),
+                    fetch('/api/dashboards')
+                ]);
+                
+                if (!foldersResponse.ok || !dashboardsResponse.ok) {
+                    throw new Error(`HTTP ${foldersResponse.status} or ${dashboardsResponse.status}`);
+                }
+                
+                const folders = await foldersResponse.json();
+                const dashboardsData = await dashboardsResponse.json();
+                const dashboardsWithFolders = dashboardsData.dashboards_with_folders || [];
+                
+                const dashboardDefs = await Promise.all(
+                    dashboardsWithFolders.map(async (dash) => {
+                        try {
+                            const response = await fetch(`/api/dashboards/${encodeURIComponent(dash.name)}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                return { ...dash, title: data.title || dash.name };
+                            }
+                        } catch (e) {
+                            console.debug(`Failed to load dashboard ${dash.name}:`, e);
+                        }
+                        return { ...dash, title: dash.name };
+                    })
+                );
+                
+                const groupedByFolder = {};
+                dashboardDefs.forEach(dash => {
+                    const folderId = dash.folder_id || 'unknown';
+                    if (!groupedByFolder[folderId]) {
+                        groupedByFolder[folderId] = [];
+                    }
+                    groupedByFolder[folderId].push(dash);
+                });
+                
+                const sortedFolders = folders.slice().sort((a, b) => {
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+                
+                let html = '';
+                sortedFolders.forEach(folder => {
+                    const dashboards = groupedByFolder[folder.id] || [];
+                    if (dashboards.length === 0) return;
+                    
+                    html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">${escapeHtml(folder.name)}</div></li>`;
+                    
+                    dashboards.forEach(dash => {
+                        const title = dash.title || dash.name;
+                        const href = `/dashboard/${escapeHtml(dash.name)}`;
+                        html += `
+                            <li class="sidebar-nav-item">
+                                <a href="${href}" class="sidebar-nav-link">
+                                    ${escapeHtml(title)}
+                                </a>
+                            </li>
+                        `;
+                    });
+                });
+                
+                const knownFolderIds = new Set(folders.map(f => f.id));
+                Object.keys(groupedByFolder).forEach(folderId => {
+                    if (!knownFolderIds.has(folderId) && groupedByFolder[folderId].length > 0) {
+                        html += `<li class="sidebar-nav-item"><div class="sidebar-section-title" style="margin-top: var(--spacing-md);">General</div></li>`;
+                        groupedByFolder[folderId].forEach(dash => {
+                            const title = dash.title || dash.name;
+                            const href = `/dashboard/${escapeHtml(dash.name)}`;
+                            html += `
+                                <li class="sidebar-nav-item">
+                                    <a href="${href}" class="sidebar-nav-link">
+                                        ${escapeHtml(title)}
+                                    </a>
+                                </li>
+                            `;
+                        });
+                    }
+                });
+                
+                dashboardListEl.innerHTML = html;
+                
+            } catch (error) {
+                console.debug('Failed to load sidebar dashboards:', error);
+                dashboardListEl.innerHTML = `
+                    <li class="sidebar-nav-item">
+                        <span class="sidebar-nav-link" style="color: var(--text-muted);">Dashboards unavailable</span>
+                    </li>
+                `;
+            }
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Format timestamp
+        function formatTimestamp(isoString) {
+            if (!isoString) return 'Never';
+            try {
+                const date = new Date(isoString);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return isoString;
+            }
+        }
+        
+        // Load share activity
+        async function loadShareActivity() {
+            const tbody = document.getElementById('share-activity-tbody');
+            const errorDiv = document.getElementById('share-activity-error');
+            
+            if (!tbody) return;
+            
+            try {
+                tbody.innerHTML = '<tr><td colspan="6" class="share-activity-loading">Loading share activity...</td></tr>';
+                errorDiv.style.display = 'none';
+                
+                const response = await fetch('/api/shares/activity', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status !== 'success') {
+                    throw new Error(result.error || 'Failed to load share activity');
+                }
+                
+                shareActivityData = result.shares || [];
+                
+                if (shareActivityData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="share-activity-empty">No share activity found.</td></tr>';
+                    return;
+                }
+                
+                // Render table
+                let html = '';
+                shareActivityData.forEach(share => {
+                    const status = share.status || 'active';
+                    const statusClass = `status-${status}`;
+                    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                    
+                    html += `
+                        <tr data-dashboard-name="${escapeHtml(share.dashboard_name)}" data-token="${escapeHtml(share.token)}">
+                            <td class="dashboard-name">${escapeHtml(share.dashboard_name)}</td>
+                            <td><span class="status-badge ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+                            <td class="timestamp">${formatTimestamp(share.created_at)}</td>
+                            <td class="timestamp">${share.expires_at ? formatTimestamp(share.expires_at) : 'Never'}</td>
+                            <td class="access-count">${share.access_count || 0}</td>
+                            <td class="timestamp">${formatTimestamp(share.last_accessed_at)}</td>
+                        </tr>
+                    `;
+                });
+                
+                tbody.innerHTML = html;
+                
+                // Attach click handlers
+                tbody.querySelectorAll('tr').forEach(row => {
+                    row.addEventListener('click', () => {
+                        const dashboardName = row.dataset.dashboardName;
+                        const token = row.dataset.token;
+                        if (dashboardName && token) {
+                            openShareModal(dashboardName, token);
+                        }
+                    });
+                });
+                
+            } catch (error) {
+                console.error('Error loading share activity:', error);
+                errorDiv.textContent = `Failed to load share activity: ${error.message}`;
+                errorDiv.style.display = 'block';
+                tbody.innerHTML = '<tr><td colspan="6" class="share-activity-empty">Error loading share activity.</td></tr>';
+            }
+        }
+        
+        // Open share modal in read-only mode
+        async function openShareModal(dashboardName, token) {
+            const modal = document.getElementById('share-dashboard-modal');
+            const closeButton = document.getElementById('share-dashboard-close');
+            const loadingDiv = document.getElementById('share-dashboard-loading');
+            const errorDiv = document.getElementById('share-dashboard-error');
+            const successDiv = document.getElementById('share-dashboard-success');
+            const shareLinkInput = document.getElementById('share-link-input');
+            const copyButton = document.getElementById('copy-share-link-button');
+            const statusBadge = document.getElementById('share-status-badge');
+            const accessCount = document.getElementById('share-access-count');
+            const createdAt = document.getElementById('share-created-at');
+            const expiresAt = document.getElementById('share-expires-at');
+            const lastAccessedAt = document.getElementById('share-last-accessed-at');
+            
+            if (!modal) return;
+            
+            // Show modal
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            
+            // Reset state
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            // Find share data
+            const share = shareActivityData.find(s => s.token === token && s.dashboard_name === dashboardName);
+            
+            if (share) {
+                // Display share info
+                const shareLink = `${window.location.origin}/share/${share.token}`;
+                shareLinkInput.value = shareLink;
+                
+                const status = share.status || 'active';
+                statusBadge.className = `status-badge status-${status}`;
+                statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                
+                accessCount.textContent = share.access_count || 0;
+                createdAt.textContent = formatTimestamp(share.created_at);
+                expiresAt.textContent = share.expires_at ? formatTimestamp(share.expires_at) : 'Never';
+                lastAccessedAt.textContent = formatTimestamp(share.last_accessed_at);
+                
+                loadingDiv.style.display = 'none';
+                successDiv.style.display = 'block';
+            } else {
+                errorDiv.textContent = 'Share information not found.';
+                errorDiv.style.display = 'block';
+                loadingDiv.style.display = 'none';
+            }
+            
+            // Close button handler
+            function closeModal() {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+            
+            closeButton.onclick = closeModal;
+            modal.querySelector('.share-dashboard-overlay').onclick = closeModal;
+            
+            // Copy button handler
+            copyButton.onclick = () => {
+                shareLinkInput.select();
+                document.execCommand('copy');
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                }, 2000);
+            };
+        }
+        
+        // Export to CSV
+        function exportToCSV() {
+            if (shareActivityData.length === 0) {
+                alert('No data to export.');
+                return;
+            }
+            
+            const headers = ['Dashboard', 'Status', 'Created', 'Expires', 'Access Count', 'Last Accessed', 'Owner User ID'];
+            const rows = shareActivityData.map(share => [
+                share.dashboard_name || '',
+                share.status || '',
+                share.created_at || '',
+                share.expires_at || '',
+                share.access_count || 0,
+                share.last_accessed_at || '',
+                share.owner_user_id || ''
+            ]);
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => {
+                    const str = String(cell);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                }).join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `ransomeye_share_activity_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Sidebar toggle
+        function initSidebarToggle() {
+            const toggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (toggle && sidebar) {
+                toggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('sidebar-open');
+                });
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSidebarDashboards();
+            loadShareActivity();
+            initSidebarToggle();
+            
+            const exportButton = document.getElementById('export-csv-button');
+            if (exportButton) {
+                exportButton.addEventListener('click', exportToCSV);
+            }
+        });
+    </script>
+</body>
+</html>
+

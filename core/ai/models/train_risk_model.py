@@ -94,7 +94,8 @@ def train_model():
 def save_model_artifact(model, scaler, models_dir: Path):
     """Save model artifact and compute hash."""
     # Save model as pickle (compatible with Rust loader expectations)
-    model_path = models_dir / f"{MODEL_NAME}.model"
+    # Use expected name for validation: risk_predictor.model
+    model_path = models_dir / "risk_predictor.model"
     
     # Create model bundle (model + scaler)
     model_bundle = {
@@ -143,9 +144,9 @@ def create_manifest(model_hash: str, model_size: int, models_dir: Path):
 
 def main():
     """Main training function."""
-    # Determine models directory
+    # Determine models directory - use path expected by validation
     models_dir = Path(os.environ.get("RANSOMEYE_AI_MODELS_DIR", 
-                                     "/home/ransomeye/rebuild/core/ai/models"))
+                                     "/home/ransomeye/rebuild/ransomeye_ai_core/models"))
     models_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Models directory: {models_dir}")

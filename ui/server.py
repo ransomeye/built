@@ -2500,6 +2500,66 @@ def list_dashboard_shares(dashboard_name: str):
         }), 500
 
 
+@app.route('/shares/activity')
+def share_activity_view():
+    """Serve Share Activity & Audit Dashboard page (read-only)."""
+    return render_template('share_activity.html')
+
+
+@app.route('/api/shares/activity', methods=['GET'])
+def get_share_activity():
+    """
+    Get all dashboard share activity (read-only audit view).
+    
+    Returns:
+        JSON array of share tokens with:
+        - dashboard_name
+        - status (active / expired / revoked)
+        - created_at
+        - expires_at
+        - access_count
+        - last_accessed_at
+        - owner_user_id
+    - Sorted by last_accessed_at DESC (or created_at if never accessed)
+    - Fail-soft if no shares exist (returns empty array)
+    """
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        shares = share_manager.get_all_share_activity()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "shares": shares,
+            "count": len(shares)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting share activity: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
 @app.route('/api/shares/cleanup', methods=['POST'])
 def cleanup_expired_shares():
     """

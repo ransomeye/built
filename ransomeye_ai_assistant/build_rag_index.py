@@ -7,7 +7,7 @@ import sys
 import json
 import pickle
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     import faiss
