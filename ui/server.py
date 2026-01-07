@@ -22,6 +22,7 @@ from flask import Flask, jsonify, send_from_directory, render_template, request
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from schema_helper import SchemaAwareDB
+from dashboard_engine import DashboardEngine
 
 # Configure logging - errors logged, not exposed to UI
 logging.basicConfig(
@@ -37,8 +38,12 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).parent.resolve()
 TEMPLATE_DIR = BASE_DIR / 'templates'
 STATIC_DIR = BASE_DIR / 'static'
+DASHBOARDS_DIR = BASE_DIR / 'dashboards'
 REBUILD_ROOT = BASE_DIR.parent.resolve()
 LOGO_PATH = REBUILD_ROOT / 'core' / 'logo-removebg-preview.png'
+
+# Initialize dashboard engine
+dashboard_engine = DashboardEngine(DASHBOARDS_DIR)
 
 # Configuration via environment variables
 DB_NAME = os.environ.get("DB_NAME", "ransomeye")
@@ -85,6 +90,64 @@ def safe_get_metric(db: SchemaAwareDB, query: str, params=None, default="Metric 
 def index():
     """Serve main SOC dashboard page."""
     return render_template('index.html')
+
+
+@app.route('/dashboard/<dashboard_name>')
+def dashboard_view(dashboard_name: str):
+    """Serve a dashboard by name (loads from JSON definition)."""
+    dashboard = dashboard_engine.load_dashboard(dashboard_name)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    return render_template('dashboard.html', dashboard=dashboard)
+
+
+@app.route('/api/dashboards')
+def list_dashboards():
+    """List all available dashboards."""
+    dashboards = dashboard_engine.list_dashboards()
+    return jsonify({
+        "dashboards": dashboards,
+        "count": len(dashboards)
+    })
+
+
+@app.route('/api/dashboards/<dashboard_name>')
+def get_dashboard_definition(dashboard_name: str):
+    """Get dashboard JSON definition."""
+    dashboard = dashboard_engine.load_dashboard(dashboard_name)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    return jsonify(dashboard)
+
+
+@app.route('/api/dashboards/<dashboard_name>/panels')
+def get_dashboard_panels(dashboard_name: str):
+    """Get dashboard panels with refresh intervals."""
+    dashboard = dashboard_engine.load_dashboard(dashboard_name)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    refresh_intervals = dashboard_engine.get_panel_refresh_intervals(dashboard)
+    panels_info = []
+    
+    for panel in dashboard.get('panels', []):
+        panels_info.append({
+            "id": panel['id'],
+            "title": panel.get('title', ''),
+            "refresh_interval": panel.get('refresh_interval'),
+            "x": panel.get('x', 0),
+            "y": panel.get('y', 0),
+            "w": panel.get('w', 12),
+            "h": panel.get('h', 1)
+        })
+    
+    return jsonify({
+        "dashboard": dashboard_name,
+        "panels": panels_info,
+        "refresh_intervals": refresh_intervals
+    })
 
 
 @app.route('/api/health')
@@ -913,6 +976,12 @@ def logo():
     if LOGO_PATH.exists():
         return send_from_directory(LOGO_PATH.parent, LOGO_PATH.name)
     return jsonify({"error": "Logo not found"}), 404
+
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files (CSS, JS, etc.)."""
+    return send_from_directory(STATIC_DIR, filename)
 
 
 if __name__ == '__main__':

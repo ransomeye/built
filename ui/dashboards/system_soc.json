@@ -1,0 +1,83 @@
+{
+  "name": "system_soc",
+  "title": "System SOC Dashboard",
+  "description": "Primary security operations center dashboard with sensor coverage, event pipeline, security signals, recent events, and integrity status",
+  "panels": [
+    {
+      "id": "sensor_coverage",
+      "title": "Sensor Coverage",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/soc",
+        "path": "sensor_health"
+      }
+    },
+    {
+      "id": "event_pipeline",
+      "title": "Event Pipeline",
+      "x": 6,
+      "y": 0,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 15,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/soc",
+        "path": "event_pipeline"
+      }
+    },
+    {
+      "id": "security_signals",
+      "title": "Security Signals",
+      "x": 0,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/soc",
+        "path": "security_signals"
+      }
+    },
+    {
+      "id": "recent_events",
+      "title": "Recent Events",
+      "x": 4,
+      "y": 2,
+      "w": 8,
+      "h": 3,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/soc",
+        "path": "recent_events"
+      }
+    },
+    {
+      "id": "integrity_status",
+      "title": "Integrity Status",
+      "x": 0,
+      "y": 4,
+      "w": 12,
+      "h": 1,
+      "refresh_interval": 60,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/soc",
+        "path": "sensor_health.integrity"
+      }
+    }
+  ]
+}
+

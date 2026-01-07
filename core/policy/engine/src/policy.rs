@@ -8,7 +8,7 @@ use std::fs;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use tracing::{error, info, debug};
+use tracing::{error, info, debug, warn};
 
 use crate::errors::PolicyError;
 use crate::decision::AllowedAction;
@@ -385,12 +385,12 @@ impl PolicyLoader {
         }
 
         if self.policies.is_empty() {
-            return Err(PolicyError::ConfigurationError(
-                "No valid policies loaded".to_string()
-            ));
+            warn!("No valid policies loaded - orchestrator will start but policy evaluation will default to DENY until policies are added");
+            // Allow starting with no policies for initial setup, but log warning
+            // Policies must be added for the system to function properly
+        } else {
+            info!("Loaded {} policies", self.policies.len());
         }
-
-        info!("Loaded {} policies", self.policies.len());
         Ok(())
     }
 

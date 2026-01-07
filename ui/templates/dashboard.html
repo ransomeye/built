@@ -1,0 +1,319 @@
+<!-- Path and File Name : /home/ransomeye/rebuild/ui/templates/dashboard.html -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU -->
+<!-- Details: Dashboard template that renders JSON-defined dashboards using the dashboard engine -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }} - RansomEye</title>
+    <link rel="stylesheet" href="/static/theme.css">
+</head>
+<body>
+    <!-- Global Header -->
+    <header class="global-header">
+        <div class="header-brand">
+            <h1>RansomEye</h1>
+        </div>
+        <div class="header-status-group">
+            <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
+        </div>
+    </header>
+    
+    <!-- Dashboard Container -->
+    <div class="dashboard-container">
+        <div class="dashboard-title">{{ dashboard.title | default(dashboard.name, true) | default('Dashboard', true) }}</div>
+        {% if dashboard.description %}
+        <div style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
+            {{ dashboard.description }}
+        </div>
+        {% endif %}
+        
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid" id="dashboard-grid">
+            <!-- Panels will be rendered here by JavaScript -->
+            <div class="panel-loading">Loading dashboard panels...</div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="footer">
+        © RansomEye.Tech | Support: Gagan@RansomEye.Tech
+    </footer>
+    
+    <script>
+        // ============================================================
+        // DASHBOARD RENDERING ENGINE (Client-Side)
+        // ============================================================
+        
+        const dashboardName = '{{ dashboard.name | default("", true) }}';
+        const dashboardDefinition = {{ dashboard | tojson }};
+        const panelRefreshTimers = {};
+        
+        // ============================================================
+        // RENDER DASHBOARD
+        // ============================================================
+        
+        async function renderDashboard() {
+            const gridEl = document.getElementById('dashboard-grid');
+            
+            if (!dashboardDefinition || !dashboardDefinition.panels) {
+                gridEl.innerHTML = '<div class="panel-error">Invalid dashboard definition</div>';
+                return;
+            }
+            
+            // Clear grid
+            gridEl.innerHTML = '';
+            
+            // Render each panel
+            for (const panel of dashboardDefinition.panels) {
+                await renderPanel(panel);
+            }
+            
+            // Initialize refresh intervals
+            initializeRefreshIntervals();
+        }
+        
+        // ============================================================
+        // RENDER PANEL
+        // ============================================================
+        
+        async function renderPanel(panel) {
+            const gridEl = document.getElementById('dashboard-grid');
+            
+            const panelId = panel.id;
+            const title = panel.title || 'Panel';
+            const x = panel.x || 0;
+            const y = panel.y || 0;
+            const w = Math.min(panel.w || 12, 12); // Max 12 columns
+            const h = panel.h || 1;
+            const refreshInterval = panel.refresh_interval;
+            const status = panel.status || 'healthy';
+            
+            // Create panel element
+            const panelEl = document.createElement('div');
+            panelEl.className = 'panel';
+            panelEl.setAttribute('data-panel-id', panelId);
+            panelEl.setAttribute('data-x', x);
+            panelEl.setAttribute('data-y', y);
+            panelEl.setAttribute('data-w', w);
+            panelEl.setAttribute('data-h', h);
+            if (refreshInterval) {
+                panelEl.setAttribute('data-refresh-interval', refreshInterval);
+            }
+            panelEl.style.gridColumn = `span ${w}`;
+            panelEl.style.gridRow = `span ${h}`;
+            
+            // Panel header
+            const headerEl = document.createElement('div');
+            headerEl.className = 'panel-header';
+            headerEl.innerHTML = `
+                <div class="panel-title">${escapeHtml(title)}</div>
+                <div class="panel-status-group">
+                    <span class="status-badge status-${status}">${status}</span>
+                    <span class="panel-timestamp" data-timestamp="${new Date().toISOString()}"></span>
+                </div>
+            `;
+            
+            // Panel body
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'panel-body';
+            bodyEl.innerHTML = '<div class="panel-loading">Loading...</div>';
+            
+            panelEl.appendChild(headerEl);
+            panelEl.appendChild(bodyEl);
+            gridEl.appendChild(panelEl);
+            
+            // Load panel data
+            await loadPanelData(panelId, panel, bodyEl);
+            
+            // Update timestamp
+            updatePanelTimestamp(panelEl);
+        }
+        
+        // ============================================================
+        // LOAD PANEL DATA
+        // ============================================================
+        
+        async function loadPanelData(panelId, panelDef, bodyEl) {
+            try {
+                const dataSource = panelDef.data_source;
+                if (!dataSource || !dataSource.endpoint) {
+                    bodyEl.innerHTML = '<div class="panel-unavailable">No data source configured</div>';
+                    return;
+                }
+                
+                // Fetch data from endpoint
+                const response = await fetch(dataSource.endpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Extract data using path (e.g., "sensor_health" or "sensor_health.linux_agents")
+                let panelData = data;
+                if (dataSource.path) {
+                    const pathParts = dataSource.path.split('.');
+                    for (const part of pathParts) {
+                        if (panelData && typeof panelData === 'object' && part in panelData) {
+                            panelData = panelData[part];
+                        } else {
+                            panelData = null;
+                            break;
+                        }
+                    }
+                }
+                
+                // Render panel content
+                renderPanelContent(panelId, panelData, bodyEl, panelDef);
+                
+            } catch (error) {
+                console.error(`Error loading panel ${panelId}:`, error);
+                bodyEl.innerHTML = '<div class="panel-unavailable">Metric unavailable</div>';
+            }
+        }
+        
+        // ============================================================
+        // RENDER PANEL CONTENT
+        // ============================================================
+        
+        function renderPanelContent(panelId, data, bodyEl, panelDef) {
+            if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+                bodyEl.innerHTML = '<div class="panel-unavailable">Metric unavailable</div>';
+                return;
+            }
+            
+            // Simple content rendering (can be extended with custom renderers)
+            let content = '';
+            
+            if (typeof data === 'string' || typeof data === 'number') {
+                content = `<div style="font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); color: var(--text-primary);">${escapeHtml(String(data))}</div>`;
+            } else if (Array.isArray(data)) {
+                // Render as list
+                content = '<ul style="list-style: none; padding: 0; margin: 0;">';
+                for (const item of data.slice(0, 10)) { // Limit to 10 items
+                    const itemText = typeof item === 'object' ? JSON.stringify(item) : String(item);
+                    content += `<li style="padding: var(--spacing-sm) 0; border-bottom: 1px solid var(--border-primary);">${escapeHtml(itemText)}</li>`;
+                }
+                if (data.length > 10) {
+                    content += `<li style="padding: var(--spacing-sm) 0; color: var(--text-muted); font-size: var(--font-size-sm);">... and ${data.length - 10} more</li>`;
+                }
+                content += '</ul>';
+            } else if (typeof data === 'object') {
+                // Render as key-value pairs
+                content = '<div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">';
+                for (const [key, value] of Object.entries(data)) {
+                    const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                    content += `
+                        <div style="display: flex; justify-content: space-between; padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--border-primary);">
+                            <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">${escapeHtml(key)}:</span>
+                            <span style="color: var(--text-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">${escapeHtml(valueStr)}</span>
+                        </div>
+                    `;
+                }
+                content += '</div>';
+            } else {
+                content = '<div class="panel-unavailable">Metric unavailable</div>';
+            }
+            
+            bodyEl.innerHTML = content;
+        }
+        
+        // ============================================================
+        // REFRESH INTERVALS
+        // ============================================================
+        
+        function initializeRefreshIntervals() {
+            const panels = document.querySelectorAll('.panel[data-refresh-interval]');
+            
+            panels.forEach(panelEl => {
+                const panelId = panelEl.getAttribute('data-panel-id');
+                const interval = parseInt(panelEl.getAttribute('data-refresh-interval'));
+                
+                if (interval && interval > 0) {
+                    // Clear existing timer if any
+                    if (panelRefreshTimers[panelId]) {
+                        clearInterval(panelRefreshTimers[panelId]);
+                    }
+                    
+                    // Set up refresh timer
+                    panelRefreshTimers[panelId] = setInterval(async () => {
+                        const panelDef = dashboardDefinition.panels.find(p => p.id === panelId);
+                        if (panelDef) {
+                            const bodyEl = panelEl.querySelector('.panel-body');
+                            if (bodyEl) {
+                                bodyEl.innerHTML = '<div class="panel-loading">Refreshing...</div>';
+                                await loadPanelData(panelId, panelDef, bodyEl);
+                                updatePanelTimestamp(panelEl);
+                            }
+                        }
+                    }, interval * 1000);
+                }
+            });
+        }
+        
+        // ============================================================
+        // UPDATE PANEL TIMESTAMP
+        // ============================================================
+        
+        function updatePanelTimestamp(panelEl) {
+            const timestampEl = panelEl.querySelector('.panel-timestamp');
+            if (timestampEl) {
+                const timestamp = new Date().toISOString();
+                timestampEl.setAttribute('data-timestamp', timestamp);
+                timestampEl.textContent = formatRelativeTime(timestamp);
+            }
+        }
+        
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function formatRelativeTime(ts) {
+            if (!ts) return 'Unknown';
+            try {
+                const date = new Date(ts);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours < 24) return `${diffHours}h ago`;
+                return date.toLocaleString();
+            } catch {
+                return ts;
+            }
+        }
+        
+        // ============================================================
+        // INITIALIZE
+        // ============================================================
+        
+        // Render dashboard on page load
+        renderDashboard();
+        
+        // Update all timestamps periodically
+        setInterval(() => {
+            document.querySelectorAll('.panel').forEach(panelEl => {
+                updatePanelTimestamp(panelEl);
+            });
+        }, 60000); // Update every minute
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            Object.values(panelRefreshTimers).forEach(timer => clearInterval(timer));
+        });
+    </script>
+</body>
+</html>
+

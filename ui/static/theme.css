@@ -1,0 +1,434 @@
+/* Path and File Name : /home/ransomeye/rebuild/ui/static/theme.css */
+/* Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU */
+/* Details: SOC-grade dark theme using CSS variables only - no hardcoded colors */
+
+/* ============================================================
+   RANSOMEYE SOC-GRADE DARK THEME
+   ============================================================
+   All colors via CSS variables only - no hardcoded values
+   Supports 40+ dashboards without code duplication
+   ============================================================ */
+
+:root {
+    /* ============================================================
+       BACKGROUND COLORS
+       ============================================================ */
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-hover: #22272e;
+    --bg-panel: #1c2128;
+    --bg-panel-header: #161b22;
+    
+    /* ============================================================
+       TEXT COLORS
+       ============================================================ */
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --text-disabled: #484f58;
+    
+    /* ============================================================
+       STATUS COLORS (Info / Warning / Critical)
+       ============================================================ */
+    --status-healthy: #238636;
+    --status-warning: #d29922;
+    --status-critical: #da3633;
+    --status-info: #58a6ff;
+    --status-degraded: #d29922;
+    
+    /* Status badge backgrounds */
+    --status-bg-healthy: rgba(35, 134, 54, 0.15);
+    --status-bg-warning: rgba(210, 153, 34, 0.15);
+    --status-bg-critical: rgba(218, 54, 51, 0.15);
+    --status-bg-info: rgba(88, 166, 255, 0.15);
+    
+    /* Status badge text */
+    --status-text-healthy: #3fb950;
+    --status-text-warning: #d29922;
+    --status-text-critical: #f85149;
+    --status-text-info: #58a6ff;
+    
+    /* ============================================================
+       ACCENT COLORS
+       ============================================================ */
+    --accent-primary: #58a6ff;
+    --accent-secondary: #388bfd;
+    --accent-muted: #1f6feb;
+    
+    /* ============================================================
+       BORDER COLORS
+       ============================================================ */
+    --border-primary: #30363d;
+    --border-secondary: #21262d;
+    --border-hover: #484f58;
+    --border-panel: #30363d;
+    
+    /* ============================================================
+       TYPOGRAPHY
+       ============================================================ */
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    --font-family-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
+    
+    --font-size-xs: 10px;
+    --font-size-sm: 12px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+    --font-size-3xl: 32px;
+    
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    --line-height: 1.5;
+    --line-height-tight: 1.25;
+    
+    /* ============================================================
+       SPACING
+       ============================================================ */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    
+    /* ============================================================
+       BORDER RADIUS
+       ============================================================ */
+    --radius-sm: 4px;
+    --radius: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    
+    /* ============================================================
+       SHADOWS
+       ============================================================ */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    
+    /* ============================================================
+       TRANSITIONS
+       ============================================================ */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+}
+
+/* ============================================================
+   GLOBAL RESET
+   ============================================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   GLOBAL HEADER
+   ============================================================ */
+.global-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    padding: var(--spacing-md) var(--spacing-xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.header-brand h1 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.header-status-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer {
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-lg) 0;
+    border-top: 1px solid var(--border-primary);
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+/* ============================================================
+   DASHBOARD CONTAINER
+   ============================================================ */
+.dashboard-container {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    max-width: 1920px;
+    margin: 0 auto;
+}
+
+.dashboard-title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-lg);
+    letter-spacing: -0.5px;
+}
+
+/* ============================================================
+   DASHBOARD GRID (12-column responsive)
+   ============================================================ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--spacing-md);
+    width: 100%;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   PANEL CONTAINER
+   ============================================================ */
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-panel);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+    transition: border-color var(--transition-base), 
+                background var(--transition-base),
+                box-shadow var(--transition-base);
+}
+
+.panel:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
+}
+
+/* Panel Header */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    background: var(--bg-panel-header);
+    border-bottom: 1px solid var(--border-panel);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.panel-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
+}
+
+.panel-status-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* Status Badge */
+.status-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: var(--line-height-tight);
+}
+
+.status-badge.status-healthy {
+    background: var(--status-bg-healthy);
+    color: var(--status-text-healthy);
+    border: 1px solid var(--status-healthy);
+}
+
+.status-badge.status-warning {
+    background: var(--status-bg-warning);
+    color: var(--status-text-warning);
+    border: 1px solid var(--status-warning);
+}
+
+.status-badge.status-critical {
+    background: var(--status-bg-critical);
+    color: var(--status-text-critical);
+    border: 1px solid var(--status-critical);
+}
+
+.status-badge.status-info {
+    background: var(--status-bg-info);
+    color: var(--status-text-info);
+    border: 1px solid var(--status-info);
+}
+
+.status-badge.status-degraded {
+    background: var(--status-bg-warning);
+    color: var(--status-text-warning);
+    border: 1px solid var(--status-warning);
+}
+
+/* Panel Timestamp */
+.panel-timestamp {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-family: var(--font-family-mono);
+    white-space: nowrap;
+}
+
+/* Panel Body */
+.panel-body {
+    padding: var(--spacing-md);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
+/* Fail-Soft State */
+.panel-unavailable {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+/* ============================================================
+   LOADING STATES
+   ============================================================ */
+.panel-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: var(--spacing-lg);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.panel-loading::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-primary);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: var(--spacing-sm);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   ERROR STATES
+   ============================================================ */
+.panel-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: var(--spacing-lg);
+    color: var(--status-text-critical);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
+/* ============================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================ */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: var(--spacing-md);
+    }
+    
+    .panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .panel-status-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+.panel-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.panel-body::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: var(--radius);
+}
+
+.panel-body::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+

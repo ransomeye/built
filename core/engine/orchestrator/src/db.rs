@@ -503,25 +503,49 @@ impl CoreDb {
         build_hash: Option<&str>,
         version: Option<&str>,
     ) -> Result<Uuid, String> {
-        let row = self
-            .client
-            .query_one(
-                r#"
-                INSERT INTO components (
-                    component_type, component_name, instance_id, build_hash, version, started_at, last_heartbeat_at
+        // Handle partial unique indexes: one for instance_id IS NOT NULL, one for instance_id IS NULL
+        let row = if instance_id.is_some() {
+            // Use the index that requires instance_id
+            self.client
+                .query_one(
+                    r#"
+                    INSERT INTO components (
+                        component_type, component_name, instance_id, build_hash, version, started_at, last_heartbeat_at
+                    )
+                    VALUES ($1::text::component_type, $2, $3, $4, $5, NOW(), NOW())
+                    ON CONFLICT (component_type, component_name, instance_id)
+                    WHERE instance_id IS NOT NULL
+                    DO UPDATE SET
+                        build_hash = COALESCE(EXCLUDED.build_hash, components.build_hash),
+                        version = COALESCE(EXCLUDED.version, components.version),
+                        last_heartbeat_at = NOW()
+                    RETURNING component_id
+                    "#,
+                    &[&component_type, &component_name, &instance_id, &build_hash, &version],
                 )
-                VALUES ($1::text::component_type, $2, $3, $4, $5, NOW(), NOW())
-                ON CONFLICT (component_type, component_name, (COALESCE(instance_id, '')))
-                DO UPDATE SET
-                    build_hash = COALESCE(EXCLUDED.build_hash, components.build_hash),
-                    version = COALESCE(EXCLUDED.version, components.version),
-                    last_heartbeat_at = NOW()
-                RETURNING component_id
-                "#,
-                &[&component_type, &component_name, &instance_id, &build_hash, &version],
-            )
-            .await
-            .map_err(|e| format!("Failed to upsert components row: {e}"))?;
+                .await
+        } else {
+            // Use the index for NULL instance_id
+            self.client
+                .query_one(
+                    r#"
+                    INSERT INTO components (
+                        component_type, component_name, instance_id, build_hash, version, started_at, last_heartbeat_at
+                    )
+                    VALUES ($1::text::component_type, $2, NULL, $3, $4, NOW(), NOW())
+                    ON CONFLICT (component_type, component_name)
+                    WHERE instance_id IS NULL
+                    DO UPDATE SET
+                        build_hash = COALESCE(EXCLUDED.build_hash, components.build_hash),
+                        version = COALESCE(EXCLUDED.version, components.version),
+                        last_heartbeat_at = NOW()
+                    RETURNING component_id
+                    "#,
+                    &[&component_type, &component_name, &build_hash, &version],
+                )
+                .await
+        }
+        .map_err(|e| format!("Failed to upsert components row: {e}"))?;
 
         Ok(row.get::<usize, Uuid>(0))
     }
