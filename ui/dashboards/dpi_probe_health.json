@@ -1,0 +1,99 @@
+{
+  "name": "dpi_probe_health",
+  "title": "DPI Probe Health",
+  "description": "DPI Probe operational health metrics: CPU, memory, disk I/O, network throughput, packet processing rate, and system state from DPI Probe host telemetry",
+  "folder_id": "general",
+  "panels": [
+    {
+      "id": "dpi_cpu_load",
+      "title": "DPI CPU & Load",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 8,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "cpu_load"
+      }
+    },
+    {
+      "id": "dpi_memory",
+      "title": "DPI Memory",
+      "x": 4,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 8,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "memory"
+      }
+    },
+    {
+      "id": "dpi_disk_io",
+      "title": "DPI Disk I/O",
+      "x": 8,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "disk_io"
+      }
+    },
+    {
+      "id": "dpi_network_throughput",
+      "title": "DPI Network Throughput",
+      "x": 0,
+      "y": 2,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 5,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "network_throughput"
+      }
+    },
+    {
+      "id": "dpi_processing_health",
+      "title": "DPI Processing Health",
+      "x": 6,
+      "y": 2,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 5,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "processing_health"
+      }
+    },
+    {
+      "id": "dpi_system_state",
+      "title": "System State",
+      "x": 0,
+      "y": 4,
+      "w": 12,
+      "h": 1,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/dpi-probe-health",
+        "path": "system_state"
+      }
+    }
+  ]
+}
+

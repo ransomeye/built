@@ -173,6 +173,48 @@
             cursor: not-allowed;
         }
         
+        .button-primary {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .button-primary:hover:not(:disabled) {
+            background: var(--accent-muted);
+        }
+        
+        .button-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .button-secondary {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .button-secondary:hover:not(:disabled) {
+            background: var(--bg-hover);
+        }
+        
+        .button-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -418,15 +460,26 @@
                 <div class="incident-report-container">
                     <div class="incident-report-header">
                         <h2 class="incident-report-title">Forensic Share Activity Report</h2>
-                        <button 
-                            type="button" 
-                            id="export-csv-button" 
-                            class="button-secondary"
-                            aria-label="Export to CSV"
-                            style="display: none;"
-                        >
-                            Export CSV
-                        </button>
+                        <div style="display: flex; gap: var(--spacing-sm);">
+                            <button 
+                                type="button" 
+                                id="generate-evidence-pack-button" 
+                                class="button-primary"
+                                aria-label="Generate Evidence Pack"
+                                style="display: none;"
+                            >
+                                Generate Evidence Pack
+                            </button>
+                            <button 
+                                type="button" 
+                                id="export-csv-button" 
+                                class="button-secondary"
+                                aria-label="Export to CSV"
+                                style="display: none;"
+                            >
+                                Export CSV
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="incident-report-error" class="incident-report-error" style="display: none;"></div>
@@ -717,6 +770,12 @@
                 reportContent.style.display = 'block';
                 exportButton.style.display = 'block';
                 
+                // Show evidence pack button
+                const evidencePackButton = document.getElementById('generate-evidence-pack-button');
+                if (evidencePackButton) {
+                    evidencePackButton.style.display = 'block';
+                }
+                
             } catch (error) {
                 console.error('Error generating report:', error);
                 errorDiv.textContent = `Failed to generate report: ${error.message}`;
@@ -796,6 +855,99 @@
                     `;
                 });
                 topDashboardsList.innerHTML = html;
+            }
+        }
+        
+        // Generate Evidence Pack
+        async function generateEvidencePack() {
+            const fromInput = document.getElementById('from-datetime');
+            const toInput = document.getElementById('to-datetime');
+            const errorDiv = document.getElementById('incident-report-error');
+            const evidencePackButton = document.getElementById('generate-evidence-pack-button');
+            
+            if (!fromInput.value || !toInput.value) {
+                errorDiv.textContent = 'Please select both "From" and "To" dates.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            const fromISO = datetimeLocalToISO(fromInput.value);
+            const toISO = datetimeLocalToISO(toInput.value);
+            
+            if (!fromISO || !toISO) {
+                errorDiv.textContent = 'Invalid date format.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Disable button and show loading
+            const originalText = evidencePackButton.textContent;
+            evidencePackButton.disabled = true;
+            evidencePackButton.textContent = 'Generating...';
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/shares/evidence-pack', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        from: fromISO,
+                        to: toISO
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                
+                // Check if response is ZIP (application/zip)
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/zip')) {
+                    // Download ZIP file
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    
+                    // Get filename from Content-Disposition header or generate one
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = 'ransomeye_evidence_pack.zip';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    
+                    link.download = filename;
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    // Show success message
+                    errorDiv.textContent = 'Evidence pack generated and downloaded successfully.';
+                    errorDiv.style.cssText = 'padding: var(--spacing-md); background: rgba(34, 197, 94, 0.1); border: 1px solid #22c55e; border-radius: var(--border-radius); color: #22c55e; margin-bottom: var(--spacing-md); display: block;';
+                    setTimeout(() => {
+                        errorDiv.style.display = 'none';
+                    }, 5000);
+                } else {
+                    throw new Error('Unexpected response type');
+                }
+                
+            } catch (error) {
+                console.error('Error generating evidence pack:', error);
+                errorDiv.textContent = `Failed to generate evidence pack: ${error.message}`;
+                errorDiv.style.cssText = 'padding: var(--spacing-md); background: var(--bg-error); border: 1px solid var(--border-error); border-radius: var(--border-radius); color: var(--text-error); margin-bottom: var(--spacing-md); display: block;';
+                errorDiv.style.display = 'block';
+            } finally {
+                evidencePackButton.disabled = false;
+                evidencePackButton.textContent = originalText;
             }
         }
         
@@ -929,6 +1081,12 @@
             const exportButton = document.getElementById('export-csv-button');
             if (exportButton) {
                 exportButton.addEventListener('click', exportToCSV);
+            }
+            
+            // Generate Evidence Pack button handler
+            const evidencePackButton = document.getElementById('generate-evidence-pack-button');
+            if (evidencePackButton) {
+                evidencePackButton.addEventListener('click', generateEvidencePack);
             }
         });
     </script>

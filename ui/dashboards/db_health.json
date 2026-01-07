@@ -1,0 +1,99 @@
+{
+  "name": "db_health",
+  "title": "Database Health",
+  "description": "PostgreSQL operational health metrics: connection status, query performance, database I/O, storage utilization, and reliability indicators",
+  "folder_id": "general",
+  "panels": [
+    {
+      "id": "connection_health",
+      "title": "Connection Health",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 15,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "connections"
+      }
+    },
+    {
+      "id": "query_performance",
+      "title": "Query Performance",
+      "x": 4,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 20,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "query_performance"
+      }
+    },
+    {
+      "id": "database_io",
+      "title": "Database I/O",
+      "x": 8,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 20,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "database_io"
+      }
+    },
+    {
+      "id": "replication",
+      "title": "Replication",
+      "x": 0,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "replication"
+      }
+    },
+    {
+      "id": "storage",
+      "title": "Storage",
+      "x": 4,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "storage"
+      }
+    },
+    {
+      "id": "reliability",
+      "title": "Reliability",
+      "x": 8,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/db-health",
+        "path": "reliability"
+      }
+    }
+  ]
+}
+

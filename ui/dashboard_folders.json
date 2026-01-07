@@ -1,0 +1,8 @@
+{
+  "general": {
+    "id": "general",
+    "name": "General",
+    "description": "Default folder for dashboards",
+    "order": 0
+  }
+}

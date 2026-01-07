@@ -25,6 +25,7 @@ pub mod envelope;
 pub mod backpressure;
 pub mod rate_limit;
 pub mod health;
+pub mod system_metrics;
 
 // Security module is in probe/security/
 
@@ -38,4 +39,5 @@ pub use envelope::EventEnvelope;
 pub use backpressure::BackpressureManager;
 pub use rate_limit::RateLimiter;
 pub use health::HealthMonitor;
+pub use system_metrics::{SystemMetricsCollector, SystemMetrics};
 

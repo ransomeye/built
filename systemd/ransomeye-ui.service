@@ -27,6 +27,16 @@ Environment="DB_USER=gagan"
 Environment="DB_PASS=gagan"
 
 # UI binding configuration from environment file (network-agnostic)
+# Supported variables in /etc/ransomeye/ui.env:
+#   RANSOMEYE_UI_BIND_ADDRESS (default: 127.0.0.1) - Bind address (127.0.0.1, 0.0.0.0, or specific IP)
+#   RANSOMEYE_UI_BIND_PORT (default: 8081) - Port number
+#   RANSOMEYE_UI_ALLOWED_ORIGINS - Comma-separated CORS origins (e.g., "http://192.168.1.50:8081")
+#   RANSOMEYE_UI_CORS_CREDENTIALS (default: false) - Enable CORS credentials
+#   RANSOMEYE_UI_TRUST_PROXY (default: false) - Trust X-Forwarded-For headers
+#   RANSOMEYE_UI_X_FRAME_OPTIONS (default: DENY) - X-Frame-Options header
+#   RANSOMEYE_UI_REFERRER_POLICY (default: strict-origin-when-cross-origin) - Referrer-Policy
+#   RANSOMEYE_UI_CSP - Content-Security-Policy header (optional)
+# See /home/ransomeye/rebuild/ui/NETWORK_HARDENING.md for details
 EnvironmentFile=/etc/ransomeye/ui.env
 
 # Security hardening

@@ -18,7 +18,8 @@ import json
 import logging
 import psycopg2
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory, render_template, request, Response
+from flask import Flask, jsonify, send_from_directory, render_template, request, Response, send_file
+from io import BytesIO
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Tuple, Any
@@ -63,16 +64,197 @@ DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PASSWORD = os.environ.get("DB_PASS", "gagan")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 
-# UI binding - network-agnostic
-UI_HOST = os.environ.get("RANSOMEYE_UI_HOST", "0.0.0.0")
-UI_PORT = int(os.environ.get("RANSOMEYE_UI_PORT", "8081"))
+# UI binding - safe defaults (127.0.0.1 for localhost-only, configurable for network access)
+UI_BIND_ADDRESS = os.environ.get("RANSOMEYE_UI_BIND_ADDRESS", "127.0.0.1")
+UI_BIND_PORT = int(os.environ.get("RANSOMEYE_UI_BIND_PORT", "8081"))
+
+# Legacy support for old env var names
+if "RANSOMEYE_UI_HOST" in os.environ:
+    UI_BIND_ADDRESS = os.environ.get("RANSOMEYE_UI_HOST")
+if "RANSOMEYE_UI_PORT" in os.environ:
+    UI_BIND_PORT = int(os.environ.get("RANSOMEYE_UI_PORT"))
+
+# CORS configuration - explicit origins only (no wildcard)
+CORS_ALLOWED_ORIGINS = os.environ.get("RANSOMEYE_UI_ALLOWED_ORIGINS", "").strip()
+if CORS_ALLOWED_ORIGINS:
+    # Parse comma-separated origins
+    CORS_ORIGINS_LIST = [origin.strip() for origin in CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+else:
+    # Default: no CORS (same-origin only)
+    CORS_ORIGINS_LIST = []
+
+# CORS credentials (disabled by default for security)
+CORS_CREDENTIALS = os.environ.get("RANSOMEYE_UI_CORS_CREDENTIALS", "false").lower() in ("true", "1", "yes", "on")
+
+# Proxy trust configuration (disabled by default)
+TRUST_PROXY = os.environ.get("RANSOMEYE_UI_TRUST_PROXY", "false").lower() in ("true", "1", "yes", "on")
 
 # Air-gap mode detection (if no internet connectivity expected)
 AIR_GAP_MODE = os.environ.get("RANSOMEYE_AIR_GAP", "false").lower() == "true"
 
 # Flask app
 app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATE_DIR))
-CORS(app)
+
+# Configure CORS with explicit origins
+if CORS_ORIGINS_LIST:
+    CORS(app, origins=CORS_ORIGINS_LIST, supports_credentials=CORS_CREDENTIALS, methods=["GET", "HEAD"])
+else:
+    # No CORS if no origins specified (same-origin only)
+    CORS(app, resources={r"/*": {"origins": []}}, supports_credentials=False, methods=["GET", "HEAD"])
+
+# Configure proxy trust
+app.config['PROXY_FIX'] = TRUST_PROXY
+
+
+def validate_bind_address(address: str) -> bool:
+    """
+    Validate bind address for security.
+    
+    Allowed values:
+    - 127.0.0.1 (localhost only - safest)
+    - 0.0.0.0 (all interfaces - use with caution)
+    - Specific interface IP (e.g., 192.168.1.100)
+    
+    Returns:
+        True if valid, False otherwise
+    """
+    if address == "127.0.0.1" or address == "localhost":
+        return True
+    if address == "0.0.0.0":
+        return True
+    
+    # Validate IP address format
+    try:
+        parts = address.split(".")
+        if len(parts) != 4:
+            return False
+        for part in parts:
+            num = int(part)
+            if num < 0 or num > 255:
+                return False
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+def get_client_ip():
+    """
+    Get client IP address, handling forwarded headers if proxy trust is enabled.
+    
+    Returns:
+        Client IP address string
+    """
+    if TRUST_PROXY:
+        # Trust X-Forwarded-For header (use first IP in chain)
+        forwarded_for = request.headers.get('X-Forwarded-For')
+        if forwarded_for:
+            # X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+            return forwarded_for.split(',')[0].strip()
+    
+    # Default: use direct connection IP
+    return request.remote_addr or "unknown"
+
+
+# Security headers middleware
+@app.after_request
+def set_security_headers(response):
+    """Set security headers on all responses."""
+    # X-Frame-Options: prevent clickjacking
+    frame_options = os.environ.get("RANSOMEYE_UI_X_FRAME_OPTIONS", "DENY")
+    if frame_options.upper() in ("DENY", "SAMEORIGIN"):
+        response.headers['X-Frame-Options'] = frame_options.upper()
+    
+    # X-Content-Type-Options: prevent MIME sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # Referrer-Policy: control referrer information
+    referrer_policy = os.environ.get("RANSOMEYE_UI_REFERRER_POLICY", "strict-origin-when-cross-origin")
+    response.headers['Referrer-Policy'] = referrer_policy
+    
+    # Content-Security-Policy: safe default that doesn't break existing UI
+    csp = os.environ.get("RANSOMEYE_UI_CSP", 
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
+    response.headers['Content-Security-Policy'] = csp
+    
+    return response
+
+
+# Method enforcement middleware
+@app.before_request
+def enforce_methods():
+    """Enforce HTTP method restrictions for security."""
+    # Log client IP for security monitoring
+    client_ip = get_client_ip()
+    
+    # Reject unsupported methods on API endpoints
+    if request.path.startswith('/api/') and request.method not in ['GET', 'HEAD', 'POST', 'DELETE']:
+        logger.warning(f"Method {request.method} not allowed on {request.path} from {client_ip}")
+        return jsonify({
+            "error": "Method not allowed",
+            "status": "error"
+        }), 405
+    
+    # Log state-changing operations for audit (actual method enforcement handled by route decorators)
+    state_changing_keywords = ['import', 'create', 'save', 'share', 'settings', 'revoke', 'cleanup', 'rotate', 'delete']
+    if any(keyword in request.path for keyword in state_changing_keywords):
+        if request.method == 'GET':
+            logger.warning(f"GET method attempted on potentially state-changing endpoint {request.path} from {client_ip}")
+        else:
+            logger.info(f"State-changing operation: {request.method} {request.path} from {client_ip}")
+
+
+# Error handlers for clean error pages
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors with clean error page."""
+    if request.path.startswith('/api/'):
+        return jsonify({
+            "error": "Resource not found",
+            "status": "error"
+        }), 404
+    return render_template('error.html', 
+                         error_code=404, 
+                         error_message="Page not found"), 404
+
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    """Handle 405 errors."""
+    if request.path.startswith('/api/'):
+        return jsonify({
+            "error": "Method not allowed",
+            "status": "error"
+        }), 405
+    return render_template('error.html', 
+                         error_code=405, 
+                         error_message="Method not allowed"), 405
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors with clean error page (no stack traces)."""
+    logger.error(f"Internal server error: {error}", exc_info=True)
+    if request.path.startswith('/api/'):
+        return jsonify({
+            "error": "Internal server error",
+            "status": "error"
+        }), 500
+    return render_template('error.html', 
+                         error_code=500, 
+                         error_message="Internal server error"), 500
+
+
+@app.errorhandler(400)
+def bad_request(error):
+    """Handle 400 errors."""
+    if request.path.startswith('/api/'):
+        return jsonify({
+            "error": "Bad request",
+            "status": "error"
+        }), 400
+    return render_template('error.html', 
+                         error_code=400, 
+                         error_message="Bad request"), 400
 
 
 def get_db_connection():
@@ -2062,6 +2244,662 @@ def dashboard_audit():
         return jsonify({"error": "Metric unavailable"}), 500
 
 
+@app.route('/api/system/instances')
+def system_instances():
+    """Instance discovery endpoint - returns available Core, DPI, and DB instances."""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        core_instances = []
+        dpi_instances = []
+        db_instances = []
+        
+        # Discover Core instances from components table
+        if db.table_exists("ransomeye", "components"):
+            if db.column_exists("ransomeye", "components", "component_type"):
+                core_rows = db.safe_query_all(
+                    """SELECT component_id, component_name, instance_id, last_heartbeat_at
+                       FROM ransomeye.components
+                       WHERE component_type = 'core_engine'
+                       ORDER BY component_name, instance_id NULLS LAST""",
+                    default=[]
+                )
+                
+                for row in core_rows:
+                    component_id = str(row[0]) if row[0] else None
+                    component_name = row[1] or "unknown"
+                    instance_id = row[2] or component_id or "default"
+                    last_heartbeat = row[3].isoformat() if row[3] and hasattr(row[3], 'isoformat') else None
+                    
+                    # Try to get hostname/IP from linux_agent_telemetry if linked
+                    hostname = None
+                    ip = None
+                    if db.table_exists("ransomeye", "linux_agent_telemetry"):
+                        if db.column_exists("ransomeye", "linux_agent_telemetry", "source_host_id"):
+                            if component_id:
+                                host_row = db.safe_query(
+                                    """SELECT DISTINCT source_host_id 
+                                       FROM ransomeye.linux_agent_telemetry
+                                       WHERE source_component_identity = %s
+                                       ORDER BY observed_at DESC LIMIT 1""",
+                                    (component_id,),
+                                    default=None
+                                )
+                                if host_row:
+                                    hostname = str(host_row) if host_row else None
+                    
+                    # Determine role (primary if first, replica if others exist)
+                    role = "primary" if len(core_instances) == 0 else "replica"
+                    
+                    core_instances.append({
+                        "id": instance_id,
+                        "component_id": component_id,
+                        "hostname": hostname or component_name,
+                        "ip": ip,
+                        "role": role,
+                        "last_heartbeat": last_heartbeat
+                    })
+        
+        # Discover DPI Probe instances from dpi_probe_telemetry
+        if db.table_exists("ransomeye", "dpi_probe_telemetry"):
+            if db.column_exists("ransomeye", "dpi_probe_telemetry", "agent_id"):
+                dpi_rows = db.safe_query_all(
+                    """SELECT DISTINCT agent_id, source_component_identity, iface_name, MAX(observed_at) as last_seen
+                       FROM ransomeye.dpi_probe_telemetry
+                       WHERE agent_id IS NOT NULL
+                       GROUP BY agent_id, source_component_identity, iface_name
+                       ORDER BY last_seen DESC""",
+                    default=[]
+                )
+                
+                for row in dpi_rows:
+                    agent_id = str(row[0]) if row[0] else None
+                    component_identity = row[1] or agent_id or "unknown"
+                    iface = row[2] or "unknown"
+                    last_seen = row[3].isoformat() if row[3] and hasattr(row[3], 'isoformat') else None
+                    
+                    # Use component_identity as stable ID, fallback to agent_id
+                    probe_id = component_identity if component_identity != "unknown" else agent_id
+                    
+                    dpi_instances.append({
+                        "id": probe_id,
+                        "agent_id": agent_id,
+                        "hostname": component_identity,
+                        "iface": iface,
+                        "last_seen": last_seen
+                    })
+        
+        # Discover DB instances from components table (if DB components registered)
+        # For now, we'll use a single DB instance identifier
+        # In HA setups, this would query pg_stat_replication or similar
+        if db.table_exists("ransomeye", "components"):
+            db_rows = db.safe_query_all(
+                """SELECT component_id, component_name, instance_id, last_heartbeat_at
+                   FROM ransomeye.components
+                   WHERE component_type IN ('db_core', 'database', 'postgres')
+                   ORDER BY component_name, instance_id NULLS LAST""",
+                default=[]
+            )
+            
+            for row in db_rows:
+                component_id = str(row[0]) if row[0] else None
+                component_name = row[1] or "unknown"
+                instance_id = row[2] or component_id or "db-01"
+                last_heartbeat = row[3].isoformat() if row[3] and hasattr(row[3], 'isoformat') else None
+                
+                # Determine role (primary if first, replica if others exist)
+                role = "primary" if len(db_instances) == 0 else "replica"
+                
+                db_instances.append({
+                    "id": instance_id,
+                    "component_id": component_id,
+                    "role": role,
+                    "last_heartbeat": last_heartbeat
+                })
+        
+        # If no DB instances found in components, create a default one
+        if not db_instances:
+            db_instances.append({
+                "id": "db-01",
+                "component_id": None,
+                "role": "primary",
+                "last_heartbeat": None
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "core": core_instances,
+            "dpi": dpi_instances,
+            "db": db_instances,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Instance discovery error: {e}", exc_info=True)
+        if conn:
+            conn.close()
+        return jsonify({
+            "core": [],
+            "dpi": [],
+            "db": [],
+            "error": "Instance discovery unavailable"
+        }), 500
+
+
+@app.route('/api/dashboards/core-system-health')
+def dashboard_core_system_health():
+    """Core system health metrics from Linux Agent telemetry - fail-soft."""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Get instance_id from query parameter
+        instance_id = request.args.get('instance_id', None)
+        
+        # Get latest system metrics from Linux Agent telemetry payload
+        # Extract CPU, memory, disk, network, filesystem, and system state metrics
+        cpu_data = {"utilization": "Metric unavailable", "load_avg_1m": "Metric unavailable", 
+                   "load_avg_5m": "Metric unavailable", "load_avg_15m": "Metric unavailable",
+                   "core_count": "Metric unavailable", "context_switches": "Metric unavailable"}
+        memory_data = {"total": "Metric unavailable", "used": "Metric unavailable",
+                      "free": "Metric unavailable", "swap_used": "Metric unavailable"}
+        disk_io_data = {"read_iops": "Metric unavailable", "write_iops": "Metric unavailable",
+                       "read_throughput": "Metric unavailable", "write_throughput": "Metric unavailable",
+                       "utilization": "Metric unavailable"}
+        filesystem_data = {"root_usage": "Metric unavailable", "critical_mounts": "Metric unavailable",
+                          "inode_usage": "Metric unavailable"}
+        network_data = {"bytes_in": "Metric unavailable", "bytes_out": "Metric unavailable",
+                       "packets_in": "Metric unavailable", "packets_out": "Metric unavailable",
+                       "errors": "Metric unavailable", "drops": "Metric unavailable"}
+        system_state_data = {"uptime": "Metric unavailable", "process_count": "Metric unavailable",
+                            "zombie_count": "Metric unavailable"}
+        
+        # Build query with instance filter if provided
+        query = """SELECT payload, observed_at, agent_id, source_component_identity 
+                   FROM ransomeye.linux_agent_telemetry 
+                   WHERE payload IS NOT NULL AND payload::text LIKE '%system%'"""
+        params = []
+        
+        if instance_id:
+            # Filter by component identity or instance_id
+            if db.column_exists("ransomeye", "linux_agent_telemetry", "source_component_identity"):
+                query += " AND (source_component_identity = %s OR agent_id::text = %s)"
+                params.extend([instance_id, instance_id])
+            elif db.column_exists("ransomeye", "linux_agent_telemetry", "agent_id"):
+                query += " AND agent_id::text = %s"
+                params.append(instance_id)
+        
+        query += " ORDER BY observed_at DESC LIMIT 1"
+        
+        # Query latest telemetry with system metrics in payload
+        if db.table_exists("ransomeye", "linux_agent_telemetry"):
+            if db.column_exists("ransomeye", "linux_agent_telemetry", "payload"):
+                if params:
+                    latest_telemetry = db.safe_query_all(query, tuple(params), default=[])
+                else:
+                    latest_telemetry = db.safe_query_all(query, default=[])
+                
+                # If instance_id specified but no results, return 404
+                if instance_id and not latest_telemetry:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({"error": f"Instance '{instance_id}' not found or offline"}), 404
+                
+                if latest_telemetry:
+                    import json as json_lib
+                    payload = latest_telemetry[0][0]
+                    if payload and isinstance(payload, dict):
+                        # Extract system metrics from payload (fail-soft if structure differs)
+                        if 'cpu' in payload:
+                            cpu_payload = payload['cpu']
+                            cpu_data = {
+                                "utilization": cpu_payload.get('utilization', cpu_data['utilization']),
+                                "load_avg_1m": cpu_payload.get('load_avg_1m', cpu_data['load_avg_1m']),
+                                "load_avg_5m": cpu_payload.get('load_avg_5m', cpu_data['load_avg_5m']),
+                                "load_avg_15m": cpu_payload.get('load_avg_15m', cpu_data['load_avg_15m']),
+                                "core_count": cpu_payload.get('core_count', cpu_data['core_count']),
+                                "context_switches": cpu_payload.get('context_switches', cpu_data['context_switches'])
+                            }
+                        if 'memory' in payload:
+                            mem_payload = payload['memory']
+                            memory_data = {
+                                "total": mem_payload.get('total', memory_data['total']),
+                                "used": mem_payload.get('used', memory_data['used']),
+                                "free": mem_payload.get('free', memory_data['free']),
+                                "swap_used": mem_payload.get('swap_used', memory_data['swap_used'])
+                            }
+                        if 'disk' in payload:
+                            disk_payload = payload['disk']
+                            disk_io_data = {
+                                "read_iops": disk_payload.get('read_iops', disk_io_data['read_iops']),
+                                "write_iops": disk_payload.get('write_iops', disk_io_data['write_iops']),
+                                "read_throughput": disk_payload.get('read_throughput', disk_io_data['read_throughput']),
+                                "write_throughput": disk_payload.get('write_throughput', disk_io_data['write_throughput']),
+                                "utilization": disk_payload.get('utilization', disk_io_data['utilization'])
+                            }
+                        if 'filesystem' in payload:
+                            fs_payload = payload['filesystem']
+                            filesystem_data = {
+                                "root_usage": fs_payload.get('root_usage', filesystem_data['root_usage']),
+                                "critical_mounts": fs_payload.get('critical_mounts', filesystem_data['critical_mounts']),
+                                "inode_usage": fs_payload.get('inode_usage', filesystem_data['inode_usage'])
+                            }
+                        if 'network' in payload:
+                            net_payload = payload['network']
+                            network_data = {
+                                "bytes_in": net_payload.get('bytes_in', network_data['bytes_in']),
+                                "bytes_out": net_payload.get('bytes_out', network_data['bytes_out']),
+                                "packets_in": net_payload.get('packets_in', network_data['packets_in']),
+                                "packets_out": net_payload.get('packets_out', network_data['packets_out']),
+                                "errors": net_payload.get('errors', network_data['errors']),
+                                "drops": net_payload.get('drops', network_data['drops'])
+                            }
+                        if 'system' in payload:
+                            sys_payload = payload['system']
+                            system_state_data = {
+                                "uptime": sys_payload.get('uptime', system_state_data['uptime']),
+                                "process_count": sys_payload.get('process_count', system_state_data['process_count']),
+                                "zombie_count": sys_payload.get('zombie_count', system_state_data['zombie_count'])
+                            }
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "cpu": cpu_data,
+            "memory": memory_data,
+            "disk_io": disk_io_data,
+            "filesystem": filesystem_data,
+            "network": network_data,
+            "system_state": system_state_data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Core system health error: {e}", exc_info=True)
+        if conn:
+            conn.close()
+        return jsonify({"error": "Metric unavailable"}), 500
+
+
+@app.route('/api/dashboards/dpi-probe-health')
+def dashboard_dpi_probe_health():
+    """DPI Probe health metrics from telemetry payload - fail-soft."""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Get probe_id from query parameter
+        probe_id = request.args.get('probe_id', None)
+        
+        # Get latest system metrics from DPI Probe telemetry payload
+        cpu_load_data = {"cpu_utilization": "Metric unavailable", "load_avg_1m": "Metric unavailable",
+                        "load_avg_5m": "Metric unavailable", "load_avg_15m": "Metric unavailable",
+                        "core_count": "Metric unavailable", "dpi_process_cpu": "Metric unavailable"}
+        memory_data = {"total": "Metric unavailable", "used": "Metric unavailable",
+                      "free": "Metric unavailable", "swap_used": "Metric unavailable",
+                      "dpi_process_rss": "Metric unavailable"}
+        disk_io_data = {"read_throughput": "Metric unavailable", "write_throughput": "Metric unavailable",
+                       "utilization": "Metric unavailable"}
+        network_throughput_data = {"packets_per_sec": "Metric unavailable", "bytes_per_sec": "Metric unavailable",
+                                  "drops": "Metric unavailable", "errors": "Metric unavailable",
+                                  "ring_buffer_drops": "Metric unavailable"}
+        processing_health_data = {"packet_processing_rate": "Metric unavailable", "packet_drops": "Metric unavailable",
+                                 "probe_uptime": "Metric unavailable", "probe_status": "Metric unavailable"}
+        system_state_data = {"host_uptime": "Metric unavailable", "process_count": "Metric unavailable",
+                            "dpi_process_status": "Metric unavailable"}
+        
+        # Build query with probe filter if provided
+        query = """SELECT payload, observed_at, agent_id, source_component_identity 
+                   FROM ransomeye.dpi_probe_telemetry 
+                   WHERE payload IS NOT NULL AND payload::text LIKE '%system%'"""
+        params = []
+        
+        if probe_id:
+            # Filter by component identity or agent_id
+            if db.column_exists("ransomeye", "dpi_probe_telemetry", "source_component_identity"):
+                query += " AND (source_component_identity = %s OR agent_id::text = %s)"
+                params.extend([probe_id, probe_id])
+            elif db.column_exists("ransomeye", "dpi_probe_telemetry", "agent_id"):
+                query += " AND agent_id::text = %s"
+                params.append(probe_id)
+        
+        query += " ORDER BY observed_at DESC LIMIT 1"
+        
+        # Query latest DPI Probe telemetry with system metrics in payload
+        if db.table_exists("ransomeye", "dpi_probe_telemetry"):
+            if db.column_exists("ransomeye", "dpi_probe_telemetry", "payload"):
+                if params:
+                    latest_telemetry = db.safe_query_all(query, tuple(params), default=[])
+                else:
+                    latest_telemetry = db.safe_query_all(query, default=[])
+                
+                # If probe_id specified but no results, return 404
+                if probe_id and not latest_telemetry:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({"error": f"Probe '{probe_id}' not found or offline"}), 404
+                
+                if latest_telemetry:
+                    import json as json_lib
+                    payload = latest_telemetry[0][0]
+                    if payload and isinstance(payload, dict):
+                        # Extract system metrics from payload (fail-soft if structure differs)
+                        if 'system' in payload:
+                            sys_payload = payload['system']
+                            # CPU & Load
+                            if 'cpu' in sys_payload:
+                                cpu_payload = sys_payload['cpu']
+                                cpu_load_data = {
+                                    "cpu_utilization": cpu_payload.get('utilization', cpu_load_data['cpu_utilization']),
+                                    "load_avg_1m": cpu_payload.get('load_avg_1m', cpu_load_data['load_avg_1m']),
+                                    "load_avg_5m": cpu_payload.get('load_avg_5m', cpu_load_data['load_avg_5m']),
+                                    "load_avg_15m": cpu_payload.get('load_avg_15m', cpu_load_data['load_avg_15m']),
+                                    "core_count": cpu_payload.get('core_count', cpu_load_data['core_count']),
+                                    "dpi_process_cpu": cpu_payload.get('dpi_process_cpu', cpu_load_data['dpi_process_cpu'])
+                                }
+                            # Memory
+                            if 'memory' in sys_payload:
+                                mem_payload = sys_payload['memory']
+                                memory_data = {
+                                    "total": mem_payload.get('total', memory_data['total']),
+                                    "used": mem_payload.get('used', memory_data['used']),
+                                    "free": mem_payload.get('free', memory_data['free']),
+                                    "swap_used": mem_payload.get('swap_used', memory_data['swap_used']),
+                                    "dpi_process_rss": mem_payload.get('dpi_process_rss', memory_data['dpi_process_rss'])
+                                }
+                            # Disk I/O
+                            if 'disk' in sys_payload:
+                                disk_payload = sys_payload['disk']
+                                disk_io_data = {
+                                    "read_throughput": disk_payload.get('read_throughput', disk_io_data['read_throughput']),
+                                    "write_throughput": disk_payload.get('write_throughput', disk_io_data['write_throughput']),
+                                    "utilization": disk_payload.get('utilization', disk_io_data['utilization'])
+                                }
+                            # Network Throughput
+                            if 'network' in sys_payload:
+                                net_payload = sys_payload['network']
+                                network_throughput_data = {
+                                    "packets_per_sec": net_payload.get('packets_per_sec', network_throughput_data['packets_per_sec']),
+                                    "bytes_per_sec": net_payload.get('bytes_per_sec', network_throughput_data['bytes_per_sec']),
+                                    "drops": net_payload.get('drops', network_throughput_data['drops']),
+                                    "errors": net_payload.get('errors', network_throughput_data['errors']),
+                                    "ring_buffer_drops": net_payload.get('ring_buffer_drops', network_throughput_data['ring_buffer_drops'])
+                                }
+                            # Processing Health
+                            if 'processing' in sys_payload:
+                                proc_payload = sys_payload['processing']
+                                processing_health_data = {
+                                    "packet_processing_rate": proc_payload.get('packet_processing_rate', processing_health_data['packet_processing_rate']),
+                                    "packet_drops": proc_payload.get('packet_drops', processing_health_data['packet_drops']),
+                                    "probe_uptime": proc_payload.get('probe_uptime', processing_health_data['probe_uptime']),
+                                    "probe_status": proc_payload.get('probe_status', processing_health_data['probe_status'])
+                                }
+                            # System State
+                            if 'system_state' in sys_payload:
+                                state_payload = sys_payload['system_state']
+                                system_state_data = {
+                                    "host_uptime": state_payload.get('host_uptime', system_state_data['host_uptime']),
+                                    "process_count": state_payload.get('process_count', system_state_data['process_count']),
+                                    "dpi_process_status": state_payload.get('dpi_process_status', system_state_data['dpi_process_status'])
+                                }
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "cpu_load": cpu_load_data,
+            "memory": memory_data,
+            "disk_io": disk_io_data,
+            "network_throughput": network_throughput_data,
+            "processing_health": processing_health_data,
+            "system_state": system_state_data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"DPI Probe health error: {e}", exc_info=True)
+        if conn:
+            conn.close()
+        return jsonify({"error": "Metric unavailable"}), 500
+
+
+@app.route('/api/dashboards/db-health')
+def dashboard_db_health():
+    """PostgreSQL database health metrics - fail-soft."""
+    # Get db_instance_id from query parameter (for future HA support)
+    db_instance_id = request.args.get('db_instance_id', None)
+    
+    # For now, all DB health queries target the current connection
+    # In HA setups, this would route to specific DB instance
+    # If instance_id specified but not found, we'll return 404
+    if db_instance_id and db_instance_id != "db-01":
+        # In future, validate instance_id against known DB instances
+        # For now, only db-01 is supported
+        return jsonify({"error": f"DB instance '{db_instance_id}' not found"}), 404
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Connection health
+        connections_data = {"active": "Metric unavailable", "idle": "Metric unavailable",
+                           "max": "Metric unavailable", "utilization": "Metric unavailable"}
+        
+        # Query performance
+        query_perf_data = {"transactions_per_sec": "Metric unavailable", 
+                          "long_running_queries": "Metric unavailable",
+                          "slow_queries": "Metric unavailable", "deadlocks": "Metric unavailable"}
+        
+        # Database I/O
+        db_io_data = {"blocks_read": "Metric unavailable", "blocks_hit": "Metric unavailable",
+                     "cache_hit_ratio": "Metric unavailable"}
+        
+        # Replication
+        replication_data = {"lag": "Metric unavailable", "replica_state": "Metric unavailable",
+                           "configured": False}
+        
+        # Storage
+        storage_data = {"database_size": "Metric unavailable", "table_bloat": "Metric unavailable",
+                       "index_bloat": "Metric unavailable"}
+        
+        # Reliability
+        reliability_data = {"checkpoint_frequency": "Metric unavailable", 
+                           "wal_generation_rate": "Metric unavailable",
+                           "last_vacuum": "Metric unavailable", "last_autovacuum": "Metric unavailable"}
+        
+        # Get connection stats from pg_stat_activity
+        try:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) FILTER (WHERE state = 'active') as active,
+                    COUNT(*) FILTER (WHERE state = 'idle') as idle,
+                    (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_conns
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+            """)
+            conn_row = cursor.fetchone()
+            if conn_row:
+                active = conn_row[0] or 0
+                idle = conn_row[1] or 0
+                max_conns = conn_row[2] or 100
+                utilization = round((active + idle) / max_conns * 100, 2) if max_conns > 0 else 0
+                connections_data = {
+                    "active": active,
+                    "idle": idle,
+                    "max": max_conns,
+                    "utilization": utilization
+                }
+        except Exception as e:
+            logger.debug(f"Connection stats query failed: {e}")
+        
+        # Get query performance from pg_stat_database
+        try:
+            cursor.execute("""
+                SELECT 
+                    xact_commit + xact_rollback as total_transactions,
+                    deadlocks
+                FROM pg_stat_database
+                WHERE datname = current_database()
+            """)
+            db_row = cursor.fetchone()
+            if db_row:
+                # Calculate transactions per second (approximate from last stats reset)
+                total_xacts = db_row[0] or 0
+                deadlocks = db_row[1] or 0
+                query_perf_data["deadlocks"] = deadlocks
+                # Note: transactions_per_sec would require time-based calculation
+        except Exception as e:
+            logger.debug(f"Query performance stats failed: {e}")
+        
+        # Get long-running queries
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) FROM pg_stat_activity
+                WHERE datname = current_database()
+                AND state = 'active'
+                AND now() - query_start > interval '5 seconds'
+            """)
+            long_running = cursor.fetchone()[0] or 0
+            query_perf_data["long_running_queries"] = long_running
+        except Exception as e:
+            logger.debug(f"Long-running queries query failed: {e}")
+        
+        # Get database I/O from pg_stat_database
+        try:
+            cursor.execute("""
+                SELECT 
+                    blks_read,
+                    blks_hit,
+                    CASE 
+                        WHEN (blks_hit + blks_read) > 0 
+                        THEN round(blks_hit::numeric / (blks_hit + blks_read) * 100, 2)
+                        ELSE 0
+                    END as cache_hit_ratio
+                FROM pg_stat_database
+                WHERE datname = current_database()
+            """)
+            io_row = cursor.fetchone()
+            if io_row:
+                db_io_data = {
+                    "blocks_read": io_row[0] or 0,
+                    "blocks_hit": io_row[1] or 0,
+                    "cache_hit_ratio": float(io_row[2]) if io_row[2] is not None else 0
+                }
+        except Exception as e:
+            logger.debug(f"Database I/O stats failed: {e}")
+        
+        # Check replication (fail-soft if not configured)
+        try:
+            cursor.execute("""
+                SELECT 
+                    CASE WHEN pg_is_in_recovery() THEN 'replica' ELSE 'primary' END as role,
+                    pg_last_wal_replay_lsn() as replay_lsn
+            """)
+            repl_row = cursor.fetchone()
+            if repl_row:
+                replication_data["configured"] = True
+                replication_data["replica_state"] = repl_row[0] if repl_row[0] else "primary"
+                # Replication lag calculation would require primary LSN comparison
+                replication_data["lag"] = "Not applicable" if repl_row[0] == "primary" else "Metric unavailable"
+        except Exception as e:
+            logger.debug(f"Replication check failed (may not be configured): {e}")
+            replication_data["configured"] = False
+            replication_data["replica_state"] = "Not configured"
+        
+        # Get storage size
+        try:
+            cursor.execute("""
+                SELECT pg_size_pretty(pg_database_size(current_database())) as db_size
+            """)
+            size_row = cursor.fetchone()
+            if size_row:
+                storage_data["database_size"] = size_row[0] if size_row[0] else "Metric unavailable"
+        except Exception as e:
+            logger.debug(f"Storage size query failed: {e}")
+        
+        # Get reliability metrics from pg_stat_bgwriter
+        try:
+            cursor.execute("""
+                SELECT 
+                    checkpoints_timed + checkpoints_req as total_checkpoints,
+                    checkpoint_write_time
+                FROM pg_stat_bgwriter
+            """)
+            bgwriter_row = cursor.fetchone()
+            if bgwriter_row:
+                total_checkpoints = bgwriter_row[0] or 0
+                reliability_data["checkpoint_frequency"] = total_checkpoints
+        except Exception as e:
+            logger.debug(f"Background writer stats failed: {e}")
+        
+        # Get WAL generation (approximate)
+        try:
+            cursor.execute("""
+                SELECT pg_current_wal_lsn() as current_lsn
+            """)
+            wal_row = cursor.fetchone()
+            if wal_row:
+                # WAL generation rate would require time-based calculation
+                reliability_data["wal_generation_rate"] = "Metric unavailable"
+        except Exception as e:
+            logger.debug(f"WAL stats failed: {e}")
+        
+        # Get last vacuum/autovacuum from pg_stat_user_tables (sample from ransomeye schema)
+        try:
+            cursor.execute("""
+                SELECT 
+                    MAX(last_vacuum) as last_vacuum,
+                    MAX(last_autovacuum) as last_autovacuum
+                FROM pg_stat_user_tables
+                WHERE schemaname = 'ransomeye'
+            """)
+            vacuum_row = cursor.fetchone()
+            if vacuum_row:
+                reliability_data["last_vacuum"] = vacuum_row[0].isoformat() if vacuum_row[0] else "Never"
+                reliability_data["last_autovacuum"] = vacuum_row[1].isoformat() if vacuum_row[1] else "Never"
+        except Exception as e:
+            logger.debug(f"Vacuum stats failed: {e}")
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "connections": connections_data,
+            "query_performance": query_perf_data,
+            "database_io": db_io_data,
+            "replication": replication_data,
+            "storage": storage_data,
+            "reliability": reliability_data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Database health error: {e}", exc_info=True)
+        if conn:
+            conn.close()
+        return jsonify({"error": "Metric unavailable"}), 500
+
+
 @app.route('/logo.png')
 def logo():
     """Serve RansomEye logo."""
@@ -3052,6 +3890,158 @@ def get_incident_report():
         }), 500
 
 
+@app.route('/api/shares/evidence-pack', methods=['POST'])
+def generate_evidence_pack():
+    """
+    Generate a cryptographically signed evidence pack for share activity in a time window.
+    
+    Request body (JSON):
+        {
+            "from": "2024-01-01T00:00:00Z",  # ISO timestamp (required)
+            "to": "2024-01-31T23:59:59Z"     # ISO timestamp (required)
+        }
+    
+    Returns:
+        ZIP archive containing:
+        - incident_summary.json: Summary statistics
+        - incident_timeline.csv: Chronological event timeline
+        - top_dashboards.csv: Top dashboards by access count
+        - manifest.json: File hashes and cryptographic signature
+    
+    Rules:
+        - Validate time range (fail-closed on invalid params)
+        - Fail-closed on any generation or signing error
+        - Audit-log evidence generation
+        - No persistent storage (temp files only)
+    """
+    # Get request body
+    if not request.is_json:
+        return jsonify({
+            "error": "Request must be JSON",
+            "status": "failed"
+        }), 400
+    
+    data = request.get_json()
+    if not isinstance(data, dict):
+        return jsonify({
+            "error": "Request body must be a JSON object",
+            "status": "failed"
+        }), 400
+    
+    from_str = data.get('from')
+    to_str = data.get('to')
+    
+    # Fail-closed: Validate required params
+    if not from_str or not to_str:
+        return jsonify({
+            "error": "Missing required fields: 'from' and 'to' (ISO timestamps)",
+            "status": "failed"
+        }), 400
+    
+    # Parse timestamps (fail-closed on invalid format)
+    try:
+        from_timestamp = datetime.fromisoformat(from_str.replace('Z', '+00:00'))
+        to_timestamp = datetime.fromisoformat(to_str.replace('Z', '+00:00'))
+        
+        # Ensure timezone-aware
+        if from_timestamp.tzinfo is None:
+            from_timestamp = from_timestamp.replace(tzinfo=timezone.utc)
+        if to_timestamp.tzinfo is None:
+            to_timestamp = to_timestamp.replace(tzinfo=timezone.utc)
+    except (ValueError, AttributeError) as e:
+        return jsonify({
+            "error": f"Invalid timestamp format: {str(e)}. Expected ISO format (e.g., '2024-01-01T00:00:00Z')",
+            "status": "failed"
+        }), 400
+    
+    # Validate time range (fail-closed: from must be before to)
+    if from_timestamp >= to_timestamp:
+        return jsonify({
+            "error": "Invalid time range: 'from' must be before 'to'",
+            "status": "failed"
+        }), 400
+    
+    # Validate reasonable time range (fail-closed: max 1 year)
+    max_range = timedelta(days=365)
+    if (to_timestamp - from_timestamp) > max_range:
+        return jsonify({
+            "error": "Time range exceeds maximum allowed (365 days)",
+            "status": "failed"
+        }), 400
+    
+    # Get database connection
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            "error": "Database unavailable",
+            "status": "failed"
+        }), 503
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        share_manager = ShareManager(conn)
+        zip_bytes, error_message = share_manager.generate_evidence_pack(from_timestamp, to_timestamp)
+        
+        if error_message:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Failed to generate evidence pack: {error_message}",
+                "status": "failed"
+            }), 500
+        
+        # Audit log evidence generation
+        user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+        share_manager._audit_log('evidence_pack', user_id, 'all', 
+                               success=True, 
+                               error=f"from:{from_timestamp.isoformat()},to:{to_timestamp.isoformat()}")
+        
+        cursor.close()
+        conn.close()
+        
+        # Generate filename with timestamp range
+        from_date = from_timestamp.strftime('%Y%m%d_%H%M%S')
+        to_date = to_timestamp.strftime('%Y%m%d_%H%M%S')
+        filename = f"ransomeye_evidence_pack_{from_date}_to_{to_date}.zip"
+        
+        # Return ZIP as downloadable file
+        return send_file(
+            BytesIO(zip_bytes),
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating evidence pack: {e}", exc_info=True)
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except:
+                pass
+        
+        # Audit log failure
+        if conn:
+            try:
+                user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+                cursor = conn.cursor()
+                cursor.execute("SET search_path = ransomeye, public;")
+                share_manager = ShareManager(conn)
+                share_manager._audit_log('evidence_pack', user_id, 'all', 
+                                       success=False, error=str(e))
+                cursor.close()
+            except:
+                pass
+        
+        return jsonify({
+            "error": "Internal server error",
+            "status": "failed"
+        }), 500
+
+
 @app.route('/api/ui/settings', methods=['POST'])
 def update_ui_settings():
     """
@@ -3141,7 +4131,44 @@ def update_ui_settings():
 
 
 if __name__ == '__main__':
-    print(f"Starting RansomEye UI Server on {UI_HOST}:{UI_PORT}")
+    # Validate bind address (fail-closed on invalid)
+    if not validate_bind_address(UI_BIND_ADDRESS):
+        logger.error(f"FAIL-CLOSED: Invalid bind address '{UI_BIND_ADDRESS}'. Allowed: 127.0.0.1, 0.0.0.0, or specific IP (e.g., 192.168.x.x)")
+        sys.exit(1)
+    
+    # Validate port range
+    if UI_BIND_PORT < 1 or UI_BIND_PORT > 65535:
+        logger.error(f"FAIL-CLOSED: Invalid port '{UI_BIND_PORT}'. Must be 1-65535")
+        sys.exit(1)
+    
+    # Log configuration for security audit
+    logger.info("=" * 60)
+    logger.info("RansomEye UI Server - Network Hardening Configuration")
+    logger.info("=" * 60)
+    logger.info(f"Bind Address: {UI_BIND_ADDRESS}:{UI_BIND_PORT}")
+    logger.info(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
+    logger.info(f"CORS Allowed Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'None (same-origin only)'}")
+    logger.info(f"CORS Credentials: {CORS_CREDENTIALS}")
+    logger.info(f"Proxy Trust: {TRUST_PROXY}")
+    logger.info(f"Air-Gap Mode: {AIR_GAP_MODE}")
+    logger.info("=" * 60)
+    
+    # Security warnings
+    if UI_BIND_ADDRESS == "0.0.0.0":
+        logger.warning("SECURITY: Binding to 0.0.0.0 exposes UI to all network interfaces. Ensure firewall rules are configured.")
+    
+    if not CORS_ORIGINS_LIST:
+        logger.info("CORS: No allowed origins configured - same-origin only (most secure)")
+    else:
+        logger.info(f"CORS: Allowing origins: {', '.join(CORS_ORIGINS_LIST)}")
+    
+    if TRUST_PROXY:
+        logger.warning("SECURITY: Proxy trust enabled - X-Forwarded-For headers will be trusted. Ensure proxy is trusted.")
+    
+    print(f"Starting RansomEye UI Server on {UI_BIND_ADDRESS}:{UI_BIND_PORT}")
     print(f"SOC-Grade Schema-Safe Dashboard")
     print(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
-    app.run(host=UI_HOST, port=UI_PORT, debug=False)
+    print(f"Access from Windows: http://<server-ip>:{UI_BIND_PORT}")
+    print(f"CORS Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'Same-origin only'}")
+    
+    app.run(host=UI_BIND_ADDRESS, port=UI_BIND_PORT, debug=False)

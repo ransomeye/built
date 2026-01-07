@@ -435,12 +435,16 @@ class ContinuousTrainer:
             X, y, test_size=0.2, random_state=42
         )
         
-        # Train ensemble model
+        # Train ensemble model with increased complexity for larger model size
         model = GradientBoostingClassifier(
-            n_estimators=200,
-            max_depth=10,
-            learning_rate=0.1,
-            random_state=42
+            n_estimators=500,
+            max_depth=30,
+            learning_rate=0.05,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            max_features='sqrt',
+            random_state=42,
+            verbose=1
         )
         
         model.fit(X_train, y_train)

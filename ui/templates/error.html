@@ -1,0 +1,78 @@
+<!-- Path and File Name : /home/ransomeye/rebuild/ui/templates/error.html -->
+<!-- Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU -->
+<!-- Details: Generic error page for HTTP errors (404, 405, 500, etc.) -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error {{ error_code }} - RansomEye</title>
+    <link rel="stylesheet" href="/static/theme.css">
+    <style>
+        .error-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: var(--spacing-lg, 24px);
+            text-align: center;
+        }
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-md, 16px);
+        }
+        .error-code {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm, 8px);
+            color: var(--color-error, #d32f2f);
+        }
+        .error-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm, 8px);
+            color: var(--text-primary, #000);
+        }
+        .error-message {
+            font-size: 1rem;
+            color: var(--text-secondary, #666);
+            margin-bottom: var(--spacing-lg, 24px);
+            max-width: 600px;
+        }
+        .error-actions {
+            display: flex;
+            gap: var(--spacing-md, 16px);
+        }
+        .button {
+            padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .button-primary {
+            background: var(--color-primary, #2196F3);
+            color: white;
+        }
+        .button-primary:hover {
+            background: var(--color-primary-dark, #1976D2);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <div class="error-code">{{ error_code }}</div>
+        <h1 class="error-title">Error {{ error_code }}</h1>
+        <p class="error-message">
+            {{ error_message | default('An error occurred while processing your request.') }}
+        </p>
+        <div class="error-actions">
+            <a href="/" class="button button-primary">Go to Main Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>
+

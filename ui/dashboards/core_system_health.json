@@ -1,0 +1,99 @@
+{
+  "name": "core_system_health",
+  "title": "Core System Health",
+  "description": "Operational health visibility for system resources: CPU, memory, disk I/O, filesystem, network, and system state metrics from Linux Agent telemetry",
+  "folder_id": "general",
+  "panels": [
+    {
+      "id": "cpu_health",
+      "title": "CPU Health",
+      "x": 0,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "cpu"
+      }
+    },
+    {
+      "id": "memory_health",
+      "title": "Memory Health",
+      "x": 4,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "memory"
+      }
+    },
+    {
+      "id": "disk_io",
+      "title": "Disk I/O",
+      "x": 8,
+      "y": 0,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 15,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "disk_io"
+      }
+    },
+    {
+      "id": "filesystem_health",
+      "title": "Filesystem Health",
+      "x": 0,
+      "y": 2,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "filesystem"
+      }
+    },
+    {
+      "id": "network_io",
+      "title": "Network I/O",
+      "x": 6,
+      "y": 2,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 10,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "network"
+      }
+    },
+    {
+      "id": "system_state",
+      "title": "System State",
+      "x": 0,
+      "y": 4,
+      "w": 12,
+      "h": 1,
+      "refresh_interval": 15,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/core-system-health",
+        "path": "system_state"
+      }
+    }
+  ]
+}
+

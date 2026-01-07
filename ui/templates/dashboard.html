@@ -309,6 +309,15 @@
                         <span class="version-history-label">Version History</span>
                     </button>
                     <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
+                    <!-- Instance Selector (for system health dashboards) -->
+                    <div id="instance-selector-container" style="display: none; margin-left: auto; margin-right: var(--spacing-md);">
+                        <label for="instance-selector" style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-right: var(--spacing-sm);">
+                            <span id="instance-selector-label">Instance</span>:
+                        </label>
+                        <select id="instance-selector" style="padding: var(--spacing-xs) var(--spacing-sm); border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--bg-primary); color: var(--text-primary); font-size: var(--font-size-sm); min-width: 150px;">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
                 </div>
             </header>
             
@@ -804,6 +813,15 @@
         const panelRefreshTimers = {};
         let hasUnsavedChanges = false;
         
+        // Instance selector state
+        const instanceSelectorConfig = {
+            'core_system_health': { type: 'core', param: 'instance_id', label: 'Core Instance' },
+            'dpi_probe_health': { type: 'dpi', param: 'probe_id', label: 'DPI Probe' },
+            'db_health': { type: 'db', param: 'db_instance_id', label: 'DB Instance' }
+        };
+        let currentInstanceId = null;
+        let availableInstances = [];
+        
         // ============================================================
         // RENDER DASHBOARD
         // ============================================================
@@ -816,6 +834,9 @@
                 return;
             }
             
+            // Initialize instance selector if this is a system health dashboard
+            await initializeInstanceSelector();
+            
             // Clear grid
             gridEl.innerHTML = '';
             
@@ -826,6 +847,117 @@
             
             // Initialize refresh intervals
             initializeRefreshIntervals();
+        }
+        
+        // ============================================================
+        // INSTANCE SELECTOR (HA-Aware)
+        // ============================================================
+        
+        async function initializeInstanceSelector() {
+            const config = instanceSelectorConfig[dashboardName];
+            if (!config) {
+                // Not a system health dashboard, hide selector
+                document.getElementById('instance-selector-container').style.display = 'none';
+                return;
+            }
+            
+            // Show selector
+            const container = document.getElementById('instance-selector-container');
+            const label = document.getElementById('instance-selector-label');
+            const selector = document.getElementById('instance-selector');
+            
+            container.style.display = 'flex';
+            label.textContent = config.label;
+            
+            try {
+                // Fetch available instances
+                const response = await fetch('/api/system/instances');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch instances');
+                }
+                
+                const data = await response.json();
+                availableInstances = data[config.type] || [];
+                
+                // Populate dropdown
+                selector.innerHTML = '';
+                if (availableInstances.length === 0) {
+                    selector.innerHTML = '<option value="">No instances available</option>';
+                    selector.disabled = true;
+                    return;
+                }
+                
+                // Add options
+                availableInstances.forEach(instance => {
+                    const option = document.createElement('option');
+                    option.value = instance.id;
+                    const displayText = `${instance.id}${instance.role ? ` (${instance.role})` : ''}${instance.hostname ? ` - ${instance.hostname}` : ''}`;
+                    option.textContent = displayText;
+                    selector.appendChild(option);
+                });
+                
+                // Load saved selection from sessionStorage or URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlInstanceId = urlParams.get(config.param);
+                const savedInstanceId = sessionStorage.getItem(`${dashboardName}_instance_id`);
+                const selectedInstanceId = urlInstanceId || savedInstanceId || (availableInstances.length > 0 ? availableInstances[0].id : null);
+                
+                if (selectedInstanceId) {
+                    selector.value = selectedInstanceId;
+                    currentInstanceId = selectedInstanceId;
+                    sessionStorage.setItem(`${dashboardName}_instance_id`, selectedInstanceId);
+                    
+                    // Update URL if needed
+                    if (!urlInstanceId && selectedInstanceId) {
+                        updateURLWithInstance(config.param, selectedInstanceId);
+                    }
+                }
+                
+                // Disable if only one instance
+                if (availableInstances.length === 1) {
+                    selector.disabled = true;
+                }
+                
+                // Handle selection change
+                selector.addEventListener('change', (e) => {
+                    const newInstanceId = e.target.value;
+                    if (newInstanceId !== currentInstanceId) {
+                        currentInstanceId = newInstanceId;
+                        sessionStorage.setItem(`${dashboardName}_instance_id`, newInstanceId);
+                        updateURLWithInstance(config.param, newInstanceId);
+                        // Reload all panels with new instance
+                        reloadDashboard();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Failed to initialize instance selector:', error);
+                selector.innerHTML = '<option value="">Instance discovery unavailable</option>';
+                selector.disabled = true;
+            }
+        }
+        
+        function updateURLWithInstance(param, instanceId) {
+            const url = new URL(window.location);
+            if (instanceId) {
+                url.searchParams.set(param, instanceId);
+            } else {
+                url.searchParams.delete(param);
+            }
+            window.history.replaceState({}, '', url);
+        }
+        
+        function reloadDashboard() {
+            // Clear existing panels
+            const gridEl = document.getElementById('dashboard-grid');
+            gridEl.innerHTML = '';
+            
+            // Clear refresh timers
+            Object.values(panelRefreshTimers).forEach(timer => clearInterval(timer));
+            Object.keys(panelRefreshTimers).forEach(key => delete panelRefreshTimers[key]);
+            
+            // Re-render all panels
+            renderDashboard();
         }
         
         // ============================================================
@@ -920,8 +1052,21 @@
                 }
                 
                 // Fetch data from endpoint
-                const response = await fetch(dataSource.endpoint);
+                // Add instance parameter if this is a system health dashboard
+                let endpointUrl = dataSource.endpoint;
+                const config = instanceSelectorConfig[dashboardName];
+                if (config && currentInstanceId) {
+                    const url = new URL(endpointUrl, window.location.origin);
+                    url.searchParams.set(config.param, currentInstanceId);
+                    endpointUrl = url.toString();
+                }
+                
+                const response = await fetch(endpointUrl);
                 if (!response.ok) {
+                    if (response.status === 404) {
+                        // Instance not found - show fail-soft message
+                        throw new Error(`Instance offline or not found`);
+                    }
                     throw new Error(`HTTP ${response.status}`);
                 }
                 

@@ -1108,4 +1108,233 @@ class ShareManager:
         if not token_id or len(token_id) < 8:
             return '****'
         return token_id[:8] + '-****'
+    
+    def generate_evidence_pack(self, from_timestamp: datetime, to_timestamp: datetime) -> Tuple[Optional[bytes], Optional[str]]:
+        """
+        Generate a cryptographically signed evidence pack for share activity in a time window.
+        
+        Creates a ZIP archive containing:
+        - incident_summary.json: Summary statistics
+        - incident_timeline.csv: Chronological event timeline
+        - top_dashboards.csv: Top dashboards by access count
+        - manifest.json: File hashes and cryptographic signature
+        
+        Args:
+            from_timestamp: Start of time window (UTC)
+            to_timestamp: End of time window (UTC)
+            
+        Returns:
+            Tuple of (zip_bytes, error_message)
+            - zip_bytes: ZIP archive bytes if successful, None on error
+            - error_message: Error message if failed, None on success
+        """
+        try:
+            # Get incident report data
+            report = self.get_incident_report(from_timestamp, to_timestamp)
+            
+            # Create temporary directory for evidence pack files
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                
+                # 1. Write incident_summary.json
+                summary_file = temp_path / 'incident_summary.json'
+                with open(summary_file, 'w') as f:
+                    json.dump({
+                        'time_range': {
+                            'from': from_timestamp.isoformat(),
+                            'to': to_timestamp.isoformat()
+                        },
+                        'summary': report['summary'],
+                        'generated_at': datetime.now(timezone.utc).isoformat(),
+                        'generator': 'RansomEye Share Evidence Pack'
+                    }, f, indent=2)
+                
+                # Helper function for CSV escaping
+                def escape_csv(value):
+                    if value is None:
+                        return ''
+                    str_value = str(value)
+                    if ',' in str_value or '"' in str_value or '\n' in str_value:
+                        return f'"{str_value.replace('"', '""')}"'
+                    return str_value
+                
+                # 2. Write incident_timeline.csv
+                timeline_file = temp_path / 'incident_timeline.csv'
+                with open(timeline_file, 'w', newline='') as f:
+                    f.write('Timestamp,Event Type,Dashboard,Token ID,Outcome\n')
+                    for event in report['timeline']:
+                        f.write(f"{escape_csv(event.get('timestamp', ''))},"
+                               f"{escape_csv(event.get('event_type', ''))},"
+                               f"{escape_csv(event.get('dashboard_name', ''))},"
+                               f"{escape_csv(event.get('token_id', ''))},"
+                               f"{escape_csv(event.get('outcome', ''))}\n")
+                
+                # 3. Write top_dashboards.csv
+                top_dashboards_file = temp_path / 'top_dashboards.csv'
+                with open(top_dashboards_file, 'w', newline='') as f:
+                    f.write('Dashboard,Access Count\n')
+                    for dash in report['top_dashboards']:
+                        f.write(f"{escape_csv(dash.get('dashboard_name', ''))},"
+                               f"{escape_csv(dash.get('access_count', 0))}\n")
+                
+                # 4. Compute file hashes and create manifest
+                manifest = {
+                    'version': '1.0',
+                    'generated_at': datetime.now(timezone.utc).isoformat(),
+                    'time_range': {
+                        'from': from_timestamp.isoformat(),
+                        'to': to_timestamp.isoformat()
+                    },
+                    'files': {}
+                }
+                
+                # Compute SHA256 hashes for each file
+                for file_name in ['incident_summary.json', 'incident_timeline.csv', 'top_dashboards.csv']:
+                    file_path = temp_path / file_name
+                    with open(file_path, 'rb') as f:
+                        file_content = f.read()
+                        file_hash = hashlib.sha256(file_content).hexdigest()
+                        manifest['files'][file_name] = {
+                            'sha256': file_hash,
+                            'size': len(file_content)
+                        }
+                
+                # 5. Sign manifest (if signing key available)
+                private_key_path = os.environ.get('RANSOMEYE_EVIDENCE_SIGNING_KEY_PATH')
+                if private_key_path and Path(private_key_path).exists():
+                    try:
+                        signature = self._sign_manifest(manifest, Path(private_key_path))
+                        manifest['signature'] = signature
+                        manifest['signature_algorithm'] = 'RSA-PSS-SHA256'
+                        manifest['public_key_fingerprint'] = self._get_public_key_fingerprint(Path(private_key_path))
+                    except Exception as e:
+                        logger.warning(f"Failed to sign manifest: {e}", exc_info=True)
+                        manifest['signature'] = None
+                        manifest['signature_error'] = str(e)
+                else:
+                    manifest['signature'] = None
+                    manifest['signature_note'] = 'No signing key configured (RANSOMEYE_EVIDENCE_SIGNING_KEY_PATH)'
+                
+                # 6. Write manifest.json
+                manifest_file = temp_path / 'manifest.json'
+                with open(manifest_file, 'w') as f:
+                    json.dump(manifest, f, indent=2)
+                
+                # 7. Create ZIP archive
+                zip_buffer = tempfile.NamedTemporaryFile(delete=False)
+                try:
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        zip_file.write(summary_file, 'incident_summary.json')
+                        zip_file.write(timeline_file, 'incident_timeline.csv')
+                        zip_file.write(top_dashboards_file, 'top_dashboards.csv')
+                        zip_file.write(manifest_file, 'manifest.json')
+                    
+                    # Read ZIP bytes
+                    zip_buffer.seek(0)
+                    zip_bytes = zip_buffer.read()
+                    
+                    return zip_bytes, None
+                    
+                finally:
+                    zip_buffer.close()
+                    try:
+                        os.unlink(zip_buffer.name)
+                    except:
+                        pass
+            
+        except Exception as e:
+            logger.error(f"Error generating evidence pack: {e}", exc_info=True)
+            return None, str(e)
+    
+    def _sign_manifest(self, manifest: Dict[str, Any], private_key_path: Path) -> str:
+        """
+        Sign manifest using RSA-PSS-SHA256 (matches existing signing infrastructure).
+        
+        Args:
+            manifest: Manifest dictionary (will be modified to remove signature before signing)
+            private_key_path: Path to private key PEM file
+            
+        Returns:
+            Base64-encoded signature
+        """
+        try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.backends import default_backend
+            
+            # Create manifest copy without signature for signing
+            manifest_for_signing = manifest.copy()
+            manifest_for_signing.pop('signature', None)
+            manifest_for_signing.pop('signature_error', None)
+            manifest_for_signing.pop('signature_note', None)
+            
+            # Serialize to JSON (compact, sorted keys for consistent hashing)
+            manifest_json = json.dumps(manifest_for_signing, sort_keys=True, separators=(',', ':'))
+            manifest_bytes = manifest_json.encode('utf-8')
+            
+            # Compute SHA256 hash
+            manifest_hash = hashlib.sha256(manifest_bytes).digest()
+            
+            # Load private key
+            with open(private_key_path, 'rb') as f:
+                private_key = serialization.load_pem_private_key(
+                    f.read(), password=None, backend=default_backend()
+                )
+            
+            # Sign hash with RSA-PSS-SHA256
+            signature = private_key.sign(
+                manifest_hash,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            # Base64 encode signature
+            signature_b64 = base64.b64encode(signature).decode('utf-8')
+            
+            return signature_b64
+            
+        except ImportError:
+            raise RuntimeError("cryptography library not available for signing")
+        except Exception as e:
+            raise RuntimeError(f"Failed to sign manifest: {e}")
+    
+    def _get_public_key_fingerprint(self, private_key_path: Path) -> str:
+        """
+        Get SHA-256 fingerprint of public key derived from private key.
+        
+        Args:
+            private_key_path: Path to private key PEM file
+            
+        Returns:
+            Hex-encoded fingerprint
+        """
+        try:
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.backends import default_backend
+            
+            # Load private key
+            with open(private_key_path, 'rb') as f:
+                private_key = serialization.load_pem_private_key(
+                    f.read(), password=None, backend=default_backend()
+                )
+            
+            # Get public key
+            public_key = private_key.public_key()
+            
+            # Serialize public key
+            public_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            
+            # Compute fingerprint
+            fingerprint = hashlib.sha256(public_pem).hexdigest()
+            return fingerprint
+            
+        except Exception as e:
+            logger.warning(f"Failed to compute public key fingerprint: {e}", exc_info=True)
+            return 'unknown'
 
