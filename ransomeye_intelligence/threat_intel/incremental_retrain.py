@@ -21,14 +21,23 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import logging
 
-# Add parent directory to path
+# Add parent directories to path
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from training_governance import (
     TrainingGovernance,
     SHAPExplainer,
     ResourceGovernor
 )
+
+# Import new continuous training system
+try:
+    from training.continuous_trainer import ContinuousTrainer
+    CONTINUOUS_TRAINING_AVAILABLE = True
+except ImportError:
+    CONTINUOUS_TRAINING_AVAILABLE = False
+    logger.warning("Continuous training system not available, using legacy retraining")
 
 # Setup logging
 logging.basicConfig(
@@ -193,6 +202,20 @@ def train_model(X: np.ndarray, y: np.ndarray, model_name: str) -> Dict:
 def main():
     """Main retraining function."""
     logger.info("Starting incremental retraining (Phase 6)")
+    
+    # Use new continuous training system if available
+    if CONTINUOUS_TRAINING_AVAILABLE:
+        logger.info("Using enhanced continuous training system")
+        try:
+            continuous_trainer = ContinuousTrainer()
+            results = continuous_trainer.run_continuous_training(force=False)
+            logger.info(f"Continuous training completed: {results.get('status', 'unknown')}")
+            return
+        except Exception as e:
+            logger.warning(f"Continuous training failed, falling back to legacy: {e}")
+    
+    # Legacy retraining (fallback)
+    logger.info("Using legacy incremental retraining")
     
     # Initialize training governance
     governance = TrainingGovernance()

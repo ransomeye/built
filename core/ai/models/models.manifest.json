@@ -1,10 +1,10 @@
 {
   "model_name": "risk_model",
   "model_version": "1.0.0",
-  "model_hash": "7fd0e25a00ed8a8bf8d2e97bffe26a45c694dd259165eb3f7e6e010c444fb496",
+  "model_hash": "818e0b645f44ca2172336f9b0019d5abbec3260b9a56138c25b35278619c472a",
   "model_size_bytes": 1055801,
   "signature": "",
-  "trained_on": "2026-01-07T08:32:51.548470Z",
+  "trained_on": "2026-01-07T08:34:53.857014Z",
   "model_type": "RandomForestClassifier",
   "features": [
     "network_connections",

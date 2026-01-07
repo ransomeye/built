@@ -351,7 +351,7 @@ class DashboardEngine:
         logger.info("Dashboard cache cleared")
     
     def save_dashboard(self, dashboard: Dict[str, Any], dashboard_name: Optional[str] = None, 
-                      save_as_overlay: bool = True) -> bool:
+                      save_as_overlay: bool = True, version_action: str = 'save') -> bool:
         """
         Save dashboard definition.
         
@@ -395,7 +395,7 @@ class DashboardEngine:
             # In future, could optimize to save only differences
             overlay = dashboard.copy()
             
-            success = self.overlay_manager.save_overlay(overlay, dashboard_name)
+            success = self.overlay_manager.save_overlay(overlay, dashboard_name, version_action=version_action)
             
             if success:
                 # Clear cache for this dashboard

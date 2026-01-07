@@ -21,6 +21,17 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# Import version manager (circular import handled lazily)
+_version_manager = None
+
+def get_version_manager(base_dir: Path):
+    """Get or create version manager instance (lazy import to avoid circular dependency)."""
+    global _version_manager
+    if _version_manager is None:
+        from version_manager import VersionManager
+        _version_manager = VersionManager(base_dir)
+    return _version_manager
+
 
 class OverlayManager:
     """Manager for user dashboard overlays."""
@@ -122,7 +133,8 @@ class OverlayManager:
             logger.error(f"Error loading overlay {overlay_path}: {e}", exc_info=True)
             return None
     
-    def save_overlay(self, overlay: Dict[str, Any], dashboard_name: str, user_id: Optional[str] = None) -> bool:
+    def save_overlay(self, overlay: Dict[str, Any], dashboard_name: str, user_id: Optional[str] = None, 
+                    version_action: str = 'save') -> bool:
         """
         Save user overlay with atomic write and backup.
         
@@ -130,6 +142,7 @@ class OverlayManager:
             overlay: Overlay dict (must be validated)
             dashboard_name: Dashboard name
             user_id: User ID (defaults to current user from env)
+            version_action: Action for version capture (save, create, duplicate, import, rename)
             
         Returns:
             True if saved successfully, False otherwise
@@ -170,6 +183,21 @@ class OverlayManager:
             
             # Atomic rename
             temp_path.replace(overlay_path)
+            
+            # Capture version snapshot (fail-closed: if version capture fails, operation fails)
+            version_manager = get_version_manager(self.base_dir)
+            version_captured = version_manager.capture_version(overlay, dashboard_name, version_action, user_id)
+            if not version_captured:
+                logger.error(f"Version capture failed for dashboard '{dashboard_name}' - operation aborted")
+                self._audit_log('save_overlay', user_id, dashboard_name, success=False, error="version_capture_failed")
+                # Restore from backup if exists
+                if backup_path and backup_path.exists():
+                    try:
+                        backup_path.replace(overlay_path)
+                        logger.info(f"Restored overlay from backup due to version capture failure: {dashboard_name}")
+                    except Exception as restore_error:
+                        logger.error(f"Failed to restore overlay from backup: {restore_error}")
+                return False
             
             # Audit log
             self._audit_log('save_overlay', user_id, dashboard_name, success=True)
@@ -398,8 +426,8 @@ class OverlayManager:
                     ]
                 }
             
-            # Save as overlay
-            success = self.save_overlay(dashboard, dashboard_name, user_id)
+            # Save as overlay with 'create' action for version capture
+            success = self.save_overlay(dashboard, dashboard_name, user_id, version_action='create')
             
             if success:
                 self._audit_log('create_personal_dashboard', user_id, dashboard_name, 
@@ -464,8 +492,8 @@ class OverlayManager:
             # Preserve all other fields (panels, layout, refresh intervals, etc.)
             # The copy() already preserves everything, we just update name and title
             
-            # Save as new overlay
-            success = self.save_overlay(new_dashboard, new_dashboard_name, user_id)
+            # Save as new overlay with 'duplicate' action for version capture
+            success = self.save_overlay(new_dashboard, new_dashboard_name, user_id, version_action='duplicate')
             
             if success:
                 self._audit_log('duplicate_dashboard', user_id, new_dashboard_name, 

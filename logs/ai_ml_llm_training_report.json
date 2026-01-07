@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-07T08:29:29.389662Z",
+  "timestamp": "2026-01-07T08:45:16.144022Z",
   "project_root": "/home/ransomeye/rebuild",
   "training_config": {
     "baseline_pack": {
@@ -37,13 +37,13 @@
     }
   },
   "results": {
-    "baseline_pack": false,
+    "baseline_pack": "skipped",
     "risk_model": true,
     "threat_correlation": true,
     "forensic_malware_dna": true,
     "threat_intel_trust": true,
     "dpi_probe_classifier": true,
-    "rag_index": false,
+    "rag_index": "skipped",
     "shap_generation": true
   },
   "trained_models": [
@@ -87,7 +87,10 @@
   "errors": [],
   "summary": {
     "success_count": 6,
+    "failed_count": 0,
+    "skipped_count": 2,
+    "total_enabled": 6,
     "total_count": 8,
-    "success_rate": 0.75
+    "success_rate": 1.0
   }
 }

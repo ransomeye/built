@@ -141,6 +141,15 @@
                             <span class="create-dashboard-icon">+</span>
                             <span class="create-dashboard-label">Create Dashboard</span>
                         </button>
+                        <button 
+                            type="button" 
+                            id="import-dashboard-button" 
+                            class="import-dashboard-button"
+                            aria-label="Import dashboard"
+                            title="Import dashboard from JSON file">
+                            <span class="import-dashboard-icon">📤</span>
+                            <span class="import-dashboard-label">Import Dashboard</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -249,6 +258,44 @@
                         style="display: none;">
                         <span class="duplicate-dashboard-icon">📄</span>
                         <span class="duplicate-dashboard-label">Duplicate</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="delete-dashboard-button" 
+                        class="delete-dashboard-button"
+                        aria-label="Delete dashboard"
+                        title="Delete this personal dashboard"
+                        style="display: none;">
+                        <span class="delete-dashboard-icon">🗑️</span>
+                        <span class="delete-dashboard-label">Delete</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="export-dashboard-button" 
+                        class="export-dashboard-button"
+                        aria-label="Export dashboard"
+                        title="Export dashboard as JSON">
+                        <span class="export-dashboard-icon">📥</span>
+                        <span class="export-dashboard-label">Export</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="import-dashboard-button-header" 
+                        class="import-dashboard-button"
+                        aria-label="Import dashboard"
+                        title="Import dashboard from JSON file">
+                        <span class="import-dashboard-icon">📤</span>
+                        <span class="import-dashboard-label">Import</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        id="version-history-button" 
+                        class="version-history-button"
+                        aria-label="View version history"
+                        title="View dashboard version history"
+                        style="display: none;">
+                        <span class="version-history-icon">🕐</span>
+                        <span class="version-history-label">Version History</span>
                     </button>
                     <a href="/" style="color: var(--text-secondary); text-decoration: none; font-size: var(--font-size-sm);">← Back to Main</a>
                 </div>
@@ -413,6 +460,203 @@
                                 </div>
                                 <div id="duplicate-dashboard-error" class="form-error" style="display: none;"></div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Delete Dashboard Modal -->
+                <div class="delete-dashboard-modal" id="delete-dashboard-modal" role="dialog" aria-labelledby="delete-dashboard-title" aria-hidden="true">
+                    <div class="delete-dashboard-overlay"></div>
+                    <div class="delete-dashboard-dialog">
+                        <div class="delete-dashboard-header">
+                            <h2 id="delete-dashboard-title">Delete Dashboard</h2>
+                            <button type="button" class="delete-dashboard-close" id="delete-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="delete-dashboard-content">
+                            <div class="delete-dashboard-warning">
+                                <p>You are about to delete the personal dashboard:</p>
+                                <p class="delete-dashboard-name" id="delete-dashboard-name-display"></p>
+                                <p>This action cannot be undone. The dashboard will be permanently removed.</p>
+                            </div>
+                            <form id="delete-dashboard-form">
+                                <div class="form-group">
+                                    <label for="delete-confirm-checkbox">
+                                        <input 
+                                            type="checkbox" 
+                                            id="delete-confirm-checkbox" 
+                                            name="confirm_delete" 
+                                            required
+                                            aria-describedby="delete-confirm-help"
+                                        />
+                                        <span>I understand this action is permanent and cannot be undone</span>
+                                    </label>
+                                    <small id="delete-confirm-help" class="form-help">
+                                        You must confirm to proceed with deletion
+                                    </small>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="button-secondary" id="delete-dashboard-cancel">Cancel</button>
+                                    <button type="submit" class="button-danger" id="delete-dashboard-submit" disabled>Delete Dashboard</button>
+                                </div>
+                                <div id="delete-dashboard-error" class="form-error" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Import Dashboard Modal -->
+                <div class="import-dashboard-modal" id="import-dashboard-modal" role="dialog" aria-labelledby="import-dashboard-title" aria-hidden="true">
+                    <div class="import-dashboard-overlay"></div>
+                    <div class="import-dashboard-dialog">
+                        <div class="import-dashboard-header">
+                            <h2 id="import-dashboard-title">Import Dashboard</h2>
+                            <button type="button" class="import-dashboard-close" id="import-dashboard-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="import-dashboard-content">
+                            <div class="import-dashboard-info">
+                                <p>Import a dashboard from an exported JSON file. The imported dashboard will be created as a personal dashboard.</p>
+                                <p style="color: var(--text-muted); font-size: var(--font-size-sm); margin-top: var(--spacing-sm);">
+                                    <strong>Note:</strong> System dashboards cannot be overwritten. Only RansomEye-compatible JSON files are accepted.
+                                </p>
+                            </div>
+                            <form id="import-dashboard-form" enctype="multipart/form-data">
+                                <div class="form-group">
+                                    <label for="import-dashboard-file">Dashboard JSON File</label>
+                                    <input 
+                                        type="file" 
+                                        id="import-dashboard-file" 
+                                        name="file" 
+                                        accept=".json"
+                                        required
+                                        aria-describedby="file-help"
+                                    />
+                                    <small id="file-help" class="form-help">
+                                        Select a JSON file exported from RansomEye (.json only)
+                                    </small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="import-dashboard-name">Dashboard Name (Optional)</label>
+                                    <input 
+                                        type="text" 
+                                        id="import-dashboard-name" 
+                                        name="new_name" 
+                                        pattern="[a-z0-9_-]+"
+                                        placeholder="auto-detected from file"
+                                        aria-describedby="import-name-help"
+                                    />
+                                    <small id="import-name-help" class="form-help">
+                                        Leave empty to use name from file. Must be unique and slug-safe (lowercase letters, numbers, hyphens, underscores)
+                                    </small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="import-dashboard-title">Dashboard Title (Optional)</label>
+                                    <input 
+                                        type="text" 
+                                        id="import-dashboard-title" 
+                                        name="new_title" 
+                                        maxlength="200"
+                                        placeholder="auto-detected from file"
+                                    />
+                                    <small class="form-help">
+                                        Leave empty to use title from file
+                                    </small>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="button-secondary" id="import-dashboard-cancel">Cancel</button>
+                                    <button type="submit" class="button-primary" id="import-dashboard-submit">Import Dashboard</button>
+                                </div>
+                                <div id="import-dashboard-error" class="form-error" style="display: none;"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Version History Modal -->
+                <div class="version-history-modal" id="version-history-modal" role="dialog" aria-labelledby="version-history-title" aria-hidden="true">
+                    <div class="version-history-overlay"></div>
+                    <div class="version-history-dialog">
+                        <div class="version-history-header">
+                            <h2 id="version-history-title">Version History</h2>
+                            <button type="button" class="version-history-close" id="version-history-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="version-history-content">
+                            <div class="version-history-info">
+                                <p>View immutable version history for this personal dashboard. Versions are captured on every save, rename, duplicate, and import.</p>
+                            </div>
+                            <div id="version-history-loading" class="version-history-loading" style="display: none;">
+                                <p>Loading version history...</p>
+                            </div>
+                            <div id="version-history-list" class="version-history-list">
+                                <!-- Versions will be populated by JavaScript -->
+                            </div>
+                            <div id="version-history-error" class="form-error" style="display: none;"></div>
+                            <div class="form-actions">
+                                <button type="button" class="button-secondary" id="version-history-close-btn">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Version Diff Modal -->
+                <div class="version-diff-modal" id="version-diff-modal" role="dialog" aria-labelledby="version-diff-title" aria-hidden="true">
+                    <div class="version-diff-overlay"></div>
+                    <div class="version-diff-dialog">
+                        <div class="version-diff-header">
+                            <h2 id="version-diff-title">Version Diff</h2>
+                            <button type="button" class="version-diff-close" id="version-diff-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="version-diff-content-wrapper">
+                            <div id="version-diff-loading" class="version-diff-loading" style="display: none;">
+                                <p>Loading version diff...</p>
+                            </div>
+                            <div id="version-diff-error" class="form-error" style="display: none;"></div>
+                            <div id="version-diff-content" class="version-diff-content">
+                                <!-- Diff content will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="version-diff-footer">
+                            <button type="button" class="button-secondary" id="version-diff-close-btn">Close</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Restore Confirmation Modal -->
+                <div class="restore-confirm-modal" id="restore-confirm-modal" role="dialog" aria-labelledby="restore-confirm-title" aria-hidden="true">
+                    <div class="restore-confirm-overlay"></div>
+                    <div class="restore-confirm-dialog">
+                        <div class="restore-confirm-header">
+                            <h2 id="restore-confirm-title">Restore Dashboard Version</h2>
+                            <button type="button" class="restore-confirm-close" id="restore-confirm-close" aria-label="Close">✕</button>
+                        </div>
+                        <div class="restore-confirm-content">
+                            <div class="restore-confirm-warning">
+                                <p><strong>Warning:</strong> This action will replace your current dashboard with the selected version. Your current dashboard state will be backed up and a new version will be created.</p>
+                            </div>
+                            <div class="restore-confirm-details">
+                                <div class="restore-detail-item">
+                                    <strong>Version Timestamp:</strong>
+                                    <span id="restore-version-timestamp">-</span>
+                                </div>
+                                <div class="restore-detail-item">
+                                    <strong>Version Hash:</strong>
+                                    <code id="restore-version-hash">-</code>
+                                </div>
+                                <div class="restore-detail-item">
+                                    <strong>Action:</strong>
+                                    <span>Restore to this version</span>
+                                </div>
+                            </div>
+                            <div class="restore-confirm-checkbox">
+                                <label>
+                                    <input type="checkbox" id="restore-confirm-checkbox">
+                                    <span>I understand that this will replace my current dashboard and cannot be undone without manual intervention.</span>
+                                </label>
+                            </div>
+                            <div id="restore-confirm-error" class="form-error" style="display: none;"></div>
+                        </div>
+                        <div class="restore-confirm-footer">
+                            <button type="button" class="button-secondary" id="restore-confirm-cancel">Cancel</button>
+                            <button type="button" class="button-primary" id="restore-confirm-submit" disabled>Restore Dashboard</button>
                         </div>
                     </div>
                 </div>
@@ -1837,13 +2081,21 @@
                 }
             }
             
-            // Show/hide "Rename Dashboard" button (only for personal dashboards)
+            // Show/hide "Rename Dashboard" and "Version History" buttons (only for personal dashboards)
             const renameBtn = document.getElementById('rename-dashboard-button');
+            const versionHistoryBtn = document.getElementById('version-history-button');
             if (renameBtn) {
                 if (has_overlay && (source === 'user' || source === 'merged')) {
                     renameBtn.style.display = 'inline-flex';
                 } else {
                     renameBtn.style.display = 'none';
+                }
+            }
+            if (versionHistoryBtn) {
+                if (has_overlay && (source === 'user' || source === 'merged')) {
+                    versionHistoryBtn.style.display = 'inline-flex';
+                } else {
+                    versionHistoryBtn.style.display = 'none';
                 }
             }
             
@@ -1854,6 +2106,16 @@
                     duplicateBtn.style.display = 'inline-flex';
                 } else {
                     duplicateBtn.style.display = 'none';
+                }
+            }
+            
+            // Show/hide "Delete Dashboard" button (only for personal dashboards)
+            const deleteBtn = document.getElementById('delete-dashboard-button');
+            if (deleteBtn) {
+                if (has_overlay && (source === 'user' || source === 'merged')) {
+                    deleteBtn.style.display = 'inline-flex';
+                } else {
+                    deleteBtn.style.display = 'none';
                 }
             }
         }
@@ -2379,6 +2641,933 @@
         
         // Initialize duplicate dashboard modal
         initDuplicateDashboardModal();
+        
+        // ============================================================
+        // DELETE DASHBOARD MODAL
+        // ============================================================
+        
+        function initDeleteDashboardModal() {
+            const modal = document.getElementById('delete-dashboard-modal');
+            const openButton = document.getElementById('delete-dashboard-button');
+            const closeButtons = [
+                document.getElementById('delete-dashboard-close'),
+                document.getElementById('delete-dashboard-cancel')
+            ];
+            const overlay = modal?.querySelector('.delete-dashboard-overlay');
+            const form = document.getElementById('delete-dashboard-form');
+            const confirmCheckbox = document.getElementById('delete-confirm-checkbox');
+            const submitBtn = document.getElementById('delete-dashboard-submit');
+            const nameDisplay = document.getElementById('delete-dashboard-name-display');
+            const errorEl = document.getElementById('delete-dashboard-error');
+            
+            // Enable/disable submit button based on checkbox
+            if (confirmCheckbox && submitBtn) {
+                confirmCheckbox.addEventListener('change', (e) => {
+                    submitBtn.disabled = !e.target.checked;
+                });
+            }
+            
+            // Open modal
+            function openModal() {
+                if (!modal || !dashboardName) return;
+                
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Reset form
+                if (form) {
+                    form.reset();
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                    }
+                }
+                
+                // Display dashboard name
+                if (nameDisplay && dashboardDefinition) {
+                    const title = dashboardDefinition.title || dashboardName;
+                    nameDisplay.textContent = `"${title}"`;
+                }
+                
+                // Clear error
+                if (errorEl) {
+                    errorEl.style.display = 'none';
+                    errorEl.textContent = '';
+                }
+                
+                // Focus on checkbox
+                if (confirmCheckbox) {
+                    setTimeout(() => confirmCheckbox.focus(), 100);
+                }
+            }
+            
+            // Close modal
+            function closeModal() {
+                if (!modal) return;
+                
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+            
+            // Handle form submission
+            async function handleSubmit(e) {
+                e.preventDefault();
+                
+                if (!form || !errorEl || !submitBtn || !dashboardName) return;
+                
+                // Validate checkbox is checked
+                if (!confirmCheckbox || !confirmCheckbox.checked) {
+                    errorEl.textContent = 'You must confirm deletion to proceed';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+                
+                // Disable submit button and show loading state
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Deleting...';
+                
+                try {
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.status === 'success') {
+                        // Success - redirect to safe location
+                        closeModal();
+                        
+                        // Redirect to default dashboard or dashboard list
+                        // Try to find a system dashboard first, otherwise go to main page
+                        fetch('/api/dashboards', {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' }
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            const dashboards = data.dashboards || [];
+                            // Try to find a system dashboard (e.g., 'system_soc' or first available)
+                            const defaultDashboard = dashboards.find(name => name.startsWith('system_')) || dashboards[0];
+                            if (defaultDashboard) {
+                                window.location.href = `/dashboard/${encodeURIComponent(defaultDashboard)}`;
+                            } else {
+                                window.location.href = '/';
+                            }
+                        })
+                        .catch(() => {
+                            // Fallback to main page if dashboard list fetch fails
+                            window.location.href = '/';
+                        });
+                    } else {
+                        // Error - show message
+                        errorEl.textContent = result.error || 'Failed to delete dashboard';
+                        errorEl.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Delete Dashboard';
+                    }
+                } catch (error) {
+                    errorEl.textContent = 'Network error: Failed to delete dashboard';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Delete Dashboard';
+                }
+            }
+            
+            // Attach event listeners
+            if (openButton) {
+                openButton.addEventListener('click', openModal);
+            }
+            
+            closeButtons.forEach(btn => {
+                if (btn) {
+                    btn.addEventListener('click', closeModal);
+                }
+            });
+            
+            if (overlay) {
+                overlay.addEventListener('click', closeModal);
+            }
+            
+            if (form) {
+                form.addEventListener('submit', handleSubmit);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+        }
+        
+        // Initialize delete dashboard modal
+        initDeleteDashboardModal();
+        
+        // ============================================================
+        // EXPORT DASHBOARD
+        // ============================================================
+        
+        function initExportDashboard() {
+            const exportButton = document.getElementById('export-dashboard-button');
+            
+            if (!exportButton || !dashboardName) return;
+            
+            async function handleExport() {
+                try {
+                    // Fetch export endpoint
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/export`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        alert(`Export failed: ${error.error || 'Unknown error'}`);
+                        return;
+                    }
+                    
+                    // Get JSON data
+                    const exportData = await response.json();
+                    
+                    // Create blob and trigger download
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `ransomeye-dashboard-${dashboardName}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                } catch (error) {
+                    console.error('Export error:', error);
+                    alert(`Export failed: ${error.message || 'Network error'}`);
+                }
+            }
+            
+            exportButton.addEventListener('click', handleExport);
+        }
+        
+        // Initialize export dashboard
+        initExportDashboard();
+        
+        // ============================================================
+        // IMPORT DASHBOARD
+        // ============================================================
+        
+        function initImportDashboard() {
+            const importButton = document.getElementById('import-dashboard-button');
+            const importButtonHeader = document.getElementById('import-dashboard-button-header');
+            const modal = document.getElementById('import-dashboard-modal');
+            const closeButton = document.getElementById('import-dashboard-close');
+            const cancelButton = document.getElementById('import-dashboard-cancel');
+            const form = document.getElementById('import-dashboard-form');
+            const errorDiv = document.getElementById('import-dashboard-error');
+            const fileInput = document.getElementById('import-dashboard-file');
+            const submitButton = document.getElementById('import-dashboard-submit');
+            
+            if (!modal || !form) return;
+            
+            // Show modal
+            function showModal() {
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                // Reset form
+                form.reset();
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+            
+            // Hide modal
+            function hideModal() {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+                form.reset();
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+            
+            // Show error
+            function showError(message) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+            
+            // Handle import
+            async function handleImport(event) {
+                event.preventDefault();
+                
+                // Validate file
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    showError('Please select a JSON file to import');
+                    return;
+                }
+                
+                const file = fileInput.files[0];
+                if (!file.name.toLowerCase().endsWith('.json')) {
+                    showError('File must be a JSON file (.json)');
+                    return;
+                }
+                
+                // Get optional fields
+                const newName = document.getElementById('import-dashboard-name').value.trim();
+                const newTitle = document.getElementById('import-dashboard-title').value.trim();
+                
+                // Validate name format if provided
+                if (newName && !/^[a-z0-9_-]+$/.test(newName.toLowerCase())) {
+                    showError('Dashboard name must be slug-safe (lowercase letters, numbers, hyphens, underscores)');
+                    return;
+                }
+                
+                // Disable submit button
+                submitButton.disabled = true;
+                submitButton.textContent = 'Importing...';
+                errorDiv.style.display = 'none';
+                
+                try {
+                    // Create FormData
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    if (newName) {
+                        formData.append('new_name', newName);
+                    }
+                    if (newTitle) {
+                        formData.append('new_title', newTitle);
+                    }
+                    
+                    // Send import request
+                    const response = await fetch('/api/dashboards/import', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        showError(result.error || 'Import failed');
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Import Dashboard';
+                        return;
+                    }
+                    
+                    // Success - redirect to imported dashboard
+                    hideModal();
+                    
+                    // Show success message briefly
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'notification-success';
+                    successMsg.textContent = `Dashboard '${result.dashboard_name}' imported successfully`;
+                    successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: var(--color-success); color: white; padding: var(--spacing-md); border-radius: var(--border-radius); z-index: 10000; box-shadow: var(--shadow-lg);';
+                    document.body.appendChild(successMsg);
+                    setTimeout(() => {
+                        document.body.removeChild(successMsg);
+                    }, 3000);
+                    
+                    // Redirect to imported dashboard
+                    window.location.href = `/dashboard/${encodeURIComponent(result.dashboard_name)}`;
+                    
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showError(`Import failed: ${error.message || 'Network error'}`);
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Import Dashboard';
+                }
+            }
+            
+            // Event listeners
+            if (importButton) {
+                importButton.addEventListener('click', showModal);
+            }
+            if (importButtonHeader) {
+                importButtonHeader.addEventListener('click', showModal);
+            }
+            if (closeButton) {
+                closeButton.addEventListener('click', hideModal);
+            }
+            if (cancelButton) {
+                cancelButton.addEventListener('click', hideModal);
+            }
+            form.addEventListener('submit', handleImport);
+            
+            // Close on overlay click
+            const overlay = modal.querySelector('.import-dashboard-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', hideModal);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    hideModal();
+                }
+            });
+        }
+        
+        // Initialize import dashboard
+        initImportDashboard();
+        
+        // ============================================================
+        // VERSION HISTORY
+        // ============================================================
+        
+        function initVersionHistory() {
+            const versionHistoryButton = document.getElementById('version-history-button');
+            const modal = document.getElementById('version-history-modal');
+            const closeButton = document.getElementById('version-history-close');
+            const closeBtn = document.getElementById('version-history-close-btn');
+            const loadingDiv = document.getElementById('version-history-loading');
+            const listDiv = document.getElementById('version-history-list');
+            const errorDiv = document.getElementById('version-history-error');
+            
+            if (!modal || !versionHistoryButton || !dashboardName) return;
+            
+            // Show modal
+            async function showModal() {
+                modal.setAttribute('aria-hidden', 'false');
+                modal.style.display = 'flex';
+                
+                // Clear previous content
+                listDiv.innerHTML = '';
+                errorDiv.style.display = 'none';
+                loadingDiv.style.display = 'block';
+                
+                try {
+                    // Fetch versions
+                    const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/versions`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    loadingDiv.style.display = 'none';
+                    
+                    if (!response.ok) {
+                        errorDiv.textContent = result.error || 'Failed to load version history';
+                        errorDiv.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Check if personal dashboard
+                    if (!result.is_personal) {
+                        listDiv.innerHTML = '<p style="color: var(--text-muted); padding: var(--spacing-md);">System dashboards do not have version history.</p>';
+                        return;
+                    }
+                    
+                    // Display versions
+                    if (!result.versions || result.versions.length === 0) {
+                        listDiv.innerHTML = '<p style="color: var(--text-muted); padding: var(--spacing-md);">No version history available.</p>';
+                        return;
+                    }
+                    
+                    // Create version list
+                    const versionsHtml = result.versions.map((version, index) => {
+                        const timestamp = new Date(version.timestamp);
+                        const formattedDate = timestamp.toLocaleString();
+                        const actionLabel = version.action.charAt(0).toUpperCase() + version.action.slice(1);
+                        const hasPrevious = index < result.versions.length - 1; // Can compare with previous version
+                        
+                        return `
+                            <div class="version-item">
+                                <div class="version-header">
+                                    <div class="version-action">${actionLabel}</div>
+                                    <div class="version-timestamp">${formattedDate}</div>
+                                </div>
+                                <div class="version-details">
+                                    <div class="version-hash">Hash: <code>${version.json_hash_short || 'N/A'}</code></div>
+                                    <div class="version-user">User: ${version.user_id || 'system'}</div>
+                                </div>
+                                <div class="version-actions">
+                                    ${hasPrevious ? `<button type="button" class="button-small button-secondary view-diff-btn" data-version-id="${version.version_id}" data-compare-with="${result.versions[index + 1].version_id}">View Diff</button>` : ''}
+                                    ${index === 0 ? '<span class="version-current-badge">Current</span>' : ''}
+                                    ${index !== 0 ? `<button type="button" class="button-small button-primary restore-version-btn" data-version-id="${version.version_id}" data-version-timestamp="${version.timestamp}" data-version-hash="${version.json_hash_short || ''}">Restore</button>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    listDiv.innerHTML = `<div class="version-list-container">${versionsHtml}</div>`;
+                    
+                    // Attach event listeners to View Diff buttons
+                    listDiv.querySelectorAll('.view-diff-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const versionId = e.target.getAttribute('data-version-id');
+                            const compareWithId = e.target.getAttribute('data-compare-with');
+                            await showVersionDiff(versionId, compareWithId);
+                        });
+                    });
+                    
+                    // Attach event listeners to Restore buttons
+                    listDiv.querySelectorAll('.restore-version-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const versionId = e.target.getAttribute('data-version-id');
+                            const versionTimestamp = e.target.getAttribute('data-version-timestamp');
+                            const versionHash = e.target.getAttribute('data-version-hash');
+                            showRestoreConfirm(versionId, versionTimestamp, versionHash);
+                        });
+                    });
+                    
+                } catch (error) {
+                    console.error('Version history error:', error);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.textContent = `Failed to load version history: ${error.message || 'Network error'}`;
+                    errorDiv.style.display = 'block';
+                }
+            }
+            
+            // Hide modal
+            function hideModal() {
+                modal.setAttribute('aria-hidden', 'true');
+                modal.style.display = 'none';
+            }
+            
+            // Event listeners
+            if (versionHistoryButton) {
+                versionHistoryButton.addEventListener('click', showModal);
+            }
+            if (closeButton) {
+                closeButton.addEventListener('click', hideModal);
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', hideModal);
+            }
+            
+            // Close on overlay click
+            const overlay = modal.querySelector('.version-history-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', hideModal);
+            }
+            
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    hideModal();
+                }
+            });
+        }
+        
+        // Initialize version history
+        initVersionHistory();
+        
+        // ============================================================
+        // VERSION DIFF VIEW
+        // ============================================================
+        
+        async function showVersionDiff(newVersionId, oldVersionId) {
+            const diffModal = document.getElementById('version-diff-modal');
+            const diffContent = document.getElementById('version-diff-content');
+            const diffLoading = document.getElementById('version-diff-loading');
+            const diffError = document.getElementById('version-diff-error');
+            const diffCloseBtn = document.getElementById('version-diff-close');
+            const diffCloseOverlay = document.querySelector('.version-diff-overlay');
+            
+            if (!diffModal || !diffContent) return;
+            
+            // Show modal
+            diffModal.setAttribute('aria-hidden', 'false');
+            diffModal.style.display = 'flex';
+            diffContent.innerHTML = '';
+            diffError.style.display = 'none';
+            diffLoading.style.display = 'block';
+            
+            try {
+                // Fetch both versions
+                const [newVersionRes, oldVersionRes] = await Promise.all([
+                    fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/versions/${encodeURIComponent(newVersionId)}`),
+                    fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/versions/${encodeURIComponent(oldVersionId)}`)
+                ]);
+                
+                const newVersion = await newVersionRes.json();
+                const oldVersion = await oldVersionRes.json();
+                
+                if (!newVersionRes.ok || !oldVersionRes.ok) {
+                    throw new Error(newVersion.error || oldVersion.error || 'Failed to load versions');
+                }
+                
+                diffLoading.style.display = 'none';
+                
+                // Compute and display diff
+                const diffHtml = computeDashboardDiff(oldVersion.dashboard, newVersion.dashboard, oldVersion, newVersion);
+                diffContent.innerHTML = diffHtml;
+                
+            } catch (error) {
+                console.error('Diff error:', error);
+                diffLoading.style.display = 'none';
+                diffError.textContent = `Failed to load version diff: ${error.message || 'Unknown error'}`;
+                diffError.style.display = 'block';
+            }
+            
+            // Close handlers
+            const closeDiffModal = () => {
+                diffModal.setAttribute('aria-hidden', 'true');
+                diffModal.style.display = 'none';
+            };
+            
+            if (diffCloseBtn) {
+                diffCloseBtn.addEventListener('click', closeDiffModal);
+            }
+            
+            const diffCloseBtnFooter = document.getElementById('version-diff-close-btn');
+            if (diffCloseBtnFooter) {
+                diffCloseBtnFooter.addEventListener('click', closeDiffModal);
+            }
+            
+            if (diffCloseOverlay) {
+                diffCloseOverlay.addEventListener('click', closeDiffModal);
+            }
+            
+            // Close on Escape
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape' && diffModal.getAttribute('aria-hidden') === 'false') {
+                    closeDiffModal();
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+        }
+        
+        // ============================================================
+        // RESTORE VERSION CONFIRMATION
+        // ============================================================
+        
+        let pendingRestoreVersionId = null;
+        
+        function showRestoreConfirm(versionId, versionTimestamp, versionHash) {
+            const restoreModal = document.getElementById('restore-confirm-modal');
+            const timestampEl = document.getElementById('restore-version-timestamp');
+            const hashEl = document.getElementById('restore-version-hash');
+            const checkboxEl = document.getElementById('restore-confirm-checkbox');
+            const submitBtn = document.getElementById('restore-confirm-submit');
+            const errorEl = document.getElementById('restore-confirm-error');
+            
+            if (!restoreModal || !dashboardName) return;
+            
+            // Store version ID for submit
+            pendingRestoreVersionId = versionId;
+            
+            // Format timestamp
+            const timestamp = new Date(versionTimestamp);
+            timestampEl.textContent = timestamp.toLocaleString();
+            hashEl.textContent = versionHash || 'N/A';
+            
+            // Reset checkbox and button
+            checkboxEl.checked = false;
+            submitBtn.disabled = true;
+            errorEl.style.display = 'none';
+            
+            // Show modal
+            restoreModal.setAttribute('aria-hidden', 'false');
+            restoreModal.style.display = 'flex';
+            
+            // Enable/disable submit based on checkbox
+            checkboxEl.addEventListener('change', () => {
+                submitBtn.disabled = !checkboxEl.checked;
+            });
+        }
+        
+        function hideRestoreConfirm() {
+            const restoreModal = document.getElementById('restore-confirm-modal');
+            if (restoreModal) {
+                restoreModal.setAttribute('aria-hidden', 'true');
+                restoreModal.style.display = 'none';
+                pendingRestoreVersionId = null;
+            }
+        }
+        
+        async function submitRestore() {
+            if (!pendingRestoreVersionId || !dashboardName) {
+                return;
+            }
+            
+            const submitBtn = document.getElementById('restore-confirm-submit');
+            const errorEl = document.getElementById('restore-confirm-error');
+            
+            // Disable button during request
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Restoring...';
+            errorEl.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/dashboards/${encodeURIComponent(dashboardName)}/versions/${encodeURIComponent(pendingRestoreVersionId)}/restore`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to restore version');
+                }
+                
+                // Success - close modals and reload dashboard
+                hideRestoreConfirm();
+                
+                // Close version history modal if open
+                const versionHistoryModal = document.getElementById('version-history-modal');
+                if (versionHistoryModal) {
+                    versionHistoryModal.setAttribute('aria-hidden', 'true');
+                    versionHistoryModal.style.display = 'none';
+                }
+                
+                // Reload page to show restored dashboard
+                window.location.reload();
+                
+            } catch (error) {
+                console.error('Restore error:', error);
+                errorEl.textContent = `Failed to restore version: ${error.message || 'Unknown error'}`;
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Restore Dashboard';
+            }
+        }
+        
+        // Initialize restore confirmation modal handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            const restoreModal = document.getElementById('restore-confirm-modal');
+            if (!restoreModal) return;
+            
+            const closeBtn = document.getElementById('restore-confirm-close');
+            const cancelBtn = document.getElementById('restore-confirm-cancel');
+            const submitBtn = document.getElementById('restore-confirm-submit');
+            const overlay = restoreModal.querySelector('.restore-confirm-overlay');
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', hideRestoreConfirm);
+            }
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', hideRestoreConfirm);
+            }
+            if (submitBtn) {
+                submitBtn.addEventListener('click', submitRestore);
+            }
+            if (overlay) {
+                overlay.addEventListener('click', hideRestoreConfirm);
+            }
+            
+            // Close on Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && restoreModal.getAttribute('aria-hidden') === 'false') {
+                    hideRestoreConfirm();
+                }
+            });
+        });
+        
+        function computeDashboardDiff(oldDashboard, newDashboard, oldVersionMeta, newVersionMeta) {
+            // Helper to format timestamp
+            function formatTimestamp(ts) {
+                return new Date(ts).toLocaleString();
+            }
+            
+            // Helper to normalize panels for comparison (ignore order)
+            function normalizePanels(panels) {
+                return panels.map(p => ({
+                    id: p.id,
+                    title: p.title,
+                    x: p.x || 0,
+                    y: p.y || 0,
+                    w: p.w || 12,
+                    h: p.h || 1,
+                    refresh_interval: p.refresh_interval,
+                    status: p.status,
+                    content: p.content
+                })).sort((a, b) => a.id.localeCompare(b.id));
+            }
+            
+            // Build diff HTML
+            let diffHtml = `
+                <div class="diff-header">
+                    <div class="diff-version-info">
+                        <div class="diff-version-old">
+                            <strong>Old Version</strong>
+                            <div class="diff-version-meta">
+                                ${formatTimestamp(oldVersionMeta.timestamp)} | ${oldVersionMeta.action}
+                            </div>
+                        </div>
+                        <div class="diff-version-new">
+                            <strong>New Version</strong>
+                            <div class="diff-version-meta">
+                                ${formatTimestamp(newVersionMeta.timestamp)} | ${newVersionMeta.action}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="diff-content">
+            `;
+            
+            // Compare metadata
+            const metadataChanges = [];
+            if (oldDashboard.title !== newDashboard.title) {
+                metadataChanges.push({
+                    field: 'Title',
+                    old: oldDashboard.title || '',
+                    new: newDashboard.title || ''
+                });
+            }
+            if (oldDashboard.description !== newDashboard.description) {
+                metadataChanges.push({
+                    field: 'Description',
+                    old: oldDashboard.description || '',
+                    new: newDashboard.description || ''
+                });
+            }
+            if (oldDashboard.folder_id !== newDashboard.folder_id) {
+                metadataChanges.push({
+                    field: 'Folder',
+                    old: oldDashboard.folder_id || '',
+                    new: newDashboard.folder_id || ''
+                });
+            }
+            
+            if (metadataChanges.length > 0) {
+                diffHtml += '<div class="diff-section"><h3>Metadata Changes</h3>';
+                metadataChanges.forEach(change => {
+                    diffHtml += `
+                        <div class="diff-item">
+                            <div class="diff-field">${change.field}</div>
+                            <div class="diff-values">
+                                <div class="diff-old"><span class="diff-label">Old:</span> ${escapeHtml(change.old)}</div>
+                                <div class="diff-new"><span class="diff-label">New:</span> ${escapeHtml(change.new)}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                diffHtml += '</div>';
+            }
+            
+            // Compare panels
+            const oldPanels = normalizePanels(oldDashboard.panels || []);
+            const newPanels = normalizePanels(newDashboard.panels || []);
+            
+            const oldPanelMap = new Map(oldPanels.map(p => [p.id, p]));
+            const newPanelMap = new Map(newPanels.map(p => [p.id, p]));
+            
+            const allPanelIds = new Set([...oldPanelMap.keys(), ...newPanelMap.keys()]);
+            const panelChanges = [];
+            
+            allPanelIds.forEach(panelId => {
+                const oldPanel = oldPanelMap.get(panelId);
+                const newPanel = newPanelMap.get(panelId);
+                
+                if (!oldPanel) {
+                    // Panel added
+                    panelChanges.push({
+                        type: 'added',
+                        panel: newPanel
+                    });
+                } else if (!newPanel) {
+                    // Panel removed
+                    panelChanges.push({
+                        type: 'removed',
+                        panel: oldPanel
+                    });
+                } else {
+                    // Panel modified - check for changes
+                    const changes = [];
+                    if (oldPanel.title !== newPanel.title) changes.push({field: 'Title', old: oldPanel.title, new: newPanel.title});
+                    if (oldPanel.x !== newPanel.x) changes.push({field: 'X Position', old: oldPanel.x, new: newPanel.x});
+                    if (oldPanel.y !== newPanel.y) changes.push({field: 'Y Position', old: oldPanel.y, new: newPanel.y});
+                    if (oldPanel.w !== newPanel.w) changes.push({field: 'Width', old: oldPanel.w, new: newPanel.w});
+                    if (oldPanel.h !== newPanel.h) changes.push({field: 'Height', old: oldPanel.h, new: newPanel.h});
+                    if (oldPanel.refresh_interval !== newPanel.refresh_interval) {
+                        changes.push({field: 'Refresh Interval', old: oldPanel.refresh_interval || 'None', new: newPanel.refresh_interval || 'None'});
+                    }
+                    if (oldPanel.status !== newPanel.status) {
+                        changes.push({field: 'Status', old: oldPanel.status || 'N/A', new: newPanel.status || 'N/A'});
+                    }
+                    if (oldPanel.content !== newPanel.content) {
+                        changes.push({field: 'Content', old: oldPanel.content || '', new: newPanel.content || ''});
+                    }
+                    
+                    if (changes.length > 0) {
+                        panelChanges.push({
+                            type: 'modified',
+                            panelId: panelId,
+                            panelTitle: newPanel.title,
+                            changes: changes
+                        });
+                    }
+                }
+            });
+            
+            if (panelChanges.length > 0) {
+                diffHtml += '<div class="diff-section"><h3>Panel Changes</h3>';
+                panelChanges.forEach(change => {
+                    if (change.type === 'added') {
+                        diffHtml += `
+                            <div class="diff-item diff-added">
+                                <div class="diff-panel-header">
+                                    <span class="diff-badge diff-badge-added">Added</span>
+                                    <strong>${escapeHtml(change.panel.title)}</strong> (ID: ${escapeHtml(change.panel.id)})
+                                </div>
+                                <div class="diff-panel-details">
+                                    Position: (${change.panel.x}, ${change.panel.y}), Size: ${change.panel.w}×${change.panel.h}
+                                </div>
+                            </div>
+                        `;
+                    } else if (change.type === 'removed') {
+                        diffHtml += `
+                            <div class="diff-item diff-removed">
+                                <div class="diff-panel-header">
+                                    <span class="diff-badge diff-badge-removed">Removed</span>
+                                    <strong>${escapeHtml(change.panel.title)}</strong> (ID: ${escapeHtml(change.panel.id)})
+                                </div>
+                                <div class="diff-panel-details">
+                                    Position: (${change.panel.x}, ${change.panel.y}), Size: ${change.panel.w}×${change.panel.h}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        diffHtml += `
+                            <div class="diff-item diff-modified">
+                                <div class="diff-panel-header">
+                                    <span class="diff-badge diff-badge-modified">Modified</span>
+                                    <strong>${escapeHtml(change.panelTitle)}</strong> (ID: ${escapeHtml(change.panelId)})
+                                </div>
+                                <div class="diff-panel-changes">
+                        `;
+                        change.changes.forEach(c => {
+                            diffHtml += `
+                                <div class="diff-change">
+                                    <div class="diff-change-field">${c.field}</div>
+                                    <div class="diff-values">
+                                        <div class="diff-old"><span class="diff-label">Old:</span> ${escapeHtml(String(c.old))}</div>
+                                        <div class="diff-new"><span class="diff-label">New:</span> ${escapeHtml(String(c.new))}</div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        diffHtml += '</div></div>';
+                    }
+                });
+                diffHtml += '</div>';
+            }
+            
+            // Check if no changes
+            if (metadataChanges.length === 0 && panelChanges.length === 0) {
+                diffHtml += '<div class="diff-no-changes">No changes detected between these versions.</div>';
+            }
+            
+            diffHtml += '</div>';
+            
+            return diffHtml;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
         
         // Update all timestamps periodically
         setInterval(() => {

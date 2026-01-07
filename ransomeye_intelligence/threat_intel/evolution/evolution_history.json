@@ -1,0 +1,157 @@
+[
+  {
+    "event_id": "evolution_20260107_090938",
+    "timestamp": "2026-01-07T09:09:38.840074Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:09:38.826578Z"
+          }
+        }
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:09:38.838093Z"
+    },
+    "evolution_version": "1.0.0"
+  },
+  {
+    "event_id": "evolution_20260107_091817",
+    "timestamp": "2026-01-07T09:18:17.534300+00:00Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:18:17.521994+00:00Z"
+          }
+        },
+        "shap_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/shap/threat_classifier_continuous_v1.0.0_shap.json"
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:18:17.532711+00:00Z"
+    },
+    "evolution_version": "1.1.0"
+  },
+  {
+    "event_id": "evolution_20260107_092341",
+    "timestamp": "2026-01-07T09:23:41.300071+00:00Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:23:41.280721+00:00Z"
+          }
+        },
+        "shap_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/shap/threat_classifier_continuous_v1.0.0_shap.json"
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:23:41.297455+00:00Z"
+    },
+    "evolution_version": "1.2.0"
+  },
+  {
+    "event_id": "evolution_20260107_092516",
+    "timestamp": "2026-01-07T09:25:16.140928Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:25:16.128458Z"
+          }
+        },
+        "shap_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/shap/threat_classifier_continuous_v1.0.0_shap.json"
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:25:16.139167Z"
+    },
+    "evolution_version": "1.3.0"
+  },
+  {
+    "event_id": "evolution_20260107_092807",
+    "timestamp": "2026-01-07T09:28:07.829131Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:28:07.816575Z"
+          }
+        },
+        "shap_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/shap/threat_classifier_continuous_v1.0.0_shap.json"
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:28:07.826820Z"
+    },
+    "evolution_version": "1.4.0"
+  },
+  {
+    "event_id": "evolution_20260107_092905",
+    "timestamp": "2026-01-07T09:29:05.292582Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-07T09:29:05.278154Z"
+          }
+        },
+        "shap_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/shap/threat_classifier_continuous_v1.0.0_shap.json"
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-07T09:29:05.290422Z"
+    },
+    "evolution_version": "1.5.0"
+  }
+]

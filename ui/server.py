@@ -18,7 +18,7 @@ import json
 import logging
 import psycopg2
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory, render_template, request
+from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 from flask_cors import CORS
 from datetime import datetime, timedelta, timezone
 from schema_helper import SchemaAwareDB
@@ -26,6 +26,7 @@ from dashboard_engine import DashboardEngine
 from folder_manager import FolderManager
 from settings_manager import SettingsManager
 from settings import SettingsValidationError
+from version_manager import VersionManager
 
 # Configure logging - errors logged, not exposed to UI
 logging.basicConfig(
@@ -281,6 +282,254 @@ def get_dashboard_source(dashboard_name: str):
     return jsonify(source_info)
 
 
+@app.route('/api/dashboards/<dashboard_name>/export', methods=['GET'])
+def export_dashboard(dashboard_name: str):
+    """
+    Export dashboard as validated JSON for backup, migration, and audit purposes.
+    
+    Rules:
+    - Export allowed for system and personal dashboards
+    - Personal dashboards export merged view (system + personal overlay)
+    - System dashboards export system JSON only
+    - Strict schema validation before export (fail-closed on corruption)
+    - Audit-log export event
+    - Returns JSON file download with proper filename
+    
+    Returns:
+        JSON file download with dashboard definition including:
+        - dashboard metadata (name, title, description, etc.)
+        - panels array
+        - layout (grid positioning)
+        - folder_id
+        - source info (system/personal/merged)
+        - export metadata (timestamp, exported_by)
+    """
+    # Validate dashboard exists
+    dashboard = dashboard_engine.load_dashboard(dashboard_name, include_overlay=True)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    # Get source information
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Get user ID for audit logging
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Strict schema validation (fail-closed on corruption)
+    if not dashboard_engine._validate_dashboard_strict(dashboard):
+        logger.error(f"Dashboard '{dashboard_name}' failed validation - cannot export corrupted dashboard")
+        dashboard_engine.overlay_manager._audit_log(
+            'export_dashboard', user_id, dashboard_name,
+            success=False, error="validation_failed"
+        )
+        return jsonify({"error": "Dashboard validation failed - dashboard is corrupted"}), 400
+    
+    # Build export JSON with metadata
+    export_data = {
+        # Dashboard definition
+        "name": dashboard.get('name'),
+        "title": dashboard.get('title', ''),
+        "description": dashboard.get('description', ''),
+        "category": dashboard.get('category', ''),
+        "type": dashboard.get('type', ''),
+        "folder_id": dashboard.get('folder_id', 'general'),
+        "panels": dashboard.get('panels', []),
+        
+        # Source information
+        "export_metadata": {
+            "source": source_info.get('source', 'unknown'),
+            "has_overlay": source_info.get('has_overlay', False),
+            "has_system": source_info.get('has_system', False),
+            "user_id": source_info.get('user_id'),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_by": user_id
+        }
+    }
+    
+    # Audit log export event
+    dashboard_engine.overlay_manager._audit_log(
+        'export_dashboard', user_id, dashboard_name,
+        success=True,
+        error=f"source:{source_info.get('source', 'unknown')}"
+    )
+    
+    logger.info(f"Exported dashboard '{dashboard_name}' (source: {source_info.get('source')}, user: {user_id})")
+    
+    # Return JSON response with proper headers for file download
+    response = Response(
+        json.dumps(export_data, indent=2, ensure_ascii=False),
+        mimetype='application/json',
+        headers={
+            'Content-Disposition': f'attachment; filename=ransomeye-dashboard-{dashboard_name}.json'
+        }
+    )
+    return response
+
+
+@app.route('/api/dashboards/import', methods=['POST'])
+def import_dashboard():
+    """
+    Import dashboard from exported JSON file.
+    
+    Request (multipart/form-data):
+        - file: JSON file (required)
+        - new_name: Optional new dashboard name (slug-safe, defaults to imported name)
+        - new_title: Optional new dashboard title (defaults to imported title)
+    
+    Rules:
+    - Import creates a NEW personal dashboard overlay only
+    - System dashboards are NEVER overwritten
+    - Validate JSON strictly against dashboard schema
+    - Reject unknown fields
+    - Reject corrupted or non-RansomEye exports
+    - Validate name uniqueness (system + user overlays)
+    - Strip export_metadata and system-only fields
+    - Fail-closed on any validation error
+    - Audit-log import event with file hash
+    """
+    import hashlib
+    
+    # Get user ID for audit logging
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if file is present
+    if 'file' not in request.files:
+        logger.error("Import request missing file")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, 'unknown',
+            success=False, error="missing_file"
+        )
+        return jsonify({"error": "File is required"}), 400
+    
+    file = request.files['file']
+    
+    # Validate file extension
+    if not file.filename or not file.filename.lower().endswith('.json'):
+        logger.error(f"Invalid file type: {file.filename}")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, 'unknown',
+            success=False, error=f"invalid_file_type:{file.filename}"
+        )
+        return jsonify({"error": "File must be a JSON file (.json)"}), 400
+    
+    # Read and parse JSON
+    try:
+        file_content = file.read()
+        file_hash = hashlib.sha256(file_content).hexdigest()
+        
+        # Parse JSON
+        import_data = json.loads(file_content.decode('utf-8'))
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in import file: {e}")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, 'unknown',
+            success=False, error=f"json_decode_error:{str(e)}"
+        )
+        return jsonify({"error": f"Invalid JSON: {str(e)}"}), 400
+    except Exception as e:
+        logger.error(f"Error reading import file: {e}", exc_info=True)
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, 'unknown',
+            success=False, error=f"file_read_error:{str(e)}"
+        )
+        return jsonify({"error": f"Error reading file: {str(e)}"}), 400
+    
+    # Extract optional parameters
+    new_name = request.form.get('new_name', '').strip()
+    new_title = request.form.get('new_title', '').strip()
+    
+    # Validate and extract dashboard data
+    # Strip export_metadata if present (it's not part of dashboard schema)
+    if 'export_metadata' in import_data:
+        export_metadata = import_data.pop('export_metadata')
+        logger.debug(f"Stripped export_metadata: {export_metadata}")
+    
+    # Get dashboard name (from import or new_name)
+    dashboard_name = new_name if new_name else import_data.get('name')
+    if not dashboard_name:
+        logger.error("Dashboard name is required (not found in import or new_name)")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, 'unknown',
+            success=False, error="missing_dashboard_name"
+        )
+        return jsonify({"error": "Dashboard name is required"}), 400
+    
+    # Validate dashboard name (slug-safe)
+    import re
+    if not re.match(r'^[a-z0-9_-]+$', dashboard_name.lower()):
+        logger.error(f"Invalid dashboard name format: {dashboard_name}")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, dashboard_name,
+            success=False, error="invalid_name_format"
+        )
+        return jsonify({"error": "Dashboard name must be slug-safe (lowercase letters, numbers, hyphens, underscores)"}), 400
+    
+    # Check for system dashboard collision (fail-closed)
+    system_dashboard_path = DASHBOARDS_DIR / f"{dashboard_name}.json"
+    if system_dashboard_path.exists():
+        logger.error(f"Dashboard name '{dashboard_name}' conflicts with a system dashboard")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, dashboard_name,
+            success=False, error="system_dashboard_collision"
+        )
+        return jsonify({"error": f"Dashboard name '{dashboard_name}' conflicts with a system dashboard"}), 400
+    
+    # Check for existing user overlay collision (fail-closed)
+    if dashboard_engine.overlay_manager.has_overlay(dashboard_name, user_id):
+        logger.error(f"Dashboard '{dashboard_name}' already exists for user '{user_id}'")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, dashboard_name,
+            success=False, error="user_overlay_collision"
+        )
+        return jsonify({"error": f"Dashboard '{dashboard_name}' already exists"}), 400
+    
+    # Update dashboard name and title
+    import_data['name'] = dashboard_name
+    if new_title:
+        import_data['title'] = new_title
+    elif 'title' not in import_data:
+        import_data['title'] = dashboard_name.replace('-', ' ').replace('_', ' ').title()
+    
+    # Validate dashboard structure strictly (fail-closed on validation error)
+    if not dashboard_engine._validate_dashboard_strict(import_data):
+        logger.error(f"Imported dashboard '{dashboard_name}' failed strict validation")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, dashboard_name,
+            success=False, error="validation_failed"
+        )
+        return jsonify({"error": "Dashboard validation failed - check schema compliance"}), 400
+    
+    # Save as personal dashboard overlay (atomic write with backup, version capture with 'import' action)
+    success = dashboard_engine.overlay_manager.save_overlay(import_data, dashboard_name, user_id, version_action='import')
+    
+    if not success:
+        logger.error(f"Failed to save imported dashboard '{dashboard_name}'")
+        dashboard_engine.overlay_manager._audit_log(
+            'import_dashboard', user_id, dashboard_name,
+            success=False, error="save_failed"
+        )
+        return jsonify({"error": "Failed to save imported dashboard"}), 500
+    
+    # Clear cache for this dashboard
+    dashboard_engine.clear_cache()
+    
+    # Audit log success
+    dashboard_engine.overlay_manager._audit_log(
+        'import_dashboard', user_id, dashboard_name,
+        success=True,
+        error=f"file_hash:{file_hash[:16]}"
+    )
+    
+    logger.info(f"Imported dashboard '{dashboard_name}' (user: {user_id}, file_hash: {file_hash[:16]})")
+    
+    return jsonify({
+        "success": True,
+        "dashboard_name": dashboard_name,
+        "title": import_data.get('title', ''),
+        "message": f"Dashboard '{dashboard_name}' imported successfully"
+    }), 200
+
+
 @app.route('/api/dashboards/<dashboard_name>/duplicate', methods=['POST'])
 def duplicate_dashboard(dashboard_name: str):
     """
@@ -434,8 +683,8 @@ def rename_dashboard(dashboard_name: str):
     # Update title only
     dashboard['title'] = new_title
     
-    # Save as overlay (only updates overlay, never system)
-    if dashboard_engine.save_dashboard(dashboard, dashboard_name, save_as_overlay=True):
+    # Save as overlay (only updates overlay, never system) with 'rename' action for version capture
+    if dashboard_engine.save_dashboard(dashboard, dashboard_name, save_as_overlay=True, version_action='rename'):
         logger.info(f"Renamed personal dashboard '{dashboard_name}' to '{new_title}' (user: {user_id})")
         
         # Audit log via overlay manager
@@ -554,6 +803,77 @@ def create_dashboard():
     }), 201
 
 
+@app.route('/api/dashboards/<dashboard_name>', methods=['DELETE'])
+def delete_dashboard(dashboard_name: str):
+    """
+    Delete a personal dashboard.
+    
+    Rules:
+    - Only personal dashboards can be deleted (must have overlay)
+    - System dashboards cannot be deleted (fail-closed, 403)
+    - Dashboard must exist and be personal
+    - Atomic delete with backup (.deleted backup)
+    - Audit-log deletion event
+    - Fail-closed on any validation error
+    """
+    # Validate dashboard exists
+    dashboard = dashboard_engine.load_dashboard(dashboard_name)
+    if not dashboard:
+        return jsonify({"error": f"Dashboard '{dashboard_name}' not found"}), 404
+    
+    # Get dashboard source information
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can be deleted
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot be deleted"
+        }), 403
+    
+    # Validate dashboard is personal-only (not merged with system)
+    # For merged dashboards, we delete the overlay (restores to system)
+    # For user-only dashboards, we delete the entire dashboard
+    if source_info.get('source') == 'user':
+        # Personal-only dashboard - delete overlay
+        success = dashboard_engine.overlay_manager.delete_overlay(dashboard_name, user_id)
+        
+        if not success:
+            return jsonify({
+                "error": "Failed to delete dashboard (internal error)"
+            }), 500
+        
+        logger.info(f"Deleted personal dashboard '{dashboard_name}' (user: {user_id})")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Dashboard '{dashboard_name}' deleted successfully",
+            "dashboard": dashboard_name
+        })
+    elif source_info.get('source') == 'merged':
+        # Merged dashboard - delete overlay (restores to system)
+        success = dashboard_engine.overlay_manager.delete_overlay(dashboard_name, user_id)
+        
+        if not success:
+            return jsonify({
+                "error": "Failed to delete dashboard overlay (internal error)"
+            }), 500
+        
+        logger.info(f"Deleted overlay for merged dashboard '{dashboard_name}' (user: {user_id}) - restored to system")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Personal customizations for '{dashboard_name}' deleted - restored to system dashboard",
+            "dashboard": dashboard_name,
+            "restored_to_system": True
+        })
+    else:
+        # Unexpected state - fail-closed
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is in an unexpected state and cannot be deleted"
+        }), 500
+
+
 @app.route('/api/dashboards/<dashboard_name>/panels')
 def get_dashboard_panels(dashboard_name: str):
     """Get dashboard panels with refresh intervals."""
@@ -642,6 +962,205 @@ def save_dashboard(dashboard_name: str):
         })
     else:
         return jsonify({"error": "Failed to save dashboard (validation or write error)"}), 400
+
+
+@app.route('/api/dashboards/<dashboard_name>/versions', methods=['GET'])
+def get_dashboard_versions(dashboard_name: str):
+    """
+    Get version history for a personal dashboard.
+    
+    Rules:
+    - Only personal dashboards have version history
+    - System dashboards return empty list
+    - Returns metadata only (no full JSON by default)
+    - Sorted by timestamp (newest first)
+    - Fail-soft on errors (returns empty list)
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if dashboard is personal (has overlay)
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # If not a personal dashboard, return empty list
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "versions": [],
+            "dashboard_name": dashboard_name,
+            "is_personal": False,
+            "message": "System dashboards do not have version history"
+        })
+    
+    try:
+        # Get versions (metadata only, no full JSON)
+        versions = version_manager.list_versions(dashboard_name, user_id, include_json=False)
+        
+        return jsonify({
+            "versions": versions,
+            "dashboard_name": dashboard_name,
+            "is_personal": True,
+            "count": len(versions)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing versions for dashboard '{dashboard_name}': {e}", exc_info=True)
+        # Fail-soft: return empty list on error
+        return jsonify({
+            "versions": [],
+            "dashboard_name": dashboard_name,
+            "is_personal": True,
+            "error": "Failed to load version history"
+        }), 500
+
+
+@app.route('/api/dashboards/<dashboard_name>/versions/<version_id>', methods=['GET'])
+def get_dashboard_version(dashboard_name: str, version_id: str):
+    """
+    Get a specific version of a personal dashboard.
+    
+    Rules:
+    - Only personal dashboards have versions
+    - Returns full dashboard JSON for the specified version
+    - Fail-closed if version not found or corrupted
+    - Validates dashboard exists and is personal
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if dashboard is personal (has overlay)
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards have versions
+    if not source_info.get('has_overlay'):
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and does not have version history"
+        }), 403
+    
+    try:
+        # Get version by ID
+        version_data = version_manager.get_version(dashboard_name, version_id, user_id)
+        
+        if not version_data:
+            return jsonify({
+                "error": f"Version '{version_id}' not found for dashboard '{dashboard_name}'"
+            }), 404
+        
+        # Validate version data structure
+        if 'dashboard' not in version_data:
+            logger.error(f"Version '{version_id}' for dashboard '{dashboard_name}' is corrupted (missing dashboard data)")
+            return jsonify({
+                "error": "Version data is corrupted"
+            }), 500
+        
+        # Return version metadata and dashboard JSON
+        return jsonify({
+            "version_id": version_data.get('version_id'),
+            "timestamp": version_data.get('timestamp'),
+            "user_id": version_data.get('user_id'),
+            "dashboard_name": version_data.get('dashboard_name'),
+            "action": version_data.get('action'),
+            "json_hash": version_data.get('json_hash'),
+            "dashboard": version_data.get('dashboard')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving version '{version_id}' for dashboard '{dashboard_name}': {e}", exc_info=True)
+        return jsonify({
+            "error": f"Failed to retrieve version: {str(e)}"
+        }), 500
+
+
+@app.route('/api/dashboards/<dashboard_name>/versions/<version_id>/restore', methods=['POST'])
+def restore_dashboard_version(dashboard_name: str, version_id: str):
+    """
+    Restore a personal dashboard to a previous version.
+    
+    Rules:
+    - Only personal dashboards can be restored
+    - System dashboards are never restorable (fail-closed)
+    - Validates version exists and is valid
+    - Backs up current overlay before restore
+    - Creates new version snapshot with action='restore'
+    - Audit-logs restore event
+    - Fail-closed on any validation error
+    """
+    # Get user ID
+    user_id = os.environ.get('RANSOMEYE_UI_USER_ID', 'system')
+    
+    # Check if dashboard is personal (has overlay)
+    source_info = dashboard_engine.get_dashboard_source(dashboard_name)
+    
+    # Fail-closed: Only personal dashboards can be restored
+    if not source_info.get('has_overlay'):
+        logger.warning(f"Attempt to restore system dashboard '{dashboard_name}' (user: {user_id})")
+        return jsonify({
+            "error": f"Dashboard '{dashboard_name}' is a system dashboard and cannot be restored"
+        }), 403
+    
+    # Validate version exists
+    try:
+        version_data = version_manager.get_version(dashboard_name, version_id, user_id)
+        
+        if not version_data:
+            logger.warning(f"Version '{version_id}' not found for dashboard '{dashboard_name}' (user: {user_id})")
+            return jsonify({
+                "error": f"Version '{version_id}' not found for dashboard '{dashboard_name}'"
+            }), 404
+        
+        # Validate version data structure
+        if 'dashboard' not in version_data:
+            logger.error(f"Version '{version_id}' for dashboard '{dashboard_name}' is corrupted (missing dashboard data)")
+            return jsonify({
+                "error": "Version data is corrupted"
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error validating version '{version_id}' for dashboard '{dashboard_name}': {e}", exc_info=True)
+        return jsonify({
+            "error": f"Failed to validate version: {str(e)}"
+        }), 500
+    
+    # Restore version
+    try:
+        success = version_manager.restore_version(
+            dashboard_name=dashboard_name,
+            version_id=version_id,
+            user_id=user_id,
+            overlay_manager=dashboard_engine.overlay_manager
+        )
+        
+        if not success:
+            logger.error(f"Failed to restore dashboard '{dashboard_name}' to version '{version_id}'")
+            return jsonify({
+                "error": "Failed to restore version (internal error)"
+            }), 500
+        
+        # Audit log restore event (also logged by version_manager, but add API-level log)
+        dashboard_engine.overlay_manager._audit_log(
+            'restore_dashboard_version', user_id, dashboard_name,
+            success=True,
+            error=f"version_id:{version_id}"
+        )
+        
+        logger.info(f"Restored dashboard '{dashboard_name}' to version '{version_id}' (user: {user_id})")
+        
+        return jsonify({
+            "success": True,
+            "dashboard_name": dashboard_name,
+            "version_id": version_id,
+            "message": "Dashboard restored successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error restoring dashboard '{dashboard_name}' to version '{version_id}': {e}", exc_info=True)
+        dashboard_engine.overlay_manager._audit_log(
+            'restore_dashboard_version', user_id, dashboard_name,
+            success=False,
+            error=str(e)
+        )
+        return jsonify({
+            "error": f"Failed to restore version: {str(e)}"
+        }), 500
 
 
 @app.route('/api/health')

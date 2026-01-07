@@ -1,0 +1,34 @@
+# Path and File Name : /home/ransomeye/rebuild/systemd/ransomeye-auto-evolution.service
+# Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7bQk7OxYQylg8CMw1iGsq7bQk7OxYQylg8CMw1iGsq7gU
+# Details of functionality of this file: Systemd service for auto-evolution system
+
+[Unit]
+Description=RansomEye Auto-Evolution System
+Documentation=https://ransomeye.tech
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=ransomeye
+Group=ransomeye
+WorkingDirectory=/home/ransomeye/rebuild
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/home/ransomeye/rebuild"
+Environment="DB_HOST=localhost"
+Environment="DB_PORT=5432"
+Environment="DB_NAME=ransomeye"
+Environment="DB_USER=gagan"
+Environment="DB_PASS=gagan"
+Environment="RANSOMWARE_LIVE_API_KEY=6c0cca08-3419-43e6-8014-0a4f87f353a3"
+Environment="RANSOMEYE_FEED_RANSOMWARELIVE_ENABLED=true"
+Environment="RANSOMEYE_FEED_RANSOMWARELIVE_API_KEY=6c0cca08-3419-43e6-8014-0a4f87f353a3"
+
+ExecStart=/usr/bin/python3 /home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/auto_evolution.py --cycle
+StandardOutput=journal
+StandardError=journal
+TimeoutSec=7200
+
+[Install]
+WantedBy=multi-user.target
+
