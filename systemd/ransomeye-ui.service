@@ -19,14 +19,15 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Environment variables (localhost-first, env-driven)
+# Environment variables (env-driven, no hardcoded IPs)
 Environment="DB_HOST=localhost"
 Environment="DB_PORT=5432"
 Environment="DB_NAME=ransomeye"
 Environment="DB_USER=gagan"
 Environment="DB_PASS=gagan"
-Environment="RANSOMEYE_UI_HOST=127.0.0.1"
-Environment="RANSOMEYE_UI_PORT=8081"
+
+# UI binding configuration from environment file (network-agnostic)
+EnvironmentFile=/etc/ransomeye/ui.env
 
 # Security hardening
 NoNewPrivileges=true

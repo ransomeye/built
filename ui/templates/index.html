@@ -3,168 +3,862 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RansomEye Dashboard</title>
+    <title>RansomEye Security Operations Center</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+        /* ============================================================
+           SOC-GRADE CALM DARK THEME - Enterprise Excellence
+           ============================================================ */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .navbar {
-            background: #1a1a1a;
-            color: white;
-            padding: 1rem 2rem;
+        
+        :root {
+            /* Calm dark palette - muted, professional */
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #1c2128;
+            --bg-hover: #22272e;
+            
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            
+            /* Status colors - red ONLY for real threats */
+            --status-protected: #238636;
+            --status-at-risk: #d29922;
+            --status-threat: #da3633;
+            --status-healthy: #238636;
+            --status-degraded: #d29922;
+            
+            /* Accent - muted blue */
+            --accent: #58a6ff;
+            --accent-muted: #388bfd;
+            
+            /* Borders - subtle */
+            --border: #30363d;
+            --border-hover: #484f58;
+            
+            /* Typography - clear, readable */
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            --font-size-xs: 10px;
+            --font-size-base: 14px;
+            --font-size-sm: 12px;
+            --font-size-lg: 16px;
+            --font-size-xl: 20px;
+            --font-size-2xl: 24px;
+            --font-size-3xl: 32px;
+            
+            --line-height: 1.5;
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            
+            --radius: 6px;
+            --radius-lg: 8px;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            font-size: var(--font-size-base);
+            line-height: var(--line-height);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ============================================================
+           GLOBAL HEADER - Status at a glance
+           ============================================================ */
+        
+        .global-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: var(--spacing-md) var(--spacing-xl);
             display: flex;
             align-items: center;
-            gap: 2rem;
-        }
-        .navbar img {
-            height: 40px;
-        }
-        .navbar h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .dashboard-card {
-            background: white;
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .dashboard-card h2 {
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            color: #1a1a1a;
-            border-bottom: 2px solid #0066cc;
-            padding-bottom: 0.5rem;
-        }
-        .metric {
-            display: flex;
             justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #eee;
+            flex-wrap: wrap;
+            gap: var(--spacing-lg);
         }
-        .metric:last-child {
+        
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+        
+        .header-brand h1 {
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+        
+        .header-status-group {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .status-label {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-badge {
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-badge.protected {
+            background: var(--status-protected);
+            color: white;
+        }
+        
+        .status-badge.at-risk {
+            background: var(--status-at-risk);
+            color: white;
+        }
+        
+        .status-badge.threat {
+            background: var(--status-threat);
+            color: white;
+        }
+        
+        .status-badge.healthy {
+            background: var(--status-healthy);
+            color: white;
+        }
+        
+        .status-badge.degraded {
+            background: var(--status-degraded);
+            color: white;
+        }
+        
+        .status-badge.mode {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        
+        .status-value {
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        /* ============================================================
+           MAIN CONTAINER
+           ============================================================ */
+        
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: var(--spacing-lg) var(--spacing-xl);
+        }
+        
+        /* ============================================================
+           SECTION 1: RANSOMWARE RISK SNAPSHOT
+           ============================================================ */
+        
+        .risk-snapshot {
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .section-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            letter-spacing: -0.3px;
+        }
+        
+        .risk-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-md);
+        }
+        
+        .risk-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: border-color 0.2s, background 0.2s;
+        }
+        
+        .risk-card:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-hover);
+        }
+        
+        .risk-card-title {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .risk-card-value {
+            font-size: var(--font-size-3xl);
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .risk-card-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+        }
+        
+        .risk-card-value.threat {
+            color: var(--status-threat);
+        }
+        
+        .risk-card-value.warning {
+            color: var(--status-at-risk);
+        }
+        
+        /* ============================================================
+           SECTION 2: ACTIVITY TIMELINE
+           ============================================================ */
+        
+        .activity-timeline {
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .timeline-chart {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            min-height: 200px;
+        }
+        
+        .timeline-legend {
+            display: flex;
+            gap: var(--spacing-lg);
+            margin-top: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+        
+        .timeline-legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+        }
+        
+        .timeline-legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        .timeline-legend-color.linux {
+            background: var(--accent);
+        }
+        
+        .timeline-legend-color.network {
+            background: var(--accent-muted);
+        }
+        
+        .timeline-legend-color.correlated {
+            background: var(--status-at-risk);
+        }
+        
+        .timeline-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 150px;
+            color: var(--text-muted);
+            font-size: var(--font-size-sm);
+        }
+        
+        /* ============================================================
+           SECTION 3: RECENT SECURITY EVENTS (PRIMARY - DOMINATES)
+           ============================================================ */
+        
+        .recent-events {
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .events-list {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .event-item {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+        
+        .event-item:last-child {
             border-bottom: none;
         }
-        .metric-label {
-            color: #666;
+        
+        .event-item:hover {
+            background: var(--bg-hover);
         }
-        .metric-value {
+        
+        .event-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-xs);
+            gap: var(--spacing-md);
+        }
+        
+        .event-severity {
+            padding: 2px var(--spacing-sm);
+            border-radius: var(--radius);
+            font-size: var(--font-size-xs);
             font-weight: 600;
-            color: #1a1a1a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.875rem;
+        
+        .event-severity.critical {
+            background: var(--status-threat);
+            color: white;
+        }
+        
+        .event-severity.error {
+            background: var(--status-at-risk);
+            color: white;
+        }
+        
+        .event-severity.warning {
+            background: var(--status-degraded);
+            color: white;
+        }
+        
+        .event-severity.info {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        
+        .event-description {
+            font-size: var(--font-size-base);
             font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
         }
-        .status-active { background: #d4edda; color: #155724; }
-        .status-inactive { background: #f8d7da; color: #721c24; }
-        .loading { text-align: center; padding: 2rem; color: #666; }
-        .error { color: #dc3545; padding: 1rem; background: #f8d7da; border-radius: 4px; }
+        
+        .event-meta {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        
+        .event-timestamp {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+        }
+        
+        .event-source {
+            color: var(--text-muted);
+        }
+        
+        /* ============================================================
+           SECTION 4: SENSOR & INTEGRITY HEALTH
+           ============================================================ */
+        
+        .sensor-health {
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--spacing-md);
+        }
+        
+        .health-indicator {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+        }
+        
+        .health-indicator-title {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .health-indicator-value {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .health-indicator-status {
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+            margin-top: var(--spacing-xs);
+        }
+        
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        
+        .footer {
+            margin-top: var(--spacing-xl);
+            padding: var(--spacing-lg) 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: var(--font-size-sm);
+            color: var(--text-muted);
+        }
+        
+        /* ============================================================
+           LOADING & ERROR STATES
+           ============================================================ */
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-xl);
+            color: var(--text-muted);
+            font-size: var(--font-size-sm);
+        }
+        
+        .error {
+            padding: var(--spacing-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+        }
+        
+        /* ============================================================
+           SCROLLBAR STYLING
+           ============================================================ */
+        
+        .events-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .events-list::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        .events-list::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        .events-list::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+        
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: var(--spacing-md);
+            }
+            
+            .global-header {
+                padding: var(--spacing-md);
+            }
+            
+            .risk-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .health-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <img src="/logo.png" alt="RansomEye Logo" onerror="this.style.display='none'">
-        <h1>RansomEye Dashboard</h1>
-    </nav>
-    
-    <div class="container">
-        <div class="dashboard-grid">
-            <div class="dashboard-card" id="system-health">
-                <h2>System Health</h2>
-                <div class="loading">Loading...</div>
-            </div>
-            
-            <div class="dashboard-card" id="telemetry">
-                <h2>Telemetry Overview</h2>
-                <div class="loading">Loading...</div>
-            </div>
-            
-            <div class="dashboard-card" id="threat-intel">
-                <h2>Threat Intelligence</h2>
-                <div class="loading">Loading...</div>
-            </div>
-            
-            <div class="dashboard-card" id="detections">
-                <h2>Detections / Risk</h2>
-                <div class="loading">Loading...</div>
-            </div>
-            
-            <div class="dashboard-card" id="audit">
-                <h2>Audit & Compliance</h2>
-                <div class="loading">Loading...</div>
-            </div>
+    <!-- Global Header -->
+    <header class="global-header">
+        <div class="header-brand">
+            <h1>RansomEye</h1>
         </div>
+        <div class="header-status-group" id="header-status">
+            <div class="loading">Loading status...</div>
+        </div>
+    </header>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Section 1: Ransomware Risk Snapshot -->
+        <section class="risk-snapshot">
+            <h2 class="section-title">Ransomware Risk Snapshot</h2>
+            <div class="risk-cards" id="risk-cards">
+                <div class="loading">Loading risk assessment...</div>
+            </div>
+        </section>
+        
+        <!-- Section 2: Activity Timeline -->
+        <section class="activity-timeline">
+            <h2 class="section-title">Activity Timeline</h2>
+            <div class="timeline-chart" id="timeline-chart">
+                <div class="loading">Loading timeline...</div>
+            </div>
+        </section>
+        
+        <!-- Section 3: Recent Security Events (PRIMARY) -->
+        <section class="recent-events">
+            <h2 class="section-title">Recent Security Events</h2>
+            <div class="events-list" id="events-list">
+                <div class="loading">Loading events...</div>
+            </div>
+        </section>
+        
+        <!-- Section 4: Sensor & Integrity Health -->
+        <section class="sensor-health">
+            <h2 class="section-title">Sensor & Integrity Health</h2>
+            <div class="health-grid" id="health-grid">
+                <div class="loading">Loading sensor status...</div>
+            </div>
+        </section>
     </div>
     
+    <!-- Footer -->
+    <footer class="footer">
+        © RansomEye.Tech | Support: Gagan@RansomEye.Tech
+    </footer>
+    
     <script>
-        async function loadDashboard(endpoint, elementId) {
+        // ============================================================
+        // SOC-GRADE DASHBOARD DATA FETCHING & RENDERING
+        // ============================================================
+        
+        let refreshInterval;
+        
+        async function loadDashboard() {
             try {
-                const response = await fetch(`/api/dashboards/${endpoint}`);
+                const response = await fetch('/api/dashboards/soc');
                 const data = await response.json();
                 
                 if (data.error) {
-                    document.getElementById(elementId).innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                    showError('Dashboard unavailable');
                     return;
                 }
                 
-                let html = '';
-                for (const [key, value] of Object.entries(data)) {
-                    if (key === 'timestamp') continue;
-                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    let displayValue = value;
-                    
-                    if (typeof value === 'boolean') {
-                        displayValue = value ? 'Yes' : 'No';
-                    } else if (typeof value === 'object' && value !== null) {
-                        displayValue = JSON.stringify(value, null, 2);
-                    }
-                    
-                    html += `<div class="metric">
-                        <span class="metric-label">${label}:</span>
-                        <span class="metric-value">${displayValue}</span>
-                    </div>`;
-                }
+                updateGlobalHeader(data.header);
+                updateRiskSnapshot(data.ransomware_risk);
+                updateActivityTimeline(data.activity_timeline);
+                updateRecentEvents(data.recent_events);
+                updateSensorHealth(data.sensor_health);
                 
-                document.getElementById(elementId).innerHTML = html;
             } catch (error) {
-                document.getElementById(elementId).innerHTML = `<div class="error">Failed to load: ${error.message}</div>`;
+                console.error('Dashboard load error:', error);
+                showError('Failed to load dashboard');
             }
         }
         
-        // Load all dashboards
-        loadDashboard('system-health', 'system-health');
-        loadDashboard('telemetry', 'telemetry');
-        loadDashboard('threat-intel', 'threat-intel');
-        loadDashboard('detections', 'detections');
-        loadDashboard('audit', 'audit');
+        function updateGlobalHeader(header) {
+            const statusEl = document.getElementById('header-status');
+            
+            const ransomwareStatus = header.ransomware_status || 'Protected';
+            const statusClass = ransomwareStatus.toLowerCase().replace(' ', '-');
+            
+            const lastEvent = header.last_event_timestamp ? 
+                formatRelativeTime(header.last_event_timestamp) : 'No events';
+            
+            const linuxCount = header.sensor_coverage?.linux_agents || 0;
+            const dpiCount = header.sensor_coverage?.dpi_probes || 0;
+            
+            statusEl.innerHTML = `
+                <div class="status-indicator">
+                    <span class="status-label">Status</span>
+                    <span class="status-badge ${statusClass}">${ransomwareStatus}</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-label">Last Event</span>
+                    <span class="status-value">${lastEvent}</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-label">Sensors</span>
+                    <span class="status-value">${linuxCount} Linux / ${dpiCount} DPI</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-badge mode">${header.mode || 'LIVE'}</span>
+                </div>
+            `;
+        }
+        
+        function updateRiskSnapshot(risk) {
+            const cardsEl = document.getElementById('risk-cards');
+            
+            const activeSignals = risk?.active_signals || 0;
+            const lateralMovement = risk?.lateral_movement || 0;
+            const highRiskHosts = risk?.high_risk_hosts || 0;
+            const confidence = risk?.detection_confidence || 0.0;
+            
+            const signalsClass = activeSignals > 0 ? 'threat' : '';
+            const hostsClass = highRiskHosts > 0 ? 'warning' : '';
+            
+            cardsEl.innerHTML = `
+                <div class="risk-card">
+                    <div class="risk-card-title">Active Ransomware Signals</div>
+                    <div class="risk-card-value ${signalsClass}">${activeSignals}</div>
+                    <div class="risk-card-subtitle">Critical events in last 24 hours</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-card-title">Suspicious Lateral Movement</div>
+                    <div class="risk-card-value">${lateralMovement}</div>
+                    <div class="risk-card-subtitle">MITRE T1021 detections</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-card-title">High-Risk Hosts</div>
+                    <div class="risk-card-value ${hostsClass}">${highRiskHosts}</div>
+                    <div class="risk-card-subtitle">Hosts with multiple critical events</div>
+                </div>
+                <div class="risk-card">
+                    <div class="risk-card-title">Detection Confidence</div>
+                    <div class="risk-card-value">${(confidence * 100).toFixed(0)}%</div>
+                    <div class="risk-card-subtitle">Average confidence score</div>
+                </div>
+            `;
+        }
+        
+        function updateActivityTimeline(timeline) {
+            const chartEl = document.getElementById('timeline-chart');
+            
+            const linux = timeline?.linux || [];
+            const network = timeline?.network || [];
+            const correlated = timeline?.correlated || [];
+            
+            if (linux.length === 0 && network.length === 0 && correlated.length === 0) {
+                chartEl.innerHTML = `
+                    <div class="timeline-placeholder">No activity data available for the last 24 hours</div>
+                    <div class="timeline-legend">
+                        <div class="timeline-legend-item">
+                            <div class="timeline-legend-color linux"></div>
+                            <span>Linux Events</span>
+                        </div>
+                        <div class="timeline-legend-item">
+                            <div class="timeline-legend-color network"></div>
+                            <span>Network Events</span>
+                        </div>
+                        <div class="timeline-legend-item">
+                            <div class="timeline-legend-color correlated"></div>
+                            <span>Correlated Events</span>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Simple text-based timeline (charts should support decisions, not decorate)
+            let html = '<div style="font-family: monospace; font-size: 12px; color: var(--text-secondary);">';
+            
+            // Combine all timelines and show hourly summary
+            const allHours = new Set();
+            [...linux, ...network, ...correlated].forEach(item => {
+                if (item.time) {
+                    const hour = new Date(item.time).toISOString().substring(0, 13);
+                    allHours.add(hour);
+                }
+            });
+            
+            const sortedHours = Array.from(allHours).sort();
+            
+            sortedHours.forEach(hour => {
+                const linuxCount = linux.find(item => item.time && item.time.startsWith(hour))?.count || 0;
+                const networkCount = network.find(item => item.time && item.time.startsWith(hour))?.count || 0;
+                const correlatedCount = correlated.find(item => item.time && item.time.startsWith(hour))?.count || 0;
+                
+                const hourDisplay = new Date(hour + ':00:00Z').toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                });
+                
+                html += `<div style="padding: 4px 0; border-bottom: 1px solid var(--border);">`;
+                html += `<span style="color: var(--text-muted);">${hourDisplay}</span> `;
+                html += `<span style="color: var(--accent);">Linux: ${linuxCount}</span> `;
+                html += `<span style="color: var(--accent-muted);">Network: ${networkCount}</span> `;
+                html += `<span style="color: var(--status-at-risk);">Correlated: ${correlatedCount}</span>`;
+                html += `</div>`;
+            });
+            
+            html += '</div>';
+            
+            html += `
+                <div class="timeline-legend">
+                    <div class="timeline-legend-item">
+                        <div class="timeline-legend-color linux"></div>
+                        <span>Linux Events</span>
+                    </div>
+                    <div class="timeline-legend-item">
+                        <div class="timeline-legend-color network"></div>
+                        <span>Network Events</span>
+                    </div>
+                    <div class="timeline-legend-item">
+                        <div class="timeline-legend-color correlated"></div>
+                        <span>Correlated Events</span>
+                    </div>
+                </div>
+            `;
+            
+            chartEl.innerHTML = html;
+        }
+        
+        function updateRecentEvents(events) {
+            const eventsEl = document.getElementById('events-list');
+            
+            if (!events || events.length === 0) {
+                eventsEl.innerHTML = '<div class="loading">No recent security events</div>';
+                return;
+            }
+            
+            let html = '';
+            events.forEach(event => {
+                const severity = (event.severity || 'info').toLowerCase();
+                const description = event.description || 'Security Event';
+                const timestamp = event.created_at || event.observed_at || '';
+                const source = event.source || 'Unknown';
+                
+                html += `
+                    <div class="event-item">
+                        <div class="event-header">
+                            <span class="event-severity ${severity}">${severity}</span>
+                            <span class="event-timestamp">${formatTimestamp(timestamp)}</span>
+                        </div>
+                        <div class="event-description">${escapeHtml(description)}</div>
+                        <div class="event-meta">
+                            <span class="event-source">Source: ${escapeHtml(source)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            eventsEl.innerHTML = html;
+        }
+        
+        function updateSensorHealth(health) {
+            const healthEl = document.getElementById('health-grid');
+            
+            const linux = health?.linux_agents || {};
+            const dpi = health?.dpi_probes || {};
+            const integrity = health?.integrity || {};
+            
+            healthEl.innerHTML = `
+                <div class="health-indicator">
+                    <div class="health-indicator-title">Linux Agents</div>
+                    <div class="health-indicator-value">${linux.active || 0} active</div>
+                    <div class="health-indicator-status">${linux.total || 0} total registered</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="health-indicator-title">DPI Probe</div>
+                    <div class="health-indicator-value">${dpi.active || 0} active</div>
+                    <div class="health-indicator-status">${typeof dpi.pps === 'string' ? 'Metrics unavailable' : dpi.pps + ' pps'}</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="health-indicator-title">Audit Chain</div>
+                    <div class="health-indicator-value">${integrity.audit_chain_status?.includes('Active') ? 'Active' : 'Inactive'}</div>
+                    <div class="health-indicator-status">${integrity.audit_chain_status || 'Not configured'}</div>
+                </div>
+                <div class="health-indicator">
+                    <div class="health-indicator-title">Tamper Protection</div>
+                    <div class="health-indicator-value">${integrity.tamper_protection || 'Unknown'}</div>
+                    <div class="health-indicator-status">${integrity.drift_detection || 'Drift detection unavailable'}</div>
+                </div>
+            `;
+        }
+        
+        function formatTimestamp(ts) {
+            if (!ts) return 'Unknown time';
+            try {
+                const date = new Date(ts);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours < 24) return `${diffHours}h ago`;
+                const diffDays = Math.floor(diffHours / 24);
+                return `${diffDays}d ago`;
+            } catch {
+                return ts;
+            }
+        }
+        
+        function formatRelativeTime(ts) {
+            if (!ts) return 'No events';
+            try {
+                const date = new Date(ts);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins} minutes ago`;
+                const diffHours = Math.floor(diffMins / 60);
+                if (diffHours < 24) return `${diffHours} hours ago`;
+                return date.toLocaleString();
+            } catch {
+                return ts;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showError(message) {
+            const sections = ['risk-cards', 'timeline-chart', 'events-list', 'health-grid'];
+            sections.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+                }
+            });
+        }
+        
+        // Load dashboard on page load
+        loadDashboard();
         
         // Refresh every 30 seconds
-        setInterval(() => {
-            loadDashboard('system-health', 'system-health');
-            loadDashboard('telemetry', 'telemetry');
-            loadDashboard('threat-intel', 'threat-intel');
-            loadDashboard('detections', 'detections');
-            loadDashboard('audit', 'audit');
-        }, 30000);
+        refreshInterval = setInterval(loadDashboard, 30000);
     </script>
 </body>
 </html>
-
