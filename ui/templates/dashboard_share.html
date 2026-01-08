@@ -279,7 +279,7 @@
                         fetch(panel.query_endpoint)
                             .then(res => res.json())
                             .then(data => {
-                                content.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                                throw new Error("LEGACY_RENDER_PATH_EXECUTED");
                             })
                             .catch(err => {
                                 content.innerHTML = `<div class="panel-error">Failed to load data: ${err.message}</div>`;

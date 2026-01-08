@@ -1092,23 +1092,40 @@
                 
                 const data = await response.json();
                 
-                // Extract data using path (e.g., "sensor_health" or "sensor_health.linux_agents")
-                let panelData = data;
-                if (dataSource.path) {
-                    const pathParts = dataSource.path.split('.');
-                    for (const part of pathParts) {
-                        if (panelData && typeof panelData === 'object' && part in panelData) {
-                            panelData = panelData[part];
-                        } else {
-                            // Path not found - panel collapses independently (no UI message)
-                            panelData = null;
-                            break;
-                        }
-                    }
+                // Extract data using path - enforce exact slicing
+                let panelData = dataSource?.path
+                    ? (data && typeof data === 'object' && dataSource.path in data)
+                        ? data[dataSource.path]
+                        : null
+                    : data;
+                
+                // Enforcement assertion: verify data was sliced if path was specified
+                if (dataSource?.path && panelData === data) {
+                    throw new Error(
+                        "PANEL_DATA_NOT_SLICED: " + panelDef.id
+                    );
                 }
                 
+                // Trace data slicing before render
+                console.error(
+                    "[PANEL DATA BEFORE RENDER]",
+                    panelDef.id,
+                    panelDef.data_source?.path,
+                    typeof panelData,
+                    Array.isArray(panelData) ? panelData.length : Object.keys(panelData || {})
+                );
+                
+                // Apply panel-level eligibility filtering
+                const sanitizedData = filterPanelData(panelDef, panelData);
+                
+                console.error(
+                    "[PANEL DATA AFTER FILTER]",
+                    panelDef.id,
+                    Array.isArray(sanitizedData) ? sanitizedData.length : 0
+                );
+                
                 // Render panel content (will collapse if panelData is null/empty)
-                const hasData = renderPanelContent(panelId, panelData, bodyEl, panelDef);
+                const hasData = renderPanelContent(panelId, sanitizedData, bodyEl, panelDef);
                 return hasData;
                 
             } catch (error) {
@@ -1120,10 +1137,72 @@
         }
         
         // ============================================================
+        // PANEL DATA FILTERING
+        // ============================================================
+        
+        function filterPanelData(panelDef, panelData) {
+            if (!Array.isArray(panelData)) return panelData;
+
+            const type = panelDef.renderer?.type;
+            const config = panelDef.renderer?.config;
+
+            if (type === "stat_grid") {
+                const stats = config?.stats || [];
+                if (stats.length === 0) return panelData;
+                
+                return panelData.filter(row =>
+                    stats.some(stat => {
+                        const v = getNestedValue(row, stat.field);
+                        return v !== null && v !== undefined;
+                    })
+                );
+            }
+
+            if (type === "timeseries") {
+                const series = config?.series || [];
+                if (series.length === 0) return panelData;
+                
+                return panelData.filter(row =>
+                    series.some(s => {
+                        const v = getNestedValue(row, s.path || s.field);
+                        return v !== null && v !== undefined;
+                    })
+                );
+            }
+
+            if (type === "key_value") {
+                const fields = config?.fields || [];
+                if (fields.length === 0) {
+                    // If no fields specified, check for system_state
+                    return panelData.filter(row =>
+                        row.system_state && Object.keys(row.system_state).length > 0
+                    );
+                }
+                
+                return panelData.filter(row =>
+                    fields.some(f => {
+                        const v = getNestedValue(row, f.field);
+                        return v !== null && v !== undefined;
+                    })
+                );
+            }
+
+            // table renders everything
+            return panelData;
+        }
+        
+        // ============================================================
         // RENDER PANEL CONTENT
         // ============================================================
         
         function renderPanelContent(panelId, data, bodyEl, panelDef) {
+            console.error(
+                "[RENDER ENTRY]",
+                panelDef.id,
+                panelDef.renderer?.type,
+                typeof data,
+                Array.isArray(data) ? data.length : "object"
+            );
             // If data is missing or empty, collapse panel (no UI message)
             if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
                 bodyEl.innerHTML = '';
@@ -1140,6 +1219,11 @@
                 let content = '';
                 let hasData = false;
                 
+                console.error(
+                    "[RENDER DISPATCH]",
+                    panelDef.id,
+                    panelDef.renderer.type
+                );
                 switch (rendererType) {
                     case 'table':
                         content = renderTable(data, renderer.config);
