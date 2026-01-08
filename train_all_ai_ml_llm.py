@@ -46,32 +46,32 @@ np.random.seed(RANDOM_SEED)
 # Project root
 PROJECT_ROOT = Path("/home/ransomeye/rebuild")
 
-# Training configuration
+# Training configuration - Updated for 200MB+ models
 TRAINING_CONFIG = {
     'baseline_pack': {
         'enabled': True,
         'use_feeds': True,
-        'n_samples': 100000
+        'n_samples': 2000000  # 2M samples for large models
     },
     'risk_model': {
         'enabled': True,
-        'n_samples': 10000
+        'n_samples': 1000000  # 1M samples
     },
     'threat_correlation': {
         'enabled': True,
-        'n_samples': 50000
+        'n_samples': 1000000  # 1M samples
     },
     'forensic_malware_dna': {
         'enabled': True,
-        'n_samples': 30000
+        'n_samples': 1000000  # 1M samples
     },
     'threat_intel_trust': {
         'enabled': True,
-        'n_samples': 40000
+        'n_samples': 1000000  # 1M samples
     },
     'dpi_probe_classifier': {
         'enabled': True,
-        'n_samples': 60000
+        'n_samples': 2000000  # 2M samples
     },
     'rag_index': {
         'enabled': True,
@@ -79,7 +79,7 @@ TRAINING_CONFIG = {
     },
     'shap_generation': {
         'enabled': True,
-        'n_samples': 1000
+        'n_samples': 10000  # Increased for larger models
     }
 }
 
@@ -122,7 +122,7 @@ class TrainingOrchestrator:
                 cwd=str(script_path.parent),
                 capture_output=True,
                 text=True,
-                timeout=3600  # 1 hour timeout
+                timeout=14400  # 4 hour timeout for large dataset training
             )
             
             if result.returncode == 0:
@@ -164,7 +164,7 @@ class TrainingOrchestrator:
                 cwd=str(script_path.parent),
                 capture_output=True,
                 text=True,
-                timeout=1800  # 30 min timeout
+                timeout=7200  # 2 hour timeout for large dataset
             )
             
             if result.returncode == 0:
@@ -203,7 +203,7 @@ class TrainingOrchestrator:
             train_script = module_dir / "train_confidence_predictor.py"
             if train_script.exists():
                 cmd = [sys.executable, str(train_script)]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
                 if result.returncode == 0:
                     self.log("✓ Threat correlation confidence predictor trained")
                     return True
@@ -936,7 +936,7 @@ if __name__ == '__main__':
             core_shap_script = self.project_root / "core" / "ai" / "models" / "generate_shap_baseline.py"
             if core_shap_script.exists():
                 cmd = [sys.executable, str(core_shap_script)]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
                 if result.returncode == 0:
                     self.log("✓ Core AI SHAP baseline generated")
             

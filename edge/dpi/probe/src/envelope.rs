@@ -39,6 +39,8 @@ pub struct EventData {
     pub features: FeaturesData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l7_metadata: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +120,7 @@ impl EnvelopeBuilder {
                     flow_byte_count: features.flow_byte_count,
                 },
                 l7_metadata: l7_metadata_json,
+                system: None, // Will be injected before serialization
             },
         };
         

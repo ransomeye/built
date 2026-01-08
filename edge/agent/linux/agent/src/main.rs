@@ -31,6 +31,9 @@ mod config_validation;
 #[path = "../../src/signing.rs"]
 mod signing;
 
+#[path = "../../src/system_metrics.rs"]
+mod system_metrics;
+
 use errors::AgentError;
 use process::ProcessMonitor;
 use filesystem::FilesystemMonitor;
@@ -277,6 +280,22 @@ fn main() -> Result<(), AgentError> {
     let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit_tokens, config.rate_limit_refill));
     let health_monitor = Arc::new(HealthMonitor::new(300)); // 5 minute max idle
     
+    // Initialize system metrics collector
+    let mut system_metrics_collector = system_metrics::SystemMetricsCollector::new();
+    let system_metrics_state = Arc::new(std::sync::Mutex::new(None::<system_metrics::SystemMetrics>));
+    
+    // Start periodic system metrics collection (every 20 seconds)
+    let metrics_state_clone = system_metrics_state.clone();
+    std::thread::spawn(move || {
+        let mut collector = system_metrics::SystemMetricsCollector::new();
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(20));
+            if let Ok(mut state) = metrics_state_clone.lock() {
+                *state = Some(collector.collect());
+            }
+        }
+    });
+    
     // Initialize syscall monitoring
     info!("[INIT-13] Initializing syscall monitoring");
     let _ = notify(false, &[NotifyState::Status("Initializing syscall monitoring...".to_string())]);
@@ -439,7 +458,35 @@ fn main() -> Result<(), AgentError> {
                 let signature = security_signer.sign(&envelope_data)
                     .map_err(|e| AgentError::SigningFailed(format!("{}", e)))?;
                 
-                let envelope = envelope_builder.build_from_process(&process_event, &features, signature)?;
+                let mut envelope = envelope_builder.build_from_process(&process_event, &features, signature)?;
+                
+                // Inject system metrics into envelope.data.system (always include, even if empty)
+                let system_json = if let Ok(metrics_guard) = system_metrics_state.lock() {
+                    if let Some(ref metrics) = *metrics_guard {
+                        serde_json::to_value(metrics)
+                            .unwrap_or_else(|_| serde_json::json!({}))
+                    } else {
+                        // Empty system metrics structure if not yet collected
+                        serde_json::json!({
+                            "cpu": {},
+                            "memory": {},
+                            "disk": {},
+                            "filesystem": {"mounts": []},
+                            "network": {},
+                            "system_state": {}
+                        })
+                    }
+                } else {
+                    serde_json::json!({
+                        "cpu": {},
+                        "memory": {},
+                        "disk": {},
+                        "filesystem": {"mounts": []},
+                        "network": {},
+                        "system_state": {}
+                    })
+                };
+                envelope.data.system = Some(system_json);
                 
                 health_monitor.record_event();
                 event_count += 1;

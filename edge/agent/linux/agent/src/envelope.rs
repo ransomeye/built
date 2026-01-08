@@ -39,6 +39,8 @@ pub struct EventData {
     pub filesystem_data: Option<FilesystemData>,
     pub network_data: Option<NetworkData>,
     pub features: FeaturesData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +142,7 @@ impl EnvelopeBuilder {
                     process_activity: features.process_activity,
                     filesystem_activity: features.filesystem_activity,
                 },
+                system: None, // Will be injected before serialization
             },
         };
         
@@ -189,6 +192,7 @@ impl EnvelopeBuilder {
                     process_activity: features.process_activity,
                     filesystem_activity: features.filesystem_activity,
                 },
+                system: None, // Will be injected before serialization
             },
         };
         
@@ -240,6 +244,7 @@ impl EnvelopeBuilder {
                     process_activity: features.process_activity,
                     filesystem_activity: features.filesystem_activity,
                 },
+                system: None, // Will be injected before serialization
             },
         };
         

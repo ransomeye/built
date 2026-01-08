@@ -28,8 +28,10 @@ mod health;
 mod config;
 mod identity;
 mod deception;
+mod system_metrics;
 
 use config::Config;
+use std::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,8 +63,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = Arc::new(transport::TransportClient::new(config.clone(), backpressure.clone())?);
     let disk_buffer = Arc::new(buffer::DiskBuffer::new(&config.buffer_dir, config.max_buffer_size_mb)?);
     
+    // Initialize system metrics collector and shared state
+    let mut metrics_collector = system_metrics::SystemMetricsCollector::new();
+    let current_system_metrics = Arc::new(Mutex::new(None::<system_metrics::SystemMetrics>));
+    
     // Start monitoring tasks
     let running = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    
+    // Start system metrics collection task (collect every 20 seconds)
+    let metrics_handle = {
+        let run = running.clone();
+        let metrics_state = current_system_metrics.clone();
+        let mut collector = metrics_collector;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(20));
+            while run.load(std::sync::atomic::Ordering::Relaxed) {
+                interval.tick().await;
+                let metrics = collector.collect();
+                if let Ok(mut state) = metrics_state.lock() {
+                    *state = Some(metrics);
+                }
+            }
+        })
+    };
     
     let process_handle = {
         let run = running.clone();
@@ -104,8 +127,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let signer = signer.clone();
         let transport = transport.clone();
         let disk_buffer = disk_buffer.clone();
+        let metrics_state = current_system_metrics.clone();
         tokio::spawn(async move {
-            process_loop(run, event_rx, signer, transport, disk_buffer).await;
+            process_loop(run, event_rx, signer, transport, disk_buffer, metrics_state).await;
         })
     };
     
@@ -122,6 +146,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ = file_handle => {}
         _ = auth_handle => {}
         _ = network_handle => {}
+        _ = metrics_handle => {}
         _ = process_loop_handle => {}
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
             info!("Shutdown timeout reached");
@@ -138,6 +163,7 @@ async fn process_loop(
     signer: Arc<signing::EventSigner>,
     transport: Arc<transport::TransportClient>,
     disk_buffer: Arc<buffer::DiskBuffer>,
+    metrics_state: Arc<Mutex<Option<system_metrics::SystemMetrics>>>,
 ) {
     while running.load(std::sync::atomic::Ordering::Relaxed) {
         // Receive event
@@ -147,7 +173,18 @@ async fn process_loop(
         };
         
         // Convert to JSON
-        let event_json = event.to_json_value();
+        let mut event_json = event.to_json_value();
+        
+        // Include system metrics in payload if available
+        if let Ok(metrics_guard) = metrics_state.lock() {
+            if let Some(ref metrics) = *metrics_guard {
+                if let Some(event_obj) = event_json.as_object_mut() {
+                    let system_json = serde_json::to_value(metrics)
+                        .unwrap_or_else(|_| serde_json::json!({}));
+                    event_obj.insert("system".to_string(), system_json);
+                }
+            }
+        }
         
         // Sign event
         let signed_event = match signer.sign_event(event_json) {

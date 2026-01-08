@@ -1,6 +1,6 @@
-// Path and File Name : /home/ransomeye/rebuild/edge/dpi/probe/src/system_metrics.rs
+// Path and File Name : /home/ransomeye/rebuild/edge/agent/linux/src/system_metrics.rs
 // Author: nXxBku0CKFAJCBN3X1g3bQk7OxYQylg8CMw1iGsq7gU
-// Details of functionality of this file: System metrics collection for DPI Probe health monitoring
+// Details of functionality of this file: System metrics collection for Linux Agent health monitoring
 
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,7 +14,6 @@ pub struct SystemMetrics {
     pub disk: DiskMetrics,
     pub filesystem: FilesystemMetrics,
     pub network: NetworkMetrics,
-    pub processing: ProcessingMetrics,
     pub system_state: SystemStateMetrics,
 }
 
@@ -25,7 +24,7 @@ pub struct CpuMetrics {
     pub load_avg_5m: Option<f64>,
     pub load_avg_15m: Option<f64>,
     pub core_count: Option<u32>,
-    pub dpi_process_cpu: Option<f64>,
+    pub agent_process_cpu: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,13 +33,15 @@ pub struct MemoryMetrics {
     pub used: Option<u64>,
     pub free: Option<u64>,
     pub swap_used: Option<u64>,
-    pub dpi_process_rss: Option<u64>,
+    pub agent_process_rss: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskMetrics {
-    pub read_throughput: Option<u64>,
-    pub write_throughput: Option<u64>,
+    pub read_bytes: Option<u64>,
+    pub write_bytes: Option<u64>,
+    pub read_iops: Option<u64>,
+    pub write_iops: Option<u64>,
     pub utilization: Option<f64>,
 }
 
@@ -64,32 +65,27 @@ pub struct MountMetrics {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMetrics {
-    pub packets_per_sec: Option<f64>,
-    pub bytes_per_sec: Option<f64>,
-    pub drops: Option<u64>,
+    pub bytes_in: Option<u64>,
+    pub bytes_out: Option<u64>,
+    pub packets_in: Option<u64>,
+    pub packets_out: Option<u64>,
     pub errors: Option<u64>,
-    pub ring_buffer_drops: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessingMetrics {
-    pub packet_processing_rate: Option<f64>,
-    pub packet_drops: Option<u64>,
-    pub probe_uptime: Option<u64>,
-    pub probe_status: Option<String>,
+    pub drops: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemStateMetrics {
     pub host_uptime: Option<u64>,
     pub process_count: Option<u32>,
-    pub dpi_process_status: Option<String>,
+    pub agent_process_status: Option<String>,
 }
 
 pub struct SystemMetricsCollector {
     pid: u32,
     start_time: u64,
     last_cpu_time: Option<CpuTime>,
+    last_disk_stats: Option<DiskStats>,
+    last_disk_time: u64,
     last_network_stats: Option<NetworkStats>,
     last_network_time: u64,
 }
@@ -98,6 +94,14 @@ pub struct SystemMetricsCollector {
 struct CpuTime {
     total: u64,
     idle: u64,
+}
+
+#[derive(Clone)]
+struct DiskStats {
+    read_bytes: u64,
+    write_bytes: u64,
+    read_ios: u64,
+    write_ios: u64,
 }
 
 #[derive(Clone)]
@@ -122,19 +126,20 @@ impl SystemMetricsCollector {
             pid,
             start_time,
             last_cpu_time: None,
+            last_disk_stats: None,
+            last_disk_time: 0,
             last_network_stats: None,
             last_network_time: 0,
         }
     }
     
-    pub fn collect(&mut self, health_stats: Option<&super::health::HealthStats>) -> SystemMetrics {
+    pub fn collect(&mut self) -> SystemMetrics {
         SystemMetrics {
             cpu: self.collect_cpu(),
             memory: self.collect_memory(),
             disk: self.collect_disk(),
             filesystem: self.collect_filesystem(),
             network: self.collect_network(),
-            processing: self.collect_processing(health_stats),
             system_state: self.collect_system_state(),
         }
     }
@@ -146,7 +151,7 @@ impl SystemMetricsCollector {
             load_avg_5m: None,
             load_avg_15m: None,
             core_count: None,
-            dpi_process_cpu: None,
+            agent_process_cpu: None,
         };
         
         // Read load average from /proc/loadavg
@@ -202,12 +207,10 @@ impl SystemMetricsCollector {
             }
         }
         
-        // Get DPI process CPU from /proc/{pid}/stat
+        // Get agent process CPU from /proc/{pid}/stat
         let proc_stat_path = format!("/proc/{}/stat", self.pid);
         if let Ok(stat_line) = fs::read_to_string(&proc_stat_path) {
             let parts: Vec<&str> = stat_line.split_whitespace().collect();
-            // Fields: pid, comm, state, ppid, pgrp, session, tty_nr, tty_pgrp, flags, minflt, cminflt, majflt, cmajflt
-            // utime (14), stime (15), cutime (16), cstime (17), priority (18), nice (19)
             if parts.len() >= 15 {
                 let utime: u64 = parts[13].parse().unwrap_or(0);
                 let stime: u64 = parts[14].parse().unwrap_or(0);
@@ -217,11 +220,9 @@ impl SystemMetricsCollector {
                 if let Ok(uptime_str) = fs::read_to_string("/proc/uptime") {
                     if let Some(uptime_secs) = uptime_str.split_whitespace().next() {
                         if let Ok(uptime) = uptime_secs.parse::<f64>() {
-                            // Calculate CPU percentage (simplified - would need previous sample for accurate rate)
-                            // For now, we'll use a basic calculation
                             if uptime > 0.0 {
                                 let clock_ticks = total_time as f64 / 100.0; // Assuming 100 Hz clock
-                                metrics.dpi_process_cpu = Some((clock_ticks / uptime) * 100.0);
+                                metrics.agent_process_cpu = Some((clock_ticks / uptime) * 100.0);
                             }
                         }
                     }
@@ -238,7 +239,7 @@ impl SystemMetricsCollector {
             used: None,
             free: None,
             swap_used: None,
-            dpi_process_rss: None,
+            agent_process_rss: None,
         };
         
         // Read memory info from /proc/meminfo
@@ -284,14 +285,14 @@ impl SystemMetricsCollector {
             }
         }
         
-        // Get DPI process RSS from /proc/{pid}/status
+        // Get agent process RSS from /proc/{pid}/status
         let proc_status_path = format!("/proc/{}/status", self.pid);
         if let Ok(status) = fs::read_to_string(&proc_status_path) {
             for line in status.lines() {
                 if line.starts_with("VmRSS:") {
                     if let Some(val) = line.split_whitespace().nth(1) {
                         if let Ok(kb) = val.parse::<u64>() {
-                            metrics.dpi_process_rss = Some(kb * 1024);
+                            metrics.agent_process_rss = Some(kb * 1024);
                         }
                     }
                     break;
@@ -302,16 +303,73 @@ impl SystemMetricsCollector {
         metrics
     }
     
-    fn collect_disk(&self) -> DiskMetrics {
-        // Read disk stats from /proc/diskstats
-        // This is simplified - in production, would track deltas over time
-        // For now, we return None values as disk throughput requires tracking deltas
-        // The dashboard will handle missing metrics gracefully (fail-soft)
-        DiskMetrics {
-            read_throughput: None,
-            write_throughput: None,
+    fn collect_disk(&mut self) -> DiskMetrics {
+        let mut metrics = DiskMetrics {
+            read_bytes: None,
+            write_bytes: None,
+            read_iops: None,
+            write_iops: None,
             utilization: None,
+        };
+        
+        // Read disk stats from /proc/diskstats
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        if let Ok(diskstats) = fs::read_to_string("/proc/diskstats") {
+            let mut total_read_bytes = 0u64;
+            let mut total_write_bytes = 0u64;
+            let mut total_read_ios = 0u64;
+            let mut total_write_ios = 0u64;
+            
+            for line in diskstats.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                // Format: major minor name reads reads_merged reads_sectors reads_ms writes writes_merged writes_sectors writes_ms ...
+                if parts.len() >= 14 {
+                    if let (Ok(reads), Ok(writes), Ok(read_sectors), Ok(write_sectors)) = (
+                        parts[3].parse::<u64>(),
+                        parts[7].parse::<u64>(),
+                        parts[5].parse::<u64>(),
+                        parts[9].parse::<u64>(),
+                    ) {
+                        total_read_ios += reads;
+                        total_write_ios += writes;
+                        total_read_bytes += read_sectors * 512; // sectors to bytes
+                        total_write_bytes += write_sectors * 512;
+                    }
+                }
+            }
+            
+            let current_stats = DiskStats {
+                read_bytes: total_read_bytes,
+                write_bytes: total_write_bytes,
+                read_ios: total_read_ios,
+                write_ios: total_write_ios,
+            };
+            
+            // Calculate rates if we have previous stats
+            if let Some(ref last_stats) = self.last_disk_stats {
+                let time_diff = now.saturating_sub(self.last_disk_time);
+                if time_diff > 0 {
+                    let read_bytes_diff = current_stats.read_bytes.saturating_sub(last_stats.read_bytes);
+                    let write_bytes_diff = current_stats.write_bytes.saturating_sub(last_stats.write_bytes);
+                    let read_ios_diff = current_stats.read_ios.saturating_sub(last_stats.read_ios);
+                    let write_ios_diff = current_stats.write_ios.saturating_sub(last_stats.write_ios);
+                    
+                    metrics.read_bytes = Some(read_bytes_diff);
+                    metrics.write_bytes = Some(write_bytes_diff);
+                    metrics.read_iops = Some(read_ios_diff);
+                    metrics.write_iops = Some(write_ios_diff);
+                }
+            }
+            
+            self.last_disk_stats = Some(current_stats);
+            self.last_disk_time = now;
         }
+        
+        metrics
     }
     
     fn collect_filesystem(&self) -> FilesystemMetrics {
@@ -325,11 +383,12 @@ impl SystemMetricsCollector {
                     let mount_point = parts[1].to_string();
                     
                     // Skip special filesystems
-                    if !mount_point.starts_with("/proc") && 
-                       !mount_point.starts_with("/sys") &&
-                       !mount_point.starts_with("/dev") &&
-                       mount_point != "/" {
-                        // Get filesystem stats using df command (fail-soft if unavailable)
+                    if mount_point.starts_with("/proc") || 
+                       mount_point.starts_with("/sys") ||
+                       mount_point.starts_with("/dev") ||
+                       mount_point == "/" {
+                        // Get filesystem stats using statvfs (via command or direct syscall)
+                        // For simplicity, we'll use a basic approach
                         let mount_metrics = self.get_mount_stats(&mount_point);
                         mounts.push(mount_metrics);
                     }
@@ -414,11 +473,12 @@ impl SystemMetricsCollector {
     
     fn collect_network(&mut self) -> NetworkMetrics {
         let mut metrics = NetworkMetrics {
-            packets_per_sec: None,
-            bytes_per_sec: None,
-            drops: None,
+            bytes_in: None,
+            bytes_out: None,
+            packets_in: None,
+            packets_out: None,
             errors: None,
-            ring_buffer_drops: None,
+            drops: None,
         };
         
         // Read network stats from /proc/net/dev
@@ -479,13 +539,15 @@ impl SystemMetricsCollector {
             if let Some(ref last_stats) = self.last_network_stats {
                 let time_diff = now.saturating_sub(self.last_network_time);
                 if time_diff > 0 {
-                    let bytes_diff = (current_stats.bytes_in + current_stats.bytes_out)
-                        .saturating_sub(last_stats.bytes_in + last_stats.bytes_out);
-                    let packets_diff = (current_stats.packets_in + current_stats.packets_out)
-                        .saturating_sub(last_stats.packets_in + last_stats.packets_out);
+                    let bytes_in_diff = current_stats.bytes_in.saturating_sub(last_stats.bytes_in);
+                    let bytes_out_diff = current_stats.bytes_out.saturating_sub(last_stats.bytes_out);
+                    let packets_in_diff = current_stats.packets_in.saturating_sub(last_stats.packets_in);
+                    let packets_out_diff = current_stats.packets_out.saturating_sub(last_stats.packets_out);
                     
-                    metrics.bytes_per_sec = Some(bytes_diff as f64 / time_diff as f64);
-                    metrics.packets_per_sec = Some(packets_diff as f64 / time_diff as f64);
+                    metrics.bytes_in = Some(bytes_in_diff);
+                    metrics.bytes_out = Some(bytes_out_diff);
+                    metrics.packets_in = Some(packets_in_diff);
+                    metrics.packets_out = Some(packets_out_diff);
                 }
             }
             
@@ -496,49 +558,11 @@ impl SystemMetricsCollector {
         metrics
     }
     
-    fn collect_processing(&self, health_stats: Option<&super::health::HealthStats>) -> ProcessingMetrics {
-        let mut metrics = ProcessingMetrics {
-            packet_processing_rate: None,
-            packet_drops: None,
-            probe_uptime: None,
-            probe_status: None,
-        };
-        
-        if let Some(stats) = health_stats {
-            metrics.probe_uptime = Some(stats.uptime);
-            
-            // Calculate packet processing rate (packets per second)
-            if stats.uptime > 0 {
-                metrics.packet_processing_rate = Some(stats.packets_processed as f64 / stats.uptime as f64);
-            }
-            
-            // Get packet drops from backpressure (would need to pass this in)
-            // For now, set to None
-            
-            // Set probe status
-            metrics.probe_status = Some(if stats.healthy {
-                "running".to_string()
-            } else {
-                "degraded".to_string()
-            });
-        } else {
-            // Calculate uptime from start_time
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            metrics.probe_uptime = Some(now.saturating_sub(self.start_time));
-            metrics.probe_status = Some("running".to_string());
-        }
-        
-        metrics
-    }
-    
     fn collect_system_state(&self) -> SystemStateMetrics {
         let mut metrics = SystemStateMetrics {
             host_uptime: None,
             process_count: None,
-            dpi_process_status: None,
+            agent_process_status: None,
         };
         
         // Read host uptime from /proc/uptime
@@ -564,12 +588,12 @@ impl SystemMetricsCollector {
             metrics.process_count = Some(count);
         }
         
-        // Check DPI process status
+        // Check agent process status
         let proc_stat_path = format!("/proc/{}/stat", self.pid);
         if fs::metadata(&proc_stat_path).is_ok() {
-            metrics.dpi_process_status = Some("running".to_string());
+            metrics.agent_process_status = Some("running".to_string());
         } else {
-            metrics.dpi_process_status = Some("stopped".to_string());
+            metrics.agent_process_status = Some("stopped".to_string());
         }
         
         metrics

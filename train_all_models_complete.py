@@ -102,7 +102,7 @@ class MandatoryTrainer:
                 cwd=str(script_path.parent),
                 capture_output=True,
                 text=True,
-                timeout=3600  # 1 hour timeout
+                timeout=14400  # 4 hour timeout for large dataset training
             )
             
             if result.returncode == 0:
@@ -136,7 +136,7 @@ class MandatoryTrainer:
                 cwd=str(script_path.parent),
                 capture_output=True,
                 text=True,
-                timeout=1800  # 30 min timeout
+                timeout=7200  # 2 hour timeout for large dataset
             )
             
             if result.returncode == 0:
@@ -211,7 +211,7 @@ class MandatoryTrainer:
                 cwd=str(PROJECT_ROOT / 'ransomeye_ai_assistant'),
                 capture_output=True,
                 text=True,
-                timeout=3600
+                timeout=10800  # 3 hour timeout for large dataset
             )
             
             if result.returncode == 0:
@@ -493,7 +493,7 @@ if __name__ == '__main__':
             result = subprocess.run(
                 [sys.executable, str(PROJECT_ROOT / 'train_all_ai_ml_llm.py')],
                 cwd=str(PROJECT_ROOT),
-                timeout=7200  # 2 hour timeout
+                timeout=21600  # 6 hour timeout for full training pipeline with large datasets
             )
             
             if result.returncode != 0:

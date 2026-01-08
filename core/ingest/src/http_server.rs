@@ -394,7 +394,27 @@ async fn handle_linux_ingest(
     let host_id = hostname::get().unwrap_or_default().to_string_lossy().to_string();
     let signature_alg = "Ed25519".to_string();
     let event_category_str: &str = event_category.as_deref().unwrap_or("");
-    let payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
+    
+    // PART 3: INGESTION CONTRACT ENFORCEMENT - Validate payload.system exists and is non-null
+    // Ensure system metrics are present in data (fail-closed if missing)
+    let mut data_with_system = data.clone();
+    if let Some(data_obj) = data_with_system.as_object_mut() {
+        if !data_obj.contains_key("system") {
+            // System metrics not present - inject empty object to satisfy contract
+            warn!("VALIDATION: payload.system missing in Linux Agent telemetry - injecting empty object");
+            data_obj.insert("system".to_string(), serde_json::json!({}));
+        } else if data_obj.get("system").is_none() || data_obj.get("system").and_then(|v| v.as_object()).is_none() {
+            // System is null or not an object - replace with empty object
+            warn!("VALIDATION: payload.system is null or invalid in Linux Agent telemetry - replacing with empty object");
+            data_obj.insert("system".to_string(), serde_json::json!({}));
+        }
+    } else {
+        error!("VALIDATION ERROR: data field is not an object - cannot inject system metrics");
+        let _ = db.execute("ROLLBACK", &[]).await;
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    
+    let payload_json = serde_json::to_string(&data_with_system).unwrap_or_else(|_| "{}".to_string());
     let payload_sha256 = {
         let data_json_bytes = serde_json::to_vec(data).unwrap_or_default();
         let mut data_hasher = Sha256::new();
@@ -702,10 +722,47 @@ async fn handle_dpi_ingest(
     let http_path_param: Option<&str> = http_path.as_deref();
     let iface_name_param: Option<&str> = iface_name.as_deref();
     let flow_id_param: Option<&str> = flow_id.as_deref();
-    let dpi_payload_json = serde_json::to_string(data).unwrap_or_else(|_| "{}".to_string());
+    
+    // PART 3: INGESTION CONTRACT ENFORCEMENT - Validate payload.system exists and is non-null
+    // Ensure system metrics are present in data (fail-closed if missing)
+    let mut data_with_system = data.clone();
+    if let Some(data_obj) = data_with_system.as_object_mut() {
+        if !data_obj.contains_key("system") {
+            // System metrics not present - inject empty object to satisfy contract
+            warn!("VALIDATION: payload.system missing in DPI Probe telemetry - injecting empty object");
+            data_obj.insert("system".to_string(), serde_json::json!({
+                "cpu": {},
+                "memory": {},
+                "disk": {},
+                "filesystem": {"mounts": []},
+                "network": {},
+                "processing": {},
+                "system_state": {}
+            }));
+        } else if data_obj.get("system").is_none() || data_obj.get("system").and_then(|v| v.as_object()).is_none() {
+            // System is null or not an object - replace with empty object
+            warn!("VALIDATION: payload.system is null or invalid in DPI Probe telemetry - replacing with empty object");
+            data_obj.insert("system".to_string(), serde_json::json!({
+                "cpu": {},
+                "memory": {},
+                "disk": {},
+                "filesystem": {"mounts": []},
+                "network": {},
+                "processing": {},
+                "system_state": {}
+            }));
+        }
+    } else {
+        error!("VALIDATION ERROR: data field is not an object - cannot inject system metrics");
+        let _ = db.simple_query("ROLLBACK").await;
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    
+    let dpi_payload_json = serde_json::to_string(&data_with_system).unwrap_or_else(|_| "{}".to_string());
     let dpi_payload_sha256 = Some(hex::decode(&payload.payload_hash).unwrap_or_default());
 
     // Insert into raw_events for DPI (within transaction)
+    // Use data_with_system (which has validated system field) for raw_events
     let raw_event_id = match db.query_one(
         r#"
         INSERT INTO raw_events (
@@ -719,7 +776,7 @@ async fn handle_dpi_ingest(
             &agent_id,
             &timestamp,
             &"flow",
-            &data,
+            &data_with_system,
             &envelope_payload_sha256,
         ],
     ).await {

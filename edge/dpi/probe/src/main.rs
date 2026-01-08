@@ -22,6 +22,7 @@ pub mod backpressure;
 pub mod rate_limit;
 pub mod health;
 pub mod hardening;
+pub mod system_metrics;
 
 #[path = "../security/mod.rs"]
 pub mod security;
@@ -267,7 +268,25 @@ fn main() -> Result<(), ProbeError> {
                 let signature = signer.sign(&envelope_data)
                     .map_err(|e| ProbeError::SigningFailed(format!("{}", e)))?;
                 
-                let envelope = envelope_builder.build(&parsed, &features, signature)?;
+                let mut envelope = envelope_builder.build(&parsed, &features, signature)?;
+                
+                // Inject system metrics into envelope.data.system (always include, even if empty)
+                let system_json = if let Some(ref sys_metrics) = current_system_metrics {
+                    serde_json::to_value(sys_metrics)
+                        .map_err(|e| ProbeError::ConfigurationError(format!("Failed to serialize system metrics: {}", e)))?
+                } else {
+                    // Include empty system metrics structure if not yet collected
+                    serde_json::json!({
+                        "cpu": {},
+                        "memory": {},
+                        "disk": {},
+                        "filesystem": {"mounts": []},
+                        "network": {},
+                        "processing": {},
+                        "system_state": {}
+                    })
+                };
+                envelope.data.system = Some(system_json);
                 
                 info!("Event envelope created: {} (sequence: {})", 
                     envelope.event_id, envelope.sequence);
@@ -292,24 +311,13 @@ fn main() -> Result<(), ProbeError> {
                 
                 // Step 4: Create SignedEvent with new format
                 use serde_json::json;
-                
-                // Include system metrics in payload if available
-                let mut signed_event_obj = serde_json::Map::new();
-                signed_event_obj.insert("envelope".to_string(), 
-                    serde_json::from_slice::<serde_json::Value>(&canonical_bytes)
-                        .map_err(|e| ProbeError::ConfigurationError(format!("Failed to parse envelope JSON: {}", e)))?);
-                signed_event_obj.insert("payload_hash".to_string(), json!(payload_hash));
-                signed_event_obj.insert("signature".to_string(), json!(signature_b64));
-                signed_event_obj.insert("signer_id".to_string(), json!(identity.component_id()));
-                
-                // Add system metrics if collected
-                if let Some(ref sys_metrics) = current_system_metrics {
-                    let system_json = serde_json::to_value(sys_metrics)
-                        .map_err(|e| ProbeError::ConfigurationError(format!("Failed to serialize system metrics: {}", e)))?;
-                    signed_event_obj.insert("system".to_string(), system_json);
-                }
-                
-                let signed_event = serde_json::Value::Object(signed_event_obj);
+                let signed_event = json!({
+                    "envelope": serde_json::from_slice::<serde_json::Value>(&canonical_bytes)
+                        .map_err(|e| ProbeError::ConfigurationError(format!("Failed to parse envelope JSON: {}", e)))?,
+                    "payload_hash": payload_hash,
+                    "signature": signature_b64,
+                    "signer_id": identity.component_id(),
+                });
                 
                 // Send directly via HTTP POST (async call in sync context)
                 let url = format!("{}/ingest/dpi", core_api_url);
