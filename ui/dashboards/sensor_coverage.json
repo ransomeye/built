@@ -1,0 +1,38 @@
+{
+  "name": "sensor_coverage",
+  "title": "Sensor Coverage Dashboard",
+  "description": "Which telemetry sensors are ACTIVE per Linux agent, based strictly on real ingested telemetry.",
+  "folder_id": "general",
+  "panels": [
+    {
+      "id": "sensor_coverage_matrix",
+      "title": "Sensor Coverage Matrix",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 4,
+      "refresh_interval": 60,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/sensor-coverage",
+        "path": "sensor_coverage_matrix"
+      }
+    },
+    {
+      "id": "coverage_summary",
+      "title": "Coverage Summary",
+      "x": 0,
+      "y": 4,
+      "w": 12,
+      "h": 2,
+      "refresh_interval": 60,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/sensor-coverage",
+        "path": "coverage_summary"
+      }
+    }
+  ]
+}

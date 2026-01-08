@@ -1131,44 +1131,358 @@
                 return false; // No data
             }
             
-            // Simple content rendering (can be extended with custom renderers)
-            let content = '';
+            // Check if panel has a renderer type defined
+            const renderer = panelDef?.renderer;
+            const rendererType = renderer?.type;
             
+            // Dispatch to specific renderer if type is known
+            if (rendererType) {
+                let content = '';
+                let hasData = false;
+                
+                switch (rendererType) {
+                    case 'table':
+                        content = renderTable(data, renderer.config);
+                        hasData = content !== '';
+                        break;
+                    case 'stat_grid':
+                        content = renderStatGrid(data, renderer.config);
+                        hasData = content !== '';
+                        break;
+                    case 'key_value':
+                        content = renderKeyValue(data, renderer.config);
+                        hasData = content !== '';
+                        break;
+                    default:
+                        // Unknown renderer type - show message instead of raw JSON
+                        content = '<div class="panel-unavailable">Renderer not implemented: ' + escapeHtml(rendererType) + '</div>';
+                        hasData = true;
+                        break;
+                }
+                
+                if (hasData && content) {
+                    bodyEl.innerHTML = content;
+                    return true;
+                } else {
+                    // Renderer returned empty - collapse panel
+                    bodyEl.innerHTML = '';
+                    bodyEl.closest('.panel').style.display = 'none';
+                    return false;
+                }
+            }
+            
+            // No renderer type - fallback to simple rendering for primitive types only
+            // (This preserves backward compatibility for panels without renderer config)
             if (typeof data === 'string' || typeof data === 'number') {
-                content = `<div style="font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); color: var(--text-primary);">${escapeHtml(String(data))}</div>`;
-            } else if (Array.isArray(data)) {
-                // Render as list
-                content = '<ul style="list-style: none; padding: 0; margin: 0;">';
-                for (const item of data.slice(0, 10)) { // Limit to 10 items
-                    const itemText = typeof item === 'object' ? JSON.stringify(item) : String(item);
-                    content += `<li style="padding: var(--spacing-sm) 0; border-bottom: 1px solid var(--border-primary);">${escapeHtml(itemText)}</li>`;
+                bodyEl.innerHTML = `<div style="font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); color: var(--text-primary);">${escapeHtml(String(data))}</div>`;
+                return true;
+            }
+            
+            // For complex types without renderer, collapse panel (no raw JSON fallback)
+            bodyEl.innerHTML = '';
+            bodyEl.closest('.panel').style.display = 'none';
+            return false;
+        }
+        
+        // ============================================================
+        // PANEL RENDERERS
+        // ============================================================
+        
+        function renderTable(data, config) {
+            if (!Array.isArray(data) || data.length === 0) {
+                return '';
+            }
+            
+            // Get column definitions from config
+            const columns = config?.columns || [];
+            
+            // If no columns defined, infer from first data object
+            let effectiveColumns = columns;
+            if (effectiveColumns.length === 0 && data.length > 0 && typeof data[0] === 'object') {
+                effectiveColumns = Object.keys(data[0]).map(key => ({
+                    field: key,
+                    label: key,
+                    type: 'string'
+                }));
+            }
+            
+            if (effectiveColumns.length === 0) {
+                return '';
+            }
+            
+            // Build table HTML
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">';
+            
+            // Table header
+            html += '<thead><tr style="border-bottom: 2px solid var(--border-primary);">';
+            for (const col of effectiveColumns) {
+                html += `<th style="padding: var(--spacing-sm); text-align: left; color: var(--text-secondary); font-weight: var(--font-weight-semibold);">${escapeHtml(col.label || col.field)}</th>`;
+            }
+            html += '</tr></thead>';
+            
+            // Table body
+            html += '<tbody>';
+            for (const row of data) {
+                html += '<tr style="border-bottom: 1px solid var(--border-primary);">';
+                for (const col of effectiveColumns) {
+                    const value = getNestedValue(row, col.field);
+                    const formatted = formatValue(value, col.type, col.format);
+                    html += `<td style="padding: var(--spacing-sm); color: var(--text-primary);">${formatted}</td>`;
                 }
-                if (data.length > 10) {
-                    content += `<li style="padding: var(--spacing-sm) 0; color: var(--text-muted); font-size: var(--font-size-sm);">... and ${data.length - 10} more</li>`;
+                html += '</tr>';
+            }
+            html += '</tbody></table></div>';
+            
+            return html;
+        }
+        
+        function renderStatGrid(data, config) {
+            if (!data || typeof data !== 'object') {
+                return '';
+            }
+            
+            const stats = config?.stats || [];
+            if (stats.length === 0) {
+                return '';
+            }
+            
+            // Handle array data (aggregate if needed)
+            let effectiveData = data;
+            if (Array.isArray(data) && data.length > 0) {
+                const aggregate = config?.aggregate || 'avg';
+                if (aggregate === 'avg') {
+                    // Calculate averages for numeric fields
+                    effectiveData = {};
+                    for (const stat of stats) {
+                        const values = data.map(item => getNestedValue(item, stat.field)).filter(v => typeof v === 'number');
+                        if (values.length > 0) {
+                            effectiveData[stat.field] = values.reduce((a, b) => a + b, 0) / values.length;
+                        }
+                    }
+                } else if (aggregate === 'sum') {
+                    effectiveData = {};
+                    for (const stat of stats) {
+                        const values = data.map(item => getNestedValue(item, stat.field)).filter(v => typeof v === 'number');
+                        if (values.length > 0) {
+                            effectiveData[stat.field] = values.reduce((a, b) => a + b, 0);
+                        }
+                    }
+                } else {
+                    // Use first item for other aggregates
+                    effectiveData = data[0] || {};
                 }
-                content += '</ul>';
-            } else if (typeof data === 'object') {
-                // Render as key-value pairs
-                content = '<div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">';
-                for (const [key, value] of Object.entries(data)) {
-                    const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                    content += `
+            }
+            
+            // Render stat tiles
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-md);">';
+            
+            for (const stat of stats) {
+                const value = getNestedValue(effectiveData, stat.field);
+                if (value === null || value === undefined) {
+                    continue;
+                }
+                
+                const formatted = formatValue(value, stat.type, stat.format, stat.unit);
+                const label = stat.label || stat.field;
+                
+                html += `
+                    <div style="display: flex; flex-direction: column; padding: var(--spacing-md); background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-primary);">
+                        <div style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: var(--spacing-xs);">${escapeHtml(label)}</div>
+                        <div style="font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--text-primary);">${formatted}</div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+        
+        function renderKeyValue(data, config) {
+            if (!data || typeof data !== 'object') {
+                return '';
+            }
+            
+            const fields = config?.fields || [];
+            const flatten = config?.flatten !== false; // Default to true
+            const groupBy = config?.group_by;
+            
+            // Handle array data (group by field if specified)
+            let itemsToRender = [];
+            if (Array.isArray(data)) {
+                if (groupBy) {
+                    // Group by specified field
+                    const grouped = {};
+                    for (const item of data) {
+                        const groupKey = getNestedValue(item, groupBy);
+                        if (groupKey !== null && groupKey !== undefined) {
+                            if (!grouped[groupKey]) {
+                                grouped[groupKey] = [];
+                            }
+                            grouped[groupKey].push(item);
+                        }
+                    }
+                    itemsToRender = Object.entries(grouped).map(([key, items]) => ({
+                        _group_key: key,
+                        _group_items: items
+                    }));
+                } else {
+                    itemsToRender = data;
+                }
+            } else {
+                itemsToRender = [data];
+            }
+            
+            let html = '<div style="display: flex; flex-direction: column; gap: var(--spacing-md);">';
+            
+            for (const item of itemsToRender) {
+                // Render group header if grouping
+                if (item._group_key !== undefined) {
+                    html += `<div style="font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--text-primary); margin-bottom: var(--spacing-xs); padding-bottom: var(--spacing-xs); border-bottom: 2px solid var(--border-primary);">${escapeHtml(String(item._group_key))}</div>`;
+                    
+                    // Render each item in group
+                    for (const groupItem of item._group_items) {
+                        html += renderKeyValueItem(groupItem, fields, flatten);
+                    }
+                } else {
+                    html += renderKeyValueItem(item, fields, flatten);
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+        
+        function renderKeyValueItem(item, fields, flatten) {
+            let html = '<div style="display: flex; flex-direction: column; gap: var(--spacing-xs); padding: var(--spacing-sm); background: var(--bg-secondary); border-radius: var(--radius-sm); border: 1px solid var(--border-primary);">';
+            
+            if (fields.length > 0) {
+                // Render only specified fields
+                for (const fieldDef of fields) {
+                    const value = getNestedValue(item, fieldDef.field);
+                    if (value === null || value === undefined) {
+                        continue;
+                    }
+                    const formatted = formatValue(value, fieldDef.type, fieldDef.format, fieldDef.unit);
+                    const label = fieldDef.label || fieldDef.field;
+                    html += `
                         <div style="display: flex; justify-content: space-between; padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--border-primary);">
-                            <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">${escapeHtml(key)}:</span>
-                            <span style="color: var(--text-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">${escapeHtml(valueStr)}</span>
+                            <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">${escapeHtml(label)}:</span>
+                            <span style="color: var(--text-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">${formatted}</span>
                         </div>
                     `;
                 }
-                content += '</div>';
             } else {
-                // Unknown data type - collapse panel (no UI message)
-                bodyEl.innerHTML = '';
-                bodyEl.closest('.panel').style.display = 'none';
-                return false; // No data
+                // Render all fields (flatten if requested)
+                const flatObj = flatten ? flattenObject(item) : item;
+                for (const [key, value] of Object.entries(flatObj)) {
+                    if (key.startsWith('_')) continue; // Skip internal fields
+                    const formatted = formatValue(value, typeof value === 'number' ? 'number' : 'string');
+                    html += `
+                        <div style="display: flex; justify-content: space-between; padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--border-primary);">
+                            <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">${escapeHtml(key)}:</span>
+                            <span style="color: var(--text-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">${formatted}</span>
+                        </div>
+                    `;
+                }
             }
             
-            bodyEl.innerHTML = content;
-            return true; // Has data
+            html += '</div>';
+            return html;
+        }
+        
+        // ============================================================
+        // RENDERER UTILITY FUNCTIONS
+        // ============================================================
+        
+        function getNestedValue(obj, path) {
+            if (!obj || !path) return null;
+            const parts = path.split('.');
+            let current = obj;
+            for (const part of parts) {
+                if (current === null || current === undefined || typeof current !== 'object') {
+                    return null;
+                }
+                current = current[part];
+            }
+            return current;
+        }
+        
+        function formatValue(value, type, format, unit) {
+            if (value === null || value === undefined) {
+                return '<span style="color: var(--text-muted);">—</span>';
+            }
+            
+            // Format based on type and format specifier
+            if (type === 'number' || typeof value === 'number') {
+                if (format === 'bytes') {
+                    return escapeHtml(formatBytes(value)) + (unit ? ' ' + escapeHtml(unit) : '');
+                } else if (format === 'percentage') {
+                    return escapeHtml(value.toFixed(1)) + '%';
+                } else if (format === 'decimal') {
+                    return escapeHtml(value.toFixed(2));
+                } else {
+                    // Default number formatting
+                    const numStr = typeof value === 'number' ? value.toLocaleString() : String(value);
+                    return escapeHtml(numStr) + (unit ? ' ' + escapeHtml(unit) : '');
+                }
+            } else if (type === 'datetime' || format === 'datetime') {
+                return escapeHtml(formatDatetime(value));
+            } else if (type === 'date' || format === 'date') {
+                return escapeHtml(formatDate(value));
+            } else {
+                // String or unknown type
+                const str = String(value);
+                return escapeHtml(str) + (unit ? ' ' + escapeHtml(unit) : '');
+            }
+        }
+        
+        function formatBytes(bytes) {
+            if (typeof bytes !== 'number' || bytes < 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return size.toFixed(unitIndex === 0 ? 0 : 2) + ' ' + units[unitIndex];
+        }
+        
+        function formatDatetime(value) {
+            try {
+                const date = new Date(value);
+                if (isNaN(date.getTime())) {
+                    return String(value);
+                }
+                return date.toLocaleString();
+            } catch {
+                return String(value);
+            }
+        }
+        
+        function formatDate(value) {
+            try {
+                const date = new Date(value);
+                if (isNaN(date.getTime())) {
+                    return String(value);
+                }
+                return date.toLocaleDateString();
+            } catch {
+                return String(value);
+            }
+        }
+        
+        function flattenObject(obj, prefix = '') {
+            const flattened = {};
+            for (const [key, value] of Object.entries(obj)) {
+                const newKey = prefix ? `${prefix}.${key}` : key;
+                if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+                    Object.assign(flattened, flattenObject(value, newKey));
+                } else {
+                    flattened[newKey] = value;
+                }
+            }
+            return flattened;
         }
         
         // ============================================================

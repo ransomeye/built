@@ -14,6 +14,30 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "table",
+        "config": {
+          "columns": [
+            {
+              "field": "agent_id",
+              "label": "Agent ID",
+              "type": "string"
+            },
+            {
+              "field": "status",
+              "label": "Status",
+              "type": "string"
+            },
+            {
+              "field": "observed_at",
+              "label": "Last Observed",
+              "type": "datetime"
+            }
+          ],
+          "sortable": true,
+          "filterable": true
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "agent_liveness"
@@ -29,6 +53,32 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "stat_grid",
+        "config": {
+          "stats": [
+            {
+              "field": "cpu.utilization",
+              "label": "CPU Utilization",
+              "unit": "%",
+              "type": "number"
+            },
+            {
+              "field": "cpu.core_count",
+              "label": "Core Count",
+              "unit": "cores",
+              "type": "number"
+            },
+            {
+              "field": "cpu.agent_process_cpu",
+              "label": "Agent Process CPU",
+              "unit": "%",
+              "type": "number"
+            }
+          ],
+          "aggregate": "avg"
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "cpu_health"
@@ -44,6 +94,42 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "stat_grid",
+        "config": {
+          "stats": [
+            {
+              "field": "memory.total",
+              "label": "Total Memory",
+              "unit": "bytes",
+              "type": "number",
+              "format": "bytes"
+            },
+            {
+              "field": "memory.used",
+              "label": "Used Memory",
+              "unit": "bytes",
+              "type": "number",
+              "format": "bytes"
+            },
+            {
+              "field": "memory.free",
+              "label": "Free Memory",
+              "unit": "bytes",
+              "type": "number",
+              "format": "bytes"
+            },
+            {
+              "field": "memory.agent_rss",
+              "label": "Agent RSS",
+              "unit": "bytes",
+              "type": "number",
+              "format": "bytes"
+            }
+          ],
+          "aggregate": "avg"
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "memory_health"
@@ -59,6 +145,44 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "timeseries",
+        "config": {
+          "x_axis": {
+            "field": "observed_at",
+            "type": "datetime"
+          },
+          "series": [
+            {
+              "field": "disk.read_bytes",
+              "label": "Read Bytes",
+              "type": "number",
+              "unit": "bytes",
+              "format": "bytes"
+            },
+            {
+              "field": "disk.write_bytes",
+              "label": "Write Bytes",
+              "type": "number",
+              "unit": "bytes",
+              "format": "bytes"
+            },
+            {
+              "field": "disk.read_iops",
+              "label": "Read IOPS",
+              "type": "number",
+              "unit": "iops"
+            },
+            {
+              "field": "disk.write_iops",
+              "label": "Write IOPS",
+              "type": "number",
+              "unit": "iops"
+            }
+          ],
+          "group_by": "agent_id"
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "disk_io_health"
@@ -74,6 +198,44 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "timeseries",
+        "config": {
+          "x_axis": {
+            "field": "observed_at",
+            "type": "datetime"
+          },
+          "series": [
+            {
+              "field": "network.bytes_in",
+              "label": "Bytes In",
+              "type": "number",
+              "unit": "bytes",
+              "format": "bytes"
+            },
+            {
+              "field": "network.bytes_out",
+              "label": "Bytes Out",
+              "type": "number",
+              "unit": "bytes",
+              "format": "bytes"
+            },
+            {
+              "field": "network.drops",
+              "label": "Drops",
+              "type": "number",
+              "unit": "packets"
+            },
+            {
+              "field": "network.errors",
+              "label": "Errors",
+              "type": "number",
+              "unit": "packets"
+            }
+          ],
+          "group_by": "agent_id"
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "network_health"
@@ -89,6 +251,31 @@
       "refresh_interval": 30,
       "status": "healthy",
       "content": "",
+      "renderer": {
+        "type": "key_value",
+        "config": {
+          "fields": [
+            {
+              "field": "system_state.host_uptime",
+              "label": "Host Uptime",
+              "type": "number",
+              "unit": "seconds"
+            },
+            {
+              "field": "system_state.process_count",
+              "label": "Process Count",
+              "type": "number"
+            },
+            {
+              "field": "system_state.agent_process_status",
+              "label": "Agent Process Status",
+              "type": "string"
+            }
+          ],
+          "group_by": "agent_id",
+          "flatten": true
+        }
+      },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "system_state"

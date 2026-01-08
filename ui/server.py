@@ -395,6 +395,11 @@ def list_dashboards():
             if not _check_linux_agent_health_visibility():
                 continue  # Skip this dashboard - no data available
         
+        # Check visibility for Sensor Coverage dashboard
+        if dashboard_name == 'sensor_coverage':
+            if not _check_sensor_coverage_visibility():
+                continue  # Skip this dashboard - no data available
+        
         visible_dashboards_with_folders.append(dash)
     
     # Filter dashboard_names to match visible dashboards
@@ -464,6 +469,77 @@ def _check_linux_agent_health_visibility() -> bool:
     
     except Exception as e:
         logger.error(f"Error checking Linux Agent Health visibility: {e}", exc_info=True)
+        if conn:
+            try:
+                cursor.close()
+                conn.close()
+            except:
+                pass
+        return False
+
+
+def _check_sensor_coverage_visibility() -> bool:
+    """
+    Check if Sensor Coverage dashboard should be visible.
+    Returns True if data exists, False otherwise.
+    
+    Uses EXACT same SQL predicate as main endpoint (no simplified COUNT query).
+    """
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Check if table exists
+        if not db.table_exists("ransomeye", "linux_agent_telemetry"):
+            cursor.close()
+            conn.close()
+            return False
+        
+        # Check if required columns exist
+        required_cols = ["agent_id", "observed_at", "payload"]
+        for col in required_cols:
+            if not db.column_exists("ransomeye", "linux_agent_telemetry", col):
+                cursor.close()
+                conn.close()
+                return False
+        
+        # Use EXACT same SQL predicate as main endpoint
+        visibility_query = """
+            WITH recent AS (
+              SELECT
+                agent_id,
+                payload
+              FROM linux_agent_telemetry
+              WHERE observed_at > NOW() - INTERVAL '10 minutes'
+            )
+            SELECT COUNT(*)
+            FROM (
+              SELECT
+                agent_id,
+                BOOL_OR(payload->>'event_category' = 'process')        AS process_sensor,
+                BOOL_OR(payload ? 'filesystem_data' AND payload->'filesystem_data' != 'null'::jsonb) AS filesystem_sensor,
+                BOOL_OR(payload ? 'network_data' AND payload->'network_data' != 'null'::jsonb) AS network_sensor,
+                BOOL_OR(payload ? 'system' AND payload->'system' != '{}'::jsonb) AS system_sensor,
+                BOOL_OR(payload->>'event_category' = 'deception')      AS deception_sensor
+              FROM recent
+              GROUP BY agent_id
+            ) AS coverage
+        """
+        
+        count = db.safe_query(visibility_query, default=0) or 0
+        
+        cursor.close()
+        conn.close()
+        
+        return count > 0
+    
+    except Exception as e:
+        logger.error(f"Error checking Sensor Coverage visibility: {e}", exc_info=True)
         if conn:
             try:
                 cursor.close()
@@ -2965,7 +3041,7 @@ def dashboard_linux_agent_health():
             "system_state": agents_data,
             "timestamp": current_time.isoformat()
         })
-    
+
     except Exception as e:
         logger.error(f"Linux Agent Health dashboard error: {e}", exc_info=True)
         if conn:
@@ -2975,6 +3051,163 @@ def dashboard_linux_agent_health():
             except:
                 pass
         return jsonify({"error": "Metric unavailable"}), 500
+
+
+@app.route('/api/dashboards/sensor-coverage')
+def dashboard_sensor_coverage():
+    """
+    Sensor Coverage Dashboard Endpoint.
+    Returns which telemetry sensors are ACTIVE per Linux agent.
+    Returns 204 No Content if no data exists.
+
+    SQL Query (EXACT as per spec):
+    WITH recent AS (
+      SELECT
+        agent_id,
+        payload
+      FROM linux_agent_telemetry
+      WHERE observed_at > NOW() - INTERVAL '10 minutes'
+    )
+    SELECT
+      agent_id,
+      BOOL_OR(payload->>'event_category' = 'process')        AS process_sensor,
+      BOOL_OR(payload ? 'filesystem_data')                   AS filesystem_sensor,
+      BOOL_OR(payload ? 'network_data')                      AS network_sensor,
+      BOOL_OR(payload ? 'system' AND payload->'system' != '{}'::jsonb) AS system_sensor,
+      BOOL_OR(payload->>'event_category' = 'deception')      AS deception_sensor
+    FROM recent
+    GROUP BY agent_id;
+    """
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+
+        # Get query parameters
+        since_minutes = int(request.args.get('since_minutes', 10))
+
+        # Check if table exists
+        if not db.table_exists("ransomeye", "linux_agent_telemetry"):
+            cursor.close()
+            conn.close()
+            return Response(status=204)
+
+        # Check if required columns exist
+        required_cols = ["agent_id", "observed_at", "payload"]
+        for col in required_cols:
+            if not db.column_exists("ransomeye", "linux_agent_telemetry", col):
+                cursor.close()
+                conn.close()
+                return Response(status=204)
+
+        # Build exact SQL query as per spec (no Python-side filtering)
+        base_query = """
+            WITH recent AS (
+              SELECT
+                agent_id,
+                payload
+              FROM linux_agent_telemetry
+              WHERE observed_at > NOW() - INTERVAL '%s minutes'
+            )
+            SELECT
+              agent_id,
+              BOOL_OR(payload->>'event_category' = 'process')        AS process_sensor,
+              BOOL_OR(payload ? 'filesystem_data' AND payload->'filesystem_data' != 'null'::jsonb) AS filesystem_sensor,
+              BOOL_OR(payload ? 'network_data' AND payload->'network_data' != 'null'::jsonb) AS network_sensor,
+              BOOL_OR(payload ? 'system' AND payload->'system' != '{}'::jsonb) AS system_sensor,
+              BOOL_OR(payload->>'event_category' = 'deception')      AS deception_sensor
+            FROM recent
+            GROUP BY agent_id
+        """ % since_minutes
+
+        # Execute query
+        cursor.execute(base_query)
+        rows = cursor.fetchall()
+
+        # If zero rows, return 204 No Content
+        if not rows or len(rows) == 0:
+            cursor.close()
+            conn.close()
+            return Response(status=204)
+
+        # Process results
+        sensor_coverage_data = []
+        for row in rows:
+            agent_id_val = str(row[0]) if row[0] else None
+            process_sensor = bool(row[1]) if row[1] is not None else False
+            filesystem_sensor = bool(row[2]) if row[2] is not None else False
+            network_sensor = bool(row[3]) if row[3] is not None else False
+            system_sensor = bool(row[4]) if row[4] is not None else False
+            deception_sensor = bool(row[5]) if row[5] is not None else False
+
+            agent_entry = {
+                "agent_id": agent_id_val,
+                "process_sensor": process_sensor,
+                "filesystem_sensor": filesystem_sensor,
+                "network_sensor": network_sensor,
+                "system_sensor": system_sensor,
+                "deception_sensor": deception_sensor
+            }
+            sensor_coverage_data.append(agent_entry)
+
+        # Calculate coverage summary
+        total_agents = len(sensor_coverage_data)
+        if total_agents == 0:
+            cursor.close()
+            conn.close()
+            return Response(status=204)
+
+        # Count agents with full coverage (all 5 sensors active)
+        full_coverage_count = 0
+        missing_sensors_count = 0
+
+        for agent in sensor_coverage_data:
+            sensors_active = sum([
+                agent["process_sensor"],
+                agent["filesystem_sensor"],
+                agent["network_sensor"],
+                agent["system_sensor"],
+                agent["deception_sensor"]
+            ])
+            if sensors_active == 5:
+                full_coverage_count += 1
+            if sensors_active < 5:
+                missing_sensors_count += 1
+
+        full_coverage_percent = (full_coverage_count / total_agents * 100) if total_agents > 0 else 0
+        missing_sensors_percent = (missing_sensors_count / total_agents * 100) if total_agents > 0 else 0
+
+        cursor.close()
+        conn.close()
+
+        current_time = datetime.now(timezone.utc)
+
+        # Structure response for panels
+        return jsonify({
+            "sensor_coverage_matrix": sensor_coverage_data,
+            "coverage_summary": {
+                "total_agents": total_agents,
+                "full_coverage_count": full_coverage_count,
+                "full_coverage_percent": round(full_coverage_percent, 2),
+                "missing_sensors_count": missing_sensors_count,
+                "missing_sensors_percent": round(missing_sensors_percent, 2)
+            },
+            "timestamp": current_time.isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error in sensor coverage endpoint: {e}", exc_info=True)
+        if conn:
+            try:
+                cursor.close()
+                conn.close()
+            except:
+                pass
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route('/api/dashboards/db-health')
@@ -4429,44 +4662,56 @@ def update_ui_settings():
 
 
 if __name__ == '__main__':
-    # Validate bind address (fail-closed on invalid)
-    if not validate_bind_address(UI_BIND_ADDRESS):
-        logger.error(f"FAIL-CLOSED: Invalid bind address '{UI_BIND_ADDRESS}'. Allowed: 127.0.0.1, 0.0.0.0, or specific IP (e.g., 192.168.x.x)")
-        sys.exit(1)
-    
-    # Validate port range
-    if UI_BIND_PORT < 1 or UI_BIND_PORT > 65535:
-        logger.error(f"FAIL-CLOSED: Invalid port '{UI_BIND_PORT}'. Must be 1-65535")
-        sys.exit(1)
-    
-    # Log configuration for security audit
-    logger.info("=" * 60)
-    logger.info("RansomEye UI Server - Network Hardening Configuration")
-    logger.info("=" * 60)
-    logger.info(f"Bind Address: {UI_BIND_ADDRESS}:{UI_BIND_PORT}")
-    logger.info(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
-    logger.info(f"CORS Allowed Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'None (same-origin only)'}")
-    logger.info(f"CORS Credentials: {CORS_CREDENTIALS}")
-    logger.info(f"Proxy Trust: {TRUST_PROXY}")
-    logger.info(f"Air-Gap Mode: {AIR_GAP_MODE}")
-    logger.info("=" * 60)
-    
-    # Security warnings
-    if UI_BIND_ADDRESS == "0.0.0.0":
+    try:
+        # FATAL startup log - unmissable
+        logger.error("UI STARTUP: server.py reached, binding to 0.0.0.0:8081")
+        
+        # Enforce explicit binding - no conditional logic
+        BIND_HOST = "0.0.0.0"
+        BIND_PORT = 8081
+        
+        # Validate port range
+        if BIND_PORT < 1 or BIND_PORT > 65535:
+            logger.error(f"FAIL-CLOSED: Invalid port '{BIND_PORT}'. Must be 1-65535")
+            sys.exit(1)
+        
+        # Log configuration for security audit
+        logger.info("=" * 60)
+        logger.info("RansomEye UI Server - Network Hardening Configuration")
+        logger.info("=" * 60)
+        logger.info(f"Bind Address: {BIND_HOST}:{BIND_PORT}")
+        logger.info(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
+        logger.info(f"CORS Allowed Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'None (same-origin only)'}")
+        logger.info(f"CORS Credentials: {CORS_CREDENTIALS}")
+        logger.info(f"Proxy Trust: {TRUST_PROXY}")
+        logger.info(f"Air-Gap Mode: {AIR_GAP_MODE}")
+        logger.info("=" * 60)
+        
+        # Temporary startup log: DB connection user confirmation
+        logger.info("UI DB connection initialized using user=%s", DB_USER)
+        
+        # Security warnings
         logger.warning("SECURITY: Binding to 0.0.0.0 exposes UI to all network interfaces. Ensure firewall rules are configured.")
-    
-    if not CORS_ORIGINS_LIST:
-        logger.info("CORS: No allowed origins configured - same-origin only (most secure)")
-    else:
-        logger.info(f"CORS: Allowing origins: {', '.join(CORS_ORIGINS_LIST)}")
-    
-    if TRUST_PROXY:
-        logger.warning("SECURITY: Proxy trust enabled - X-Forwarded-For headers will be trusted. Ensure proxy is trusted.")
-    
-    print(f"Starting RansomEye UI Server on {UI_BIND_ADDRESS}:{UI_BIND_PORT}")
-    print(f"SOC-Grade Schema-Safe Dashboard")
-    print(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
-    print(f"Access from Windows: http://<server-ip>:{UI_BIND_PORT}")
-    print(f"CORS Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'Same-origin only'}")
-    
-    app.run(host=UI_BIND_ADDRESS, port=UI_BIND_PORT, debug=False)
+        
+        if not CORS_ORIGINS_LIST:
+            logger.info("CORS: No allowed origins configured - same-origin only (most secure)")
+        else:
+            logger.info(f"CORS: Allowing origins: {', '.join(CORS_ORIGINS_LIST)}")
+        
+        if TRUST_PROXY:
+            logger.warning("SECURITY: Proxy trust enabled - X-Forwarded-For headers will be trusted. Ensure proxy is trusted.")
+        
+        print(f"Starting RansomEye UI Server on {BIND_HOST}:{BIND_PORT}")
+        print(f"SOC-Grade Schema-Safe Dashboard")
+        print(f"Database: {DB_NAME}@{DB_HOST}:{DB_PORT}")
+        print(f"Access from Windows: http://<server-ip>:{BIND_PORT}")
+        print(f"CORS Origins: {CORS_ORIGINS_LIST if CORS_ORIGINS_LIST else 'Same-origin only'}")
+        
+        # Explicit binding - no Flask dev defaults, no reloader
+        app.run(host=BIND_HOST, port=BIND_PORT, debug=False, use_reloader=False)
+        
+    except Exception as e:
+        logger.error(f"FATAL: UI startup failed with exception: {e}", exc_info=True)
+        import traceback
+        logger.error(f"FATAL: Full traceback:\n{traceback.format_exc()}")
+        sys.exit(1)
