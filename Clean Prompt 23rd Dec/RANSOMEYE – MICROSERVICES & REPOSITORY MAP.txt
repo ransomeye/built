@@ -1,0 +1,489 @@
+# RANSOMEYE – MICROSERVICES & REPOSITORY MAP
+
+*(Authoritative Engineering Layout)*
+
+---
+
+## 0. GLOBAL REPO CONVENTIONS (APPLY TO ALL)
+
+**Mandatory**
+
+* Env-only configuration
+* Signed binaries / artifacts
+* Manifest-first startup
+* Fail-closed behavior
+* No hardcoded paths / IPs
+* Synthetic test data only
+* Unified installer (except agents & DPI)
+
+**Common Libraries (Shared)**
+
+```
+ransomeye-common/
+├── crypto/
+├── signing/
+├── telemetry/
+├── schema/
+├── config/
+├── utils/
+```
+
+---
+
+# 1. ENDPOINT AGENTS
+
+---
+
+## 1.1 Linux Agent
+
+### Repo
+
+```
+ransomeye-agent-linux/
+```
+
+### Services / Modules
+
+```
+agent/
+├── process_monitor/
+├── filesystem_monitor/
+├── persistence_monitor/
+├── network_intent_monitor/
+├── deception/
+├── context_violation_engine/
+├── temporal_gravity_engine/
+├── rarity_budget_engine/
+├── health_monitor/
+├── command_executor/
+├── telemetry_emitter/
+```
+
+### Responsibilities
+
+* Host telemetry (process, file, persistence)
+* Context violations
+* Temporal violations
+* Rarity budgets
+* Deception triggers
+* Signed command execution
+* No DB access
+
+### Outputs
+
+* Protobuf → Secure Bus → Ingest
+
+---
+
+## 1.2 Windows Agent
+
+### Repo
+
+```
+ransomeye-agent-windows/
+```
+
+### Services / Modules
+
+```
+agent/
+├── process_monitor/
+├── filesystem_monitor/
+├── registry_monitor/
+├── persistence_monitor/
+├── network_intent_monitor/
+├── lolbins_detector/
+├── deception/
+├── context_violation_engine/
+├── temporal_gravity_engine/
+├── rarity_budget_engine/
+├── health_monitor/
+├── command_executor/
+├── telemetry_emitter/
+```
+
+### Responsibilities
+
+* Windows-specific telemetry
+* Registry & service persistence
+* LOLBins abuse detection
+* Deception
+* No DB access
+
+---
+
+# 2. NETWORK SENSOR
+
+---
+
+## 2.1 DPI Probe
+
+### Repo
+
+```
+ransomeye-dpi-probe/
+```
+
+### Services / Modules
+
+```
+probe/
+├── packet_capture/
+├── flow_aggregator/
+├── protocol_fingerprinter/
+├── tls_metadata_extractor/
+├── dns_analyzer/
+├── network_physics_engine/
+├── beaconing_detector/
+├── lateral_movement_detector/
+├── exfiltration_detector/
+├── rarity_budget_engine/
+├── negative_space_detector/
+├── sensor_integrity_monitor/
+├── telemetry_emitter/
+```
+
+### Responsibilities
+
+* Passive packet capture
+* Flow & protocol analysis
+* TLS / DNS metadata
+* Network physics invariants
+* No enforcement
+* No DB access
+
+---
+
+# 3. INGESTION & NORMALIZATION
+
+---
+
+## 3.1 Secure Telemetry Bus
+
+### Repo
+
+```
+ransomeye-secure-bus/
+```
+
+### Modules
+
+```
+bus/
+├── auth/
+├── signing_verifier/
+├── rate_limiter/
+├── queue_manager/
+```
+
+### Responsibilities
+
+* AuthN / AuthZ
+* Signature validation
+* Replay protection
+* Backpressure handling
+
+---
+
+## 3.2 Telemetry Ingest Service
+
+### Repo
+
+```
+ransomeye-ingest/
+```
+
+### Services
+
+```
+ingest/
+├── schema_validator/
+├── normalizer/
+├── deduplicator/
+├── host_identity_mapper/
+├── enrichment/
+├── db_writer/
+```
+
+### Responsibilities
+
+* Validate schemas
+* Normalize Agent + DPI data
+* Write raw & normalized events to DB
+
+---
+
+# 4. CORRELATION & DETECTION CORE
+
+---
+
+## 4.1 Correlation Engine (Critical Brain)
+
+### Repo
+
+```
+ransomeye-correlation-engine/
+```
+
+### Services
+
+```
+engine/
+├── contradiction_engine/
+├── mutual_attestation_engine/
+├── confidence_accumulator/
+├── state_machine/
+├── graph_builder/
+├── incident_builder/
+```
+
+### Responsibilities
+
+* Cross-domain contradiction detection
+* Host ↔ Network attestation
+* Confidence accumulation
+* Incident lifecycle
+* No ML here
+
+---
+
+# 5. AI / ML CORE (LOW COMPUTE)
+
+---
+
+## 5.1 AI Core
+
+### Repo
+
+```
+ransomeye-ai-core/
+```
+
+### Services
+
+```
+ai/
+├── feature_store/
+├── clustering_engine/
+├── novelty_detector/
+├── drift_monitor/
+├── shap_explainer/
+├── model_registry/
+├── autolearn_controller/
+```
+
+### Responsibilities
+
+* Unsupervised clustering
+* Novel behavior detection
+* Drift tracking
+* SHAP explanations
+* No real-time blocking
+
+---
+
+# 6. LLM & SOC INTELLIGENCE
+
+---
+
+## 6.1 LLM Summarizer / SOC Copilot
+
+### Repo
+
+```
+ransomeye-llm-soc/
+```
+
+### Services
+
+```
+llm/
+├── incident_summarizer/
+├── explainability_translator/
+├── playbook_generator/
+├── report_generator/
+├── query_interface/
+```
+
+### Responsibilities
+
+* Human-readable explanations
+* Incident narratives
+* SOC guidance
+* **No decisions**
+
+---
+
+# 7. POLICY & RESPONSE
+
+---
+
+## 7.1 Policy Engine
+
+### Repo
+
+```
+ransomeye-policy-engine/
+```
+
+### Services
+
+```
+policy/
+├── rule_evaluator/
+├── simulation_engine/
+├── enforcement_controller/
+├── command_signer/
+```
+
+### Responsibilities
+
+* Decide response
+* Simulate first
+* Sign commands
+* Dispatch to agents
+
+---
+
+# 8. DATABASE LAYER
+
+---
+
+## 8.1 Intel Database
+
+### Repo
+
+```
+ransomeye-db/
+```
+
+### Contents
+
+```
+db/
+├── migrations/
+├── schemas/
+├── indexes/
+├── retention_policies/
+```
+
+### Written By
+
+* Ingest
+* Correlation Engine
+* AI Core (metadata only)
+
+### Read By
+
+* Correlation Engine
+* AI Core
+* Dashboards
+* LLM
+* Reports
+
+---
+
+# 9. DASHBOARDS & REPORTING
+
+---
+
+## 9.1 SOC UI & Dashboards
+
+### Repo
+
+```
+ransomeye-ui/
+```
+
+### Services
+
+```
+ui/
+├── dashboards/
+├── incident_views/
+├── mitre_mapping/
+├── analytics/
+```
+
+---
+
+# 10. INSTALLER & OPERATIONS
+
+---
+
+## 10.1 Unified Installer
+
+### Repo
+
+```
+ransomeye-installer/
+```
+
+### Responsibilities
+
+* Deploy all core services
+* Validate manifests
+* Enforce fail-closed
+* Systemd orchestration
+
+---
+
+# 11. CI / TESTING / VALIDATION
+
+---
+
+## 11.1 CI & Synthetic Test Harness
+
+### Repo
+
+```
+ransomeye-ci/
+```
+
+### Services
+
+```
+ci/
+├── synthetic_traffic_generator/
+├── synthetic_malware_sim/
+├── regression_tests/
+├── signing_validation/
+```
+
+---
+
+# 12. END-TO-END DATA FLOW (FINAL)
+
+```
+Linux / Windows Agent
+        ↓
+      Secure Bus
+        ↓
+       Ingest
+        ↓
+     Intel DB
+        ↓
+Correlation Engine
+        ↓
+   AI Core (optional)
+        ↓
+ Policy Engine
+        ↓
+     Agents
+```
+
+---
+
+# FINAL CHECK (IMPORTANT)
+
+This mapping guarantees:
+
+* Zero tight coupling
+* Horizontal scalability
+* Low compute
+* Unknown threat resilience
+* Clear ownership per repo
+* Clean CI boundaries
+
+---
+

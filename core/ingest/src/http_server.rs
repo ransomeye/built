@@ -421,6 +421,21 @@ async fn handle_linux_ingest(
     
     // PART 3: INGESTION CONTRACT ENFORCEMENT - Validate payload.system exists and is non-null
     // Ensure system metrics are present in data (preserve valid metrics, inject empty if missing)
+    // ROOT CAUSE ANALYSIS:
+    // - data: &JsonValue from payload.envelope.get("data") - this is a reference to the envelope's data field
+    // - data_with_system: JsonValue (owned) cloned from data
+    // - The agent sends EventData with system: Option<serde_json::Value> and skip_serializing_if = "Option::is_none"
+    // - If system is None, it's omitted from JSON, so data doesn't have "system" key
+    // - We inject "system" into data_with_system, then serialize it to payload_json
+    // STRUCT DEFINITIONS:
+    // - payload: SignedEvent { envelope: JsonValue, ... }
+    // - payload.envelope: JsonValue (object with "data" field)
+    // - data: &JsonValue (reference to envelope["data"])
+    // - data_with_system: JsonValue (owned clone of data, mutated to include "system")
+    error!("[DEBUG] data is_object: {}", data.is_object());
+    error!("[DEBUG] data keys before modification: {:?}", 
+           data.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    
     let mut data_with_system = data.clone();
     if let Some(data_obj) = data_with_system.as_object_mut() {
         let system_value = data_obj.get("system");
@@ -445,10 +460,29 @@ async fn handle_linux_ingest(
         return Err(StatusCode::BAD_REQUEST);
     }
     
+    // HARD ASSERTION: Verify system exists before serialization
+    assert!(
+        data_with_system.get("system").is_some(),
+        "FATAL: system missing before DB write | data_with_system keys: {:?}",
+        data_with_system.as_object().map(|o| o.keys().collect::<Vec<_>>())
+    );
+    
+    error!("[DEBUG] data_with_system keys after modification: {:?}", 
+           data_with_system.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    error!("[DEBUG] data_with_system has system key: {}", 
+           data_with_system.get("system").is_some());
+    
     // OPTION A (Preferred, validator-aligned): Write JSON with system at top level
     // Structure: { "system": { ... }, ...rest of data fields... }
     // This ensures payload.system exists when validator queries the DB column
-    let payload_json = serde_json::to_string(&data_with_system).unwrap_or_else(|_| "{}".to_string());
+    // FIX: Use JsonValue directly for binding to ensure proper JSONB serialization
+    // Root cause: String binding may not preserve JSON structure correctly in all cases
+    let payload_json_value = data_with_system.clone();
+    let payload_json = serde_json::to_string(&payload_json_value).unwrap_or_else(|_| "{}".to_string());
+    
+    error!("[DEBUG] payload_json length: {}, contains 'system': {}", 
+           payload_json.len(), 
+           payload_json.contains("\"system\""));
     
     // TEMPORARY: Log payload_json once to verify system metrics are included at top level
     if !LOGGED_PAYLOAD_JSON.swap(true, Ordering::Relaxed) {
@@ -489,7 +523,7 @@ async fn handle_linux_ingest(
     let protocol_param: Option<String> = protocol.clone();
     
     // INSERT #1 — REQUIRED FIELDS ONLY (within transaction)
-    let insert_result = db.execute(
+    let insert_result = db.query_one(
         r#"
         INSERT INTO linux_agent_telemetry (
             agent_id, source_message_id, source_nonce, source_component_identity,
@@ -499,6 +533,7 @@ async fn handle_linux_ingest(
         VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
         )
+        RETURNING telemetry_id, source_message_id
         "#,
         &[
             &agent_id,
@@ -519,10 +554,25 @@ async fn handle_linux_ingest(
     ).await;
 
     match insert_result {
-        Ok(_) => {
+        Ok(insert_row) => {
+            let inserted_telemetry_id: Uuid = insert_row.get(0);
+            let inserted_source_message_id: Uuid = insert_row.get(1);
+            error!("[DB INSERT RESULT] telemetry_id = {}, source_message_id = {}", inserted_telemetry_id, inserted_source_message_id);
+            
+            // Use the returned source_message_id for UPDATE to ensure exact match
+            let update_source_message_id = inserted_source_message_id;
             // UPDATE #2 — OPTIONAL FIELDS (within transaction)
+            // Normalize optional parameters to owned types for tokio_postgres binding
+            let file_path_db: Option<String> = file_path_param.map(|s| s.to_string());
+            let protocol_db: Option<String> = protocol_param.map(|s| s.to_string());
+            let cmdline_db: Option<String> = cmdline_param.map(|s| s.to_string());
+            let src_ip_db: Option<IpAddr> = network_src_ip_param;
+            let dst_ip_db: Option<IpAddr> = network_dst_ip_param;
+            
+            // FIX: Bind JsonValue directly instead of String to ensure proper JSONB handling
+            // Root cause: String->JSONB conversion may lose structure; JsonValue binding is type-safe
             error!("[DB WRITE] linux_agent_telemetry.payload bound with system key = {}",
-                   payload_json.contains("\"system\""));
+                   payload_json_value.get("system").is_some());
             let update_result = db.execute(
                 r#"
                 UPDATE linux_agent_telemetry
@@ -536,21 +586,52 @@ async fn handle_linux_ingest(
                 WHERE source_message_id = $8
                 "#,
                 &[
-                    &file_path_param.as_deref(),
-                    &network_src_ip_param_str.as_deref(),
-                    &network_dst_ip_param_str.as_deref(),
-                    &payload_json,
+                    &file_path_db,
+                    &src_ip_db,
+                    &dst_ip_db,
+                    &payload_json_value,
                     &payload_sha256,
-                    &protocol_param.as_deref(),
-                    &cmdline_param.as_deref(),
-                    &message_id_uuid,
+                    &protocol_db,
+                    &cmdline_db,
+                    &update_source_message_id,
                 ],
             ).await;
             
-            // UPDATE is optional - if it fails, we still commit raw_events + required telemetry fields
-            if let Err(e) = update_result {
-                warn!("Failed to update linux_agent_telemetry optional fields (non-fatal): {}", e);
-                // Continue to commit - raw_events and required telemetry fields are already inserted
+            // Log UPDATE result and verify payload was written correctly
+            match update_result {
+                Ok(rows_affected) => {
+                    error!("[DB UPDATE RESULT] rows_affected = {} | UPDATE used source_message_id = {}", rows_affected, update_source_message_id);
+                    // Hard check: UPDATE must match exactly one row
+                    if rows_affected == 0 {
+                        error!("FATAL: UPDATE matched zero rows for source_message_id={}", update_source_message_id);
+                    }
+                    // Verify payload was written by querying it back
+                    if rows_affected > 0 {
+                        if let Ok(Some(verify_row)) = db.query_opt(
+                            "SELECT payload FROM linux_agent_telemetry WHERE source_message_id = $1",
+                            &[&update_source_message_id],
+                        ).await {
+                            let returned_payload: serde_json::Value = verify_row.get(0);
+                            let payload_str = serde_json::to_string(&returned_payload).unwrap_or_else(|_| "{}".to_string());
+                            let payload_preview = if payload_str.len() > 500 {
+                                format!("{}...", &payload_str[..500])
+                            } else {
+                                payload_str.clone()
+                            };
+                            error!(
+                                "[DB UPDATE RESULT] VERIFIED: payload contains 'system': {} | payload preview: {}",
+                                returned_payload.get("system").is_some(),
+                                payload_preview
+                            );
+                        }
+                    } else {
+                        error!("[DB UPDATE RESULT] rows_affected = 0 | No row found with source_message_id = {}", message_id_uuid);
+                    }
+                }
+                Err(e) => {
+                    error!("[DB UPDATE RESULT] ERROR: Failed to update linux_agent_telemetry optional fields (non-fatal): {}", e);
+                    // Continue to commit - raw_events and required telemetry fields are already inserted
+                }
             }
             
             // Commit transaction (raw_events + telemetry persisted atomically)

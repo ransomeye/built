@@ -1,0 +1,564 @@
+DPI PROBE – COMPLETE SPECIFICATION (WITH ENHANCEMENTS)
+0. ROLE & BOUNDARIES (ABSOLUTE)
+
+The DPI Probe is:
+
+Passive
+
+Out-of-band
+
+High-throughput
+
+Network-only
+
+Non-blocking
+
+Non-decrypting
+
+Non-enforcing
+
+It provides ground-truth network behavior that the Linux Agent can never see.
+
+1. DPI PROBE – TELEMETRY COLLECTION (COMPLETE + ENHANCED)
+1.1 Packet Capture Telemetry
+
+Captured using:
+
+AF_PACKET / DPDK / PF_RING (profile-based)
+
+Raw Packet Metadata
+
+capture_ts_ns (UTC, nanosecond)
+
+interface
+
+direction (ingress / egress)
+
+packet_size
+
+vlan_id
+
+tcp_flags
+
+fragmentation_flags
+
+L2
+
+src_mac
+
+dst_mac
+
+ethertype
+
+L3
+
+src_ip
+
+dst_ip
+
+ttl / hop_limit
+
+ip_flags
+
+L4
+
+src_port
+
+dst_port
+
+protocol
+
+tcp_seq_meta
+
+tcp_ack_meta
+
+flow_5_tuple_id
+
+❌ No payload storage
+❌ No TLS decryption
+❌ No packet modification
+
+1.2 Flow Telemetry (PRIMARY OUTPUT)
+
+Packets aggregated into flows:
+
+(src_ip, src_port, dst_ip, dst_port, protocol)
+
+Flow Metrics
+
+flow_start_ts
+
+flow_end_ts
+
+total_packets
+
+total_bytes
+
+avg_pkt_size
+
+pkt_rate
+
+byte_rate
+
+tcp_handshake_time
+
+tcp_rst_seen
+
+tcp_fin_seen
+
+Directional Metrics
+
+bytes_client_to_server
+
+bytes_server_to_client
+
+asymmetry_ratio
+
+1.3 Protocol & TLS Fingerprinting
+Identified Protocols
+
+HTTP / HTTPS (SNI only)
+
+DNS
+
+SMTP / POP3 / IMAP
+
+FTP
+
+SMB
+
+SSH
+
+RDP
+
+NTP
+
+TOR
+
+UNKNOWN (entropy-based)
+
+TLS Metadata (NO DECRYPTION)
+
+tls_version
+
+cipher_suite
+
+ja3
+
+ja3s
+
+sni
+
+cert_issuer
+
+cert_validity_days
+
+cert_hash
+
+1.4 DNS Telemetry (ENHANCED)
+Queries
+
+query_name
+
+query_type
+
+client_ip
+
+resolver_ip
+
+timestamp
+
+Responses
+
+resolved_ips
+
+ttl
+
+nxdomain_flag
+
+servfail_flag
+
+fast_flux_score
+
+Threat Features
+
+domain_entropy
+
+domain_age_first_seen
+
+nxdomain_ratio
+
+query_frequency
+
+1.5 Lateral Movement Detection (ENHANCED)
+Signals
+
+SMB scanning bursts
+
+RDP fan-out
+
+SSH brute-force patterns
+
+East-west propagation graphs
+
+Failed auth session bursts
+
+SYN → RST storms
+
+1.6 Data Exfiltration Detection (ENHANCED)
+Indicators
+
+Long-lived encrypted sessions
+
+High asymmetry ratios
+
+Low-and-slow byte leakage
+
+Off-hours uploads
+
+Rare ASN destinations
+
+DNS tunneling heuristics
+
+Cloud storage abuse
+
+TOR / VPN detection
+
+1.7 Network Asset Discovery
+
+Passive only.
+
+internal_ip
+
+observed_ports
+
+observed_protocols
+
+os_fingerprint_hint
+
+first_seen
+
+last_seen
+
+1.8 DPI Health & Integrity Telemetry (ENHANCED)
+
+packet_drop_rate
+
+ring_buffer_overflows
+
+capture_gbps
+
+cpu_per_core
+
+nic_queue_depth
+
+timestamp_drift
+
+interface_up_down
+
+probe_uptime
+
+sensor_integrity_score
+
+capture_gap_detected
+
+2. DPI PROBE – AI / ML ROLE (STRICT)
+2.1 On-Probe Intelligence (Allowed)
+
+Feature Extraction ONLY
+
+Flow duration
+
+Timing variance
+
+Periodicity score (FFT / autocorrelation)
+
+Byte asymmetry
+
+Protocol rarity
+
+Destination rarity
+
+JA3 frequency drift
+
+NXDOMAIN ratios
+
+Outputs:
+
+feature_vector
+
+suspicion_score
+
+reason_codes
+
+2.2 Explicitly Forbidden on DPI
+
+❌ ML inference
+
+❌ ONNX
+
+❌ Random Forest / XGBoost
+
+❌ LLMs
+
+❌ Enforcement
+
+❌ Blocking
+
+All inference is centralized.
+
+3. DATABASE MODEL (AUTHORITATIVE)
+
+⚠️ DPI never writes directly to DB.
+Schemas below represent final persisted state.
+
+3.1 network_flows
+Column	Type
+flow_id	UUID (PK)
+src_ip	INET
+dst_ip	INET
+src_port	INT
+dst_port	INT
+protocol	TEXT
+start_ts	TIMESTAMP
+end_ts	TIMESTAMP
+bytes_total	BIGINT
+packets_total	BIGINT
+asymmetry_ratio	FLOAT
+probe_id	TEXT
+
+Indexes
+
+(src_ip, start_ts)
+
+(dst_ip, start_ts)
+
+(protocol)
+
+(probe_id, start_ts)
+
+3.2 protocol_events
+Column	Type
+flow_id	UUID (FK)
+protocol	TEXT
+tls_version	TEXT
+ja3	TEXT
+ja3s	TEXT
+sni	TEXT
+cert_hash	TEXT
+risk_flags	JSONB
+
+Indexes
+
+(ja3)
+
+(sni)
+
+(protocol)
+
+3.3 dns_events
+Column	Type
+query	TEXT
+response	INET[]
+client_ip	INET
+resolver_ip	INET
+ttl	INT
+entropy_score	FLOAT
+nxdomain	BOOL
+timestamp	TIMESTAMP
+
+Indexes
+
+(query)
+
+(client_ip, timestamp)
+
+(entropy_score DESC)
+
+3.4 lateral_movement_events
+Column	Type
+src_host	INET
+dst_host	INET
+protocol	TEXT
+fanout_score	FLOAT
+timestamp	TIMESTAMP
+probe_id	TEXT
+
+Indexes
+
+(src_host, timestamp)
+
+(fanout_score DESC)
+
+3.5 exfiltration_events
+Column	Type
+src_host	INET
+dst_ip	INET
+dst_country	TEXT
+bytes_sent	BIGINT
+duration_sec	INT
+suspicion_score	FLOAT
+timestamp	TIMESTAMP
+
+Indexes
+
+(suspicion_score DESC)
+
+(dst_country)
+
+(timestamp)
+
+3.6 network_assets
+Column	Type
+ip_address	INET (PK)
+observed_ports	INT[]
+protocols	TEXT[]
+os_hint	TEXT
+first_seen	TIMESTAMP
+last_seen	TIMESTAMP
+probe_id	TEXT
+
+Indexes
+
+(last_seen)
+
+(probe_id)
+
+3.7 dpi_health
+Column	Type
+probe_id	TEXT
+capture_rate	FLOAT
+drop_rate	FLOAT
+cpu_usage	FLOAT
+integrity_score	FLOAT
+timestamp	TIMESTAMP
+
+Indexes
+
+(probe_id, timestamp)
+
+4. AGENT + DPI CORRELATION FLOW (STEP-BY-STEP)
+
+This is the core detection advantage.
+
+STEP 1 – Local Execution
+
+Linux Agent detects:
+
+Process start
+
+File write burst
+
+Honeyfile access
+
+Agent emits:
+
+ProcessStart + FileWrite + HostID
+
+STEP 2 – Network Activity
+
+DPI sees:
+
+New outbound flow
+
+Rare destination
+
+JA3 not seen before
+
+Beaconing periodicity
+
+DPI emits:
+
+Flow + FeatureVector + SuspicionScore
+
+STEP 3 – Ingest Normalization
+
+Ingest layer:
+
+Deduplicates
+
+Normalizes Agent + DPI events
+
+Tags same HostID / IP
+
+STEP 4 – Correlation Engine
+
+Engine correlates:
+
+Process → Network flow
+
+File encryption → Exfil pattern
+
+Honeyfile → Lateral scan
+
+State machine transition:
+
+Clean → Suspicious → Probable → Confirmed
+
+STEP 5 – AI Inference (Centralized)
+
+AI Core evaluates:
+
+Behavioral DNA
+
+Network fingerprints
+
+Host behavior
+
+Outputs:
+
+Threat family
+
+Confidence score
+
+SHAP explanation
+
+STEP 6 – Policy & Response
+
+Policy Engine:
+
+Simulate OR enforce
+
+Commands signed
+
+Linux Agent:
+
+Kill process
+
+Isolate network
+
+DPI:
+
+Continues observing for containment validation
+
+5. HARD GUARANTEES (RE-ASSERTED)
+
+Passive capture only
+
+No TLS decryption
+
+No blocking
+
+Env-only config
+
+Signed binaries
+
+Fail-closed
+
+Synthetic CI traffic only
+
+DB writes centralized only
+
+6. WHY THIS WORKS (NON-MARKETING)
+
+Agent sees intent
+
+DPI sees truth
+
+Core correlates context
+
+AI explains why
+
+Policy decides how
+
+Sentinel ensures survivability

@@ -86,7 +86,11 @@ def validate_part1_database():
                    COUNT(DISTINCT agent_id) as unique_agents,
                    MIN(observed_at) as oldest,
                    MAX(observed_at) as newest,
-                   COUNT(*) FILTER (WHERE payload IS NOT NULL AND payload::text LIKE '%system%') as with_system_metrics
+                   COUNT(*) FILTER (
+                     WHERE payload ? 'system'
+                     AND jsonb_typeof(payload->'system') = 'object'
+                     AND payload->'system' != '{}'::jsonb
+                   ) as with_system_metrics
             FROM linux_agent_telemetry
         """)
         row = cursor.fetchone()
@@ -97,6 +101,23 @@ def validate_part1_database():
             log_result("part1_database", f"Oldest record: {oldest}", "INFO")
             log_result("part1_database", f"Newest record: {newest}", "INFO")
             log_result("part1_database", f"Rows with system metrics: {with_system}", "INFO")
+            
+            # Debug query for system metrics detection
+            cursor.execute("""
+                SELECT
+                  COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE payload ? 'system') AS has_system,
+                  COUNT(*) FILTER (
+                    WHERE payload ? 'system'
+                    AND jsonb_typeof(payload->'system') = 'object'
+                    AND payload->'system' != '{}'::jsonb
+                  ) AS has_real_system
+                FROM linux_agent_telemetry
+            """)
+            debug_row = cursor.fetchone()
+            if debug_row:
+                debug_total, debug_has_system, debug_has_real_system = debug_row
+                log_result("part1_database", f"DEBUG: total={debug_total}, has_system_key={debug_has_system}, has_real_system={debug_has_real_system}", "INFO")
             
             if total == 0:
                 log_result("part1_database", "BLOCKER: No Linux Agent telemetry found", "ERROR")
@@ -109,7 +130,9 @@ def validate_part1_database():
                 cursor.execute("""
                     SELECT payload, observed_at, agent_id, source_component_identity
                     FROM linux_agent_telemetry
-                    WHERE payload IS NOT NULL AND payload::text LIKE '%system%'
+                    WHERE payload ? 'system'
+                    AND jsonb_typeof(payload->'system') = 'object'
+                    AND payload->'system' != '{}'::jsonb
                     ORDER BY observed_at DESC
                     LIMIT 1
                 """)

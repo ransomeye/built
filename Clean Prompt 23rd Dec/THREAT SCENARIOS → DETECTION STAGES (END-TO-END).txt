@@ -1,0 +1,245 @@
+# THREAT SCENARIOS → DETECTION STAGES (END-TO-END)
+
+Detection stages follow the **Engine State Machine**:
+
+```
+Clean → Suspicious → Probable → Confirmed
+```
+
+---
+
+## 1. RANSOMWARE (MODERN FILELESS + ENCRYPTOR)
+
+### Scenario
+
+User executes a trojanized binary → encrypts files → contacts C2 → exfiltrates keys.
+
+### Stage Mapping
+
+| Stage                 | Signal Source | What is Detected                    | Why It Matters               |
+| --------------------- | ------------- | ----------------------------------- | ---------------------------- |
+| Clean → Suspicious    | Linux Agent   | New process from `/tmp` or user dir | Untrusted execution context  |
+| Suspicious            | Linux Agent   | Rapid file writes + entropy > 7.5   | Encryption behavior          |
+| Suspicious            | DPI Probe     | New outbound TLS flow + rare JA3    | Potential C2                 |
+| Suspicious → Probable | DPI Probe     | Beaconing periodicity               | Active C2 channel            |
+| Probable              | Agent + DPI   | File encryption + network C2        | Multi-domain confirmation    |
+| Probable → Confirmed  | AI Core       | Behavioral DNA match                | Ransomware family identified |
+
+**Response**
+
+* Kill process
+* Isolate host
+* Preserve evidence
+* DPI validates containment
+
+---
+
+## 2. WORM (INTERNAL LATERAL PROPAGATION)
+
+### Scenario
+
+One infected host scans SMB/RDP and spreads internally.
+
+### Stage Mapping
+
+| Stage                 | Signal Source | Detection                    | Why                        |
+| --------------------- | ------------- | ---------------------------- | -------------------------- |
+| Clean → Suspicious    | DPI Probe     | SMB/RDP fan-out spike        | Abnormal east-west traffic |
+| Suspicious            | DPI Probe     | SYN → RST bursts             | Failed auth scanning       |
+| Suspicious            | Linux Agent   | New service/process spawn    | Payload execution          |
+| Suspicious → Probable | DPI + Agent   | Scan + execution correlation | Propagation confirmed      |
+| Probable → Confirmed  | Engine        | Multi-host graph expansion   | Worm classification        |
+
+**Response**
+
+* Network isolation
+* Lateral movement containment
+* Internal IOC sweep
+
+---
+
+## 3. TROJAN / BACKDOOR (STEALTHY PERSISTENCE)
+
+### Scenario
+
+User installs trojan → establishes low-and-slow C2 → persistence.
+
+### Stage Mapping
+
+| Stage                 | Source      | Detection                    | Why                 |
+| --------------------- | ----------- | ---------------------------- | ------------------- |
+| Clean → Suspicious    | Linux Agent | New startup entry / cron     | Persistence attempt |
+| Suspicious            | DPI Probe   | Long-lived encrypted session | Covert channel      |
+| Suspicious            | DPI Probe   | Rare ASN destination         | Low prevalence      |
+| Suspicious → Probable | DPI         | Beaconing w/ jitter          | Modern C2           |
+| Probable → Confirmed  | AI Core     | Network behavior DNA         | Trojan family       |
+
+**Response**
+
+* Kill persistence
+* Host isolation
+* Credential rotation
+
+---
+
+## 4. CREDENTIAL HARVESTING / PASSWORD SPRAY
+
+### Scenario
+
+Attacker brute-forces SSH/RDP.
+
+### Stage Mapping
+
+| Stage                 | Source    | Detection               | Why                |
+| --------------------- | --------- | ----------------------- | ------------------ |
+| Clean → Suspicious    | DPI Probe | Repeated short sessions | Auth failures      |
+| Suspicious            | DPI Probe | Multi-user targeting    | Spray pattern      |
+| Suspicious → Probable | Engine    | Cross-host correlation  | Coordinated attack |
+| Probable → Confirmed  | Policy    | Threshold exceeded      | Active intrusion   |
+
+**Response**
+
+* Block offending IPs (external controls)
+* Force password resets
+* Alert SOC
+
+---
+
+## 5. DNS TUNNELING (COVERT EXFIL)
+
+### Scenario
+
+Malware exfiltrates data via DNS TXT records.
+
+### Stage Mapping
+
+| Stage                 | Source    | Detection            | Why               |
+| --------------------- | --------- | -------------------- | ----------------- |
+| Clean → Suspicious    | DPI Probe | High-entropy domains | Encoded payload   |
+| Suspicious            | DPI Probe | NXDOMAIN ratio spike | DGA/tunnel        |
+| Suspicious            | DPI Probe | Large TXT records    | Data transfer     |
+| Suspicious → Probable | Engine    | DNS volume anomaly   | Exfil confirmed   |
+| Probable → Confirmed  | AI Core   | Tunnel signature     | Malicious channel |
+
+**Response**
+
+* Isolate host
+* Sinkhole domains
+* Forensic review
+
+---
+
+## 6. DATA EXFILTRATION (LOW & SLOW)
+
+### Scenario
+
+Insider or malware slowly leaks data.
+
+### Stage Mapping
+
+| Stage                 | Source    | Detection             | Why                |
+| --------------------- | --------- | --------------------- | ------------------ |
+| Clean → Suspicious    | DPI Probe | Off-hours uploads     | Behavioral anomaly |
+| Suspicious            | DPI Probe | Rare destination ASN  | Untrusted endpoint |
+| Suspicious            | DPI Probe | Byte asymmetry        | Data leaving       |
+| Suspicious → Probable | Engine    | Sustained pattern     | Intentional exfil  |
+| Probable → Confirmed  | AI Core   | Contextual validation | Malicious intent   |
+
+**Response**
+
+* Isolate host
+* Legal & compliance workflow
+* Evidence preservation
+
+---
+
+## 7. LIVING-OFF-THE-LAND (LOLbins)
+
+### Scenario
+
+Attacker uses `curl`, `wget`, `bash` for stealth.
+
+### Stage Mapping
+
+| Stage                 | Source      | Detection                 | Why             |
+| --------------------- | ----------- | ------------------------- | --------------- |
+| Clean → Suspicious    | Linux Agent | LOLbin execution          | Dual-use tool   |
+| Suspicious            | DPI Probe   | Download from rare domain | Payload fetch   |
+| Suspicious → Probable | Engine      | Tool + network link       | Abuse confirmed |
+| Probable → Confirmed  | AI Core     | LOLbin abuse model        | Attack pattern  |
+
+**Response**
+
+* Kill process
+* Lock down execution paths
+* Audit system
+
+---
+
+## 8. TOR / DARKNET C2
+
+### Scenario
+
+Malware communicates via TOR.
+
+### Stage Mapping
+
+| Stage                 | Source    | Detection               | Why               |
+| --------------------- | --------- | ----------------------- | ----------------- |
+| Clean → Suspicious    | DPI Probe | TOR fingerprint         | Anonymity network |
+| Suspicious            | DPI Probe | Encrypted long sessions | Persistent C2     |
+| Suspicious → Probable | Engine    | Context correlation     | Malicious use     |
+| Probable → Confirmed  | Policy    | Policy violation        | High risk         |
+
+**Response**
+
+* Immediate isolation
+* Full host forensic capture
+
+---
+
+## 9. DPI SENSOR BLINDING ATTEMPT
+
+### Scenario
+
+Attacker overloads or disables DPI.
+
+### Stage Mapping
+
+| Stage                 | Source     | Detection            | Why             |
+| --------------------- | ---------- | -------------------- | --------------- |
+| Clean → Suspicious    | DPI Health | Packet drops spike   | Sensor stress   |
+| Suspicious            | DPI Health | Capture gaps         | Tampering       |
+| Suspicious → Probable | Engine     | Loss + active attack | Evasion attempt |
+| Probable → Confirmed  | Policy     | Integrity breach     | Critical event  |
+
+**Response**
+
+* Raise SOC alert
+* Mark detections confidence-adjusted
+* Investigate infrastructure
+
+---
+
+# SUMMARY MATRIX (WHO SEES WHAT FIRST)
+
+| Threat       | First Detector | Why              |
+| ------------ | -------------- | ---------------- |
+| Ransomware   | Agent          | File system      |
+| Worm         | DPI            | Network fan-out  |
+| Trojan       | DPI            | C2 behavior      |
+| DNS Tunnel   | DPI            | DNS patterns     |
+| Exfiltration | DPI            | Byte asymmetry   |
+| LOLbins      | Agent          | Process context  |
+| TOR          | DPI            | Fingerprint      |
+| Insider      | DPI            | Behavioral drift |
+
+---
+
+## KEY TAKEAWAY
+
+> **No single sensor can detect modern threats alone.**
+> RansomEye’s strength is **Agent intent + DPI truth + AI correlation**.
+
+---
+

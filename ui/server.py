@@ -375,17 +375,102 @@ def dashboard_view(dashboard_name: str):
 def list_dashboards():
     """
     List all available dashboards with folder assignments.
+    Filters out dashboards that should be hidden (e.g., no data available).
     
     Returns:
         JSON with dashboards array (names) and dashboards_with_folders array (name + folder_id)
     """
     dashboard_names = dashboard_engine.list_dashboards()
     dashboards_with_folders = dashboard_engine.list_dashboards_with_folders()
+    
+    # Check visibility for dashboards that require data
+    visible_dashboards = []
+    visible_dashboards_with_folders = []
+    
+    for dash in dashboards_with_folders:
+        dashboard_name = dash.get('name')
+        
+        # Check visibility for Linux Agent Health dashboard
+        if dashboard_name == 'linux_agent_health':
+            if not _check_linux_agent_health_visibility():
+                continue  # Skip this dashboard - no data available
+        
+        visible_dashboards_with_folders.append(dash)
+    
+    # Filter dashboard_names to match visible dashboards
+    visible_dashboard_names = [d['name'] for d in visible_dashboards_with_folders]
+    
     return jsonify({
-        "dashboards": dashboard_names,
-        "dashboards_with_folders": dashboards_with_folders,
-        "count": len(dashboard_names)
+        "dashboards": visible_dashboard_names,
+        "dashboards_with_folders": visible_dashboards_with_folders,
+        "count": len(visible_dashboard_names)
     })
+
+
+def _check_linux_agent_health_visibility() -> bool:
+    """
+    Check if Linux Agent Health dashboard should be visible.
+    Returns True if data exists, False otherwise.
+    
+    Uses EXACT same SQL predicate as main endpoint (no simplified COUNT query).
+    """
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Check if table exists
+        if not db.table_exists("ransomeye", "linux_agent_telemetry"):
+            cursor.close()
+            conn.close()
+            return False
+        
+        # Check if required columns exist
+        required_cols = ["agent_id", "observed_at", "payload"]
+        for col in required_cols:
+            if not db.column_exists("ransomeye", "linux_agent_telemetry", col):
+                cursor.close()
+                conn.close()
+                return False
+        
+        # Use EXACT same SQL predicate as main endpoint
+        # Reuse the same WITH latest CTE and check if it returns any rows
+        visibility_query = """
+            WITH latest AS (
+              SELECT DISTINCT ON (agent_id)
+                agent_id,
+                observed_at,
+                payload->'system' AS system
+              FROM linux_agent_telemetry
+              WHERE payload ? 'system'
+                AND payload->'system' != '{}'::jsonb
+                AND observed_at > NOW() - INTERVAL '10 minutes'
+              ORDER BY agent_id, observed_at DESC
+            )
+            SELECT COUNT(*)
+            FROM latest
+        """
+        
+        count = db.safe_query(visibility_query, default=0) or 0
+        
+        cursor.close()
+        conn.close()
+        
+        return count > 0
+    
+    except Exception as e:
+        logger.error(f"Error checking Linux Agent Health visibility: {e}", exc_info=True)
+        if conn:
+            try:
+                cursor.close()
+                conn.close()
+            except:
+                pass
+        return False
 
 
 @app.route('/api/dashboard-folders', methods=['GET'])
@@ -2676,6 +2761,219 @@ def dashboard_dpi_probe_health():
         logger.error(f"DPI Probe health error: {e}", exc_info=True)
         if conn:
             conn.close()
+        return jsonify({"error": "Metric unavailable"}), 500
+
+
+@app.route('/api/dashboards/linux-agent-health')
+def dashboard_linux_agent_health():
+    """
+    Linux Agent Health Dashboard Endpoint.
+    Returns operational health and liveness metrics for Linux agents.
+    Returns 204 No Content if no data exists.
+    
+    SQL Query (EXACT as per spec):
+    WITH latest AS (
+      SELECT DISTINCT ON (agent_id)
+        agent_id,
+        observed_at,
+        payload->'system' AS system
+      FROM linux_agent_telemetry
+      WHERE payload ? 'system'
+        AND payload->'system' != '{}'::jsonb
+        AND observed_at > NOW() - INTERVAL '10 minutes'
+      ORDER BY agent_id, observed_at DESC
+    )
+    SELECT
+      agent_id,
+      observed_at,
+      system->'cpu' AS cpu,
+      system->'memory' AS memory,
+      system->'disk' AS disk,
+      system->'network' AS network,
+      system->'system_state' AS system_state
+    FROM latest;
+    """
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database unavailable"}), 503
+    
+    try:
+        db = SchemaAwareDB(conn)
+        cursor = conn.cursor()
+        cursor.execute("SET search_path = ransomeye, public;")
+        
+        # Get query parameters
+        agent_id = request.args.get('agent_id', None)
+        since_minutes = int(request.args.get('since_minutes', 10))
+        
+        # Check if table exists
+        if not db.table_exists("ransomeye", "linux_agent_telemetry"):
+            cursor.close()
+            conn.close()
+            return Response(status=204)
+        
+        # Check if required columns exist
+        required_cols = ["agent_id", "observed_at", "payload"]
+        for col in required_cols:
+            if not db.column_exists("ransomeye", "linux_agent_telemetry", col):
+                cursor.close()
+                conn.close()
+                return Response(status=204)
+        
+        # Build exact SQL query as per spec (no Python-side filtering)
+        # Agent_id filter is handled in SQL WHERE clause if provided
+        if agent_id:
+            # When agent_id is provided, add it to WHERE clause in SQL
+            base_query = """
+                WITH latest AS (
+                  SELECT DISTINCT ON (agent_id)
+                    agent_id,
+                    observed_at,
+                    payload->'system' AS system
+                  FROM linux_agent_telemetry
+                  WHERE payload ? 'system'
+                    AND payload->'system' != '{}'::jsonb
+                    AND observed_at > NOW() - INTERVAL '%s minutes'
+                    AND agent_id::text = %s
+                  ORDER BY agent_id, observed_at DESC
+                )
+                SELECT
+                  agent_id,
+                  observed_at,
+                  system->'cpu' AS cpu,
+                  system->'memory' AS memory,
+                  system->'disk' AS disk,
+                  system->'network' AS network,
+                  system->'system_state' AS system_state
+                FROM latest
+            """ % (since_minutes, agent_id)
+            params = ()
+        else:
+            # Exact SQL as per spec (no agent_id filter)
+            base_query = """
+                WITH latest AS (
+                  SELECT DISTINCT ON (agent_id)
+                    agent_id,
+                    observed_at,
+                    payload->'system' AS system
+                  FROM linux_agent_telemetry
+                  WHERE payload ? 'system'
+                    AND payload->'system' != '{}'::jsonb
+                    AND observed_at > NOW() - INTERVAL '%s minutes'
+                  ORDER BY agent_id, observed_at DESC
+                )
+                SELECT
+                  agent_id,
+                  observed_at,
+                  system->'cpu' AS cpu,
+                  system->'memory' AS memory,
+                  system->'disk' AS disk,
+                  system->'network' AS network,
+                  system->'system_state' AS system_state
+                FROM latest
+            """ % since_minutes
+            params = ()
+        
+        # Execute query
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        
+        # If zero rows, return 204 No Content
+        if not rows or len(rows) == 0:
+            cursor.close()
+            conn.close()
+            return Response(status=204)
+        
+        # Process results
+        import json as json_lib
+        agents_data = []
+        current_time = datetime.now(timezone.utc)
+        
+        for row in rows:
+            agent_id_val = str(row[0]) if row[0] else None
+            observed_at_val = row[1]
+            cpu_json = row[2]
+            memory_json = row[3]
+            disk_json = row[4]
+            network_json = row[5]
+            system_state_json = row[6]
+            
+            # Calculate status based on time since last observation
+            if observed_at_val:
+                time_diff = (current_time - observed_at_val).total_seconds() / 60.0
+                if time_diff < 2:
+                    status = "ONLINE"
+                elif time_diff < 5:
+                    status = "DEGRADED"
+                else:
+                    status = "OFFLINE"
+            else:
+                status = "OFFLINE"
+            
+            # Parse JSONB fields (they come as dict or None)
+            cpu_data = cpu_json if isinstance(cpu_json, dict) else {}
+            memory_data = memory_json if isinstance(memory_json, dict) else {}
+            disk_data = disk_json if isinstance(disk_json, dict) else {}
+            network_data = network_json if isinstance(network_json, dict) else {}
+            system_state_data = system_state_json if isinstance(system_state_json, dict) else {}
+            
+            agent_entry = {
+                "agent_id": agent_id_val,
+                "observed_at": observed_at_val.isoformat() if hasattr(observed_at_val, 'isoformat') else str(observed_at_val),
+                "status": status,
+                "cpu": {
+                    "utilization": cpu_data.get("utilization"),
+                    "core_count": cpu_data.get("core_count"),
+                    "agent_process_cpu": cpu_data.get("agent_process_cpu")
+                },
+                "memory": {
+                    "total": memory_data.get("total"),
+                    "used": memory_data.get("used"),
+                    "free": memory_data.get("free"),
+                    "agent_rss": memory_data.get("agent_process_rss")
+                },
+                "disk": {
+                    "read_bytes": disk_data.get("read_bytes"),
+                    "write_bytes": disk_data.get("write_bytes"),
+                    "read_iops": disk_data.get("read_iops"),
+                    "write_iops": disk_data.get("write_iops")
+                },
+                "network": {
+                    "bytes_in": network_data.get("bytes_in"),
+                    "bytes_out": network_data.get("bytes_out"),
+                    "drops": network_data.get("drops"),
+                    "errors": network_data.get("errors")
+                },
+                "system_state": {
+                    "host_uptime": system_state_data.get("host_uptime"),
+                    "process_count": system_state_data.get("process_count"),
+                    "agent_process_status": system_state_data.get("agent_process_status")
+                }
+            }
+            agents_data.append(agent_entry)
+        
+        cursor.close()
+        conn.close()
+        
+        # Structure response for panels
+        return jsonify({
+            "agent_liveness": agents_data,
+            "cpu_health": agents_data,
+            "memory_health": agents_data,
+            "disk_io_health": agents_data,
+            "network_health": agents_data,
+            "system_state": agents_data,
+            "timestamp": current_time.isoformat()
+        })
+    
+    except Exception as e:
+        logger.error(f"Linux Agent Health dashboard error: {e}", exc_info=True)
+        if conn:
+            try:
+                cursor.close()
+                conn.close()
+            except:
+                pass
         return jsonify({"error": "Metric unavailable"}), 500
 
 

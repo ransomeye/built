@@ -1,0 +1,204 @@
+## MITRE ATT&CK FRAMEWORK CONTEXT
+
+MITRE ATT&CK is used here as the **taxonomy only**.
+RansomEye does **behavioral detection**, not signature chasing.
+
+---
+
+# 1. RANSOMWARE (FILELESS + ENCRYPTOR)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name                   | Detector |
+| ----------------- | ------------ | -------------------------------- | -------- |
+| Initial Access    | T1566        | Phishing                         | Agent    |
+| Execution         | T1059        | Command & Scripting Interpreter  | Agent    |
+| Execution         | T1204        | User Execution                   | Agent    |
+| Defense Evasion   | T1027        | Obfuscated / Encrypted Files     | Agent    |
+| Defense Evasion   | T1140        | Deobfuscate/Decode Files         | Agent    |
+| Credential Access | T1555        | Credentials from Password Stores | Agent    |
+| Discovery         | T1083        | File and Directory Discovery     | Agent    |
+| Command & Control | T1071.001    | Web-based C2                     | DPI      |
+| Command & Control | T1095        | Non-Application Layer Protocol   | DPI      |
+| Exfiltration      | T1041        | Exfiltration Over C2 Channel     | DPI      |
+| Impact            | T1486        | Data Encrypted for Impact        | Agent    |
+
+**Why correlation matters**
+
+* Agent confirms encryption
+* DPI confirms live C2
+* Combined = Confirmed ransomware
+
+---
+
+# 2. WORM (LATERAL PROPAGATION)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name                  | Detector |
+| ----------------- | ------------ | ------------------------------- | -------- |
+| Execution         | T1059        | Command & Scripting Interpreter | Agent    |
+| Lateral Movement  | T1021.002    | SMB/Windows Admin Shares        | DPI      |
+| Lateral Movement  | T1021.001    | SSH                             | DPI      |
+| Discovery         | T1018        | Remote System Discovery         | DPI      |
+| Discovery         | T1046        | Network Service Scanning        | DPI      |
+| Credential Access | T1110        | Brute Force                     | DPI      |
+| Impact            | T1499        | Endpoint Denial of Service      | DPI      |
+
+**Why DPI leads**
+
+* Worms reveal themselves by **fan-out**
+* Agent confirms payload execution
+
+---
+
+# 3. TROJAN / BACKDOOR (STEALTH PERSISTENCE)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name          | Detector |
+| ----------------- | ------------ | ----------------------- | -------- |
+| Execution         | T1059        | Command Interpreter     | Agent    |
+| Persistence       | T1053.003    | Cron                    | Agent    |
+| Persistence       | T1547        | Boot or Logon Autostart | Agent    |
+| Defense Evasion   | T1036        | Masquerading            | Agent    |
+| Command & Control | T1071.001    | Web-based C2            | DPI      |
+| Command & Control | T1573        | Encrypted Channel       | DPI      |
+| Exfiltration      | T1041        | Exfiltration Over C2    | DPI      |
+
+**Key signal**
+
+* Low-and-slow encrypted C2 visible only in DPI
+
+---
+
+# 4. CREDENTIAL HARVESTING / PASSWORD SPRAY
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name    | Detector |
+| ----------------- | ------------ | ----------------- | -------- |
+| Credential Access | T1110.003    | Password Spraying | DPI      |
+| Credential Access | T1110.001    | Brute Force       | DPI      |
+| Discovery         | T1087        | Account Discovery | Agent    |
+| Lateral Movement  | T1021.001    | SSH               | DPI      |
+| Persistence       | T1078        | Valid Accounts    | Agent    |
+
+**Key signal**
+
+* DPI sees auth failures
+* Agent confirms account use
+
+---
+
+# 5. DNS TUNNELING (COVERT EXFIL)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name                         | Detector |
+| ----------------- | ------------ | -------------------------------------- | -------- |
+| Command & Control | T1071.004    | DNS                                    | DPI      |
+| Command & Control | T1001.003    | Protocol Impersonation                 | DPI      |
+| Exfiltration      | T1048.003    | Exfiltration Over Alternative Protocol | DPI      |
+| Defense Evasion   | T1027        | Obfuscated Files or Information        | DPI      |
+
+**Why DPI is mandatory**
+
+* DNS payload entropy cannot be seen on host alone
+
+---
+
+# 6. DATA EXFILTRATION (LOW & SLOW)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name                 | Detector |
+| ----------------- | ------------ | ------------------------------ | -------- |
+| Collection        | T1005        | Data from Local System         | Agent    |
+| Exfiltration      | T1041        | Exfiltration Over C2           | DPI      |
+| Exfiltration      | T1567        | Exfiltration Over Web Services | DPI      |
+| Command & Control | T1071.001    | Web-based C2                   | DPI      |
+| Defense Evasion   | T1070        | Indicator Removal              | Agent    |
+
+---
+
+# 7. LIVING-OFF-THE-LAND (LOLBINS)
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name                  | Detector |
+| ----------------- | ------------ | ------------------------------- | -------- |
+| Execution         | T1059        | Command & Scripting Interpreter | Agent    |
+| Defense Evasion   | T1218        | Signed Binary Proxy Execution   | Agent    |
+| Defense Evasion   | T1036        | Masquerading                    | Agent    |
+| Command & Control | T1105        | Ingress Tool Transfer           | DPI      |
+| Discovery         | T1082        | System Information Discovery    | Agent    |
+
+**Why correlation matters**
+
+* LOLbins are benign until paired with network misuse
+
+---
+
+# 8. TOR / DARKNET C2
+
+### MITRE Mapping
+
+| Tactic            | Technique ID | Technique Name             | Detector |
+| ----------------- | ------------ | -------------------------- | -------- |
+| Command & Control | T1090.003    | Multi-hop Proxy            | DPI      |
+| Command & Control | T1573        | Encrypted Channel          | DPI      |
+| Defense Evasion   | T1001.002    | Obfuscated Non-C2 Protocol | DPI      |
+
+**Policy-driven**
+
+* TOR may be policy violation even without malware
+
+---
+
+# 9. DPI SENSOR BLINDING / EVASION
+
+### MITRE Mapping
+
+| Tactic          | Technique ID | Technique Name         | Detector   |
+| --------------- | ------------ | ---------------------- | ---------- |
+| Defense Evasion | T1562.001    | Disable Security Tools | DPI Health |
+| Defense Evasion | T1499        | Resource Exhaustion    | DPI Health |
+| Impact          | T1489        | Service Stop           | DPI Health |
+
+**Critical**
+
+* Treated as infrastructure attack, not endpoint event
+
+---
+
+# MASTER VIEW – MITRE COVERAGE STRENGTH
+
+| MITRE Tactic         | Covered By  |
+| -------------------- | ----------- |
+| Initial Access       | Agent       |
+| Execution            | Agent       |
+| Persistence          | Agent       |
+| Privilege Escalation | Agent       |
+| Defense Evasion      | Agent + DPI |
+| Credential Access    | Agent + DPI |
+| Discovery            | Agent + DPI |
+| Lateral Movement     | DPI         |
+| Command & Control    | DPI         |
+| Exfiltration         | DPI         |
+| Impact               | Agent       |
+
+---
+
+## FINAL TAKEAWAY
+
+> RansomEye does **not** “map to MITRE for compliance only”.
+> It **detects behaviors first**, then **projects them onto MITRE** for:
+>
+> * SOC reasoning
+> * Incident reporting
+> * Red-team validation
+> * Executive metrics
+
+---
+

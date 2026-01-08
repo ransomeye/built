@@ -840,9 +840,21 @@
             // Clear grid
             gridEl.innerHTML = '';
             
+            // Track if any panel has data
+            let hasData = false;
+            
             // Render each panel
             for (const panel of dashboardDefinition.panels) {
-                await renderPanel(panel);
+                const panelHasData = await renderPanel(panel);
+                if (panelHasData) {
+                    hasData = true;
+                }
+            }
+            
+            // If no panels have data (all returned 204 or empty), hide entire dashboard
+            if (!hasData) {
+                gridEl.closest('.dashboard-container')?.style.setProperty('display', 'none');
+                return;
             }
             
             // Initialize refresh intervals
@@ -1026,8 +1038,8 @@
             
             gridEl.appendChild(panelEl);
             
-            // Load panel data
-            await loadPanelData(panelId, panel, bodyEl);
+            // Load panel data and return whether it has data
+            const hasData = await loadPanelData(panelId, panel, bodyEl);
             
             // Update timestamp
             updatePanelTimestamp(panelEl);
@@ -1037,6 +1049,8 @@
                 panelEl.classList.add('edit-mode-panel');
                 initPanelDragResize(panelEl);
             }
+            
+            return hasData;
         }
         
         // ============================================================
@@ -1063,6 +1077,12 @@
                 
                 const response = await fetch(endpointUrl);
                 if (!response.ok) {
+                    if (response.status === 204) {
+                        // No content - panel should collapse (no UI message)
+                        bodyEl.innerHTML = '';
+                        bodyEl.style.display = 'none';
+                        return;
+                    }
                     if (response.status === 404) {
                         // Instance not found - show fail-soft message
                         throw new Error(`Instance offline or not found`);
@@ -1080,18 +1100,22 @@
                         if (panelData && typeof panelData === 'object' && part in panelData) {
                             panelData = panelData[part];
                         } else {
+                            // Path not found - panel collapses independently (no UI message)
                             panelData = null;
                             break;
                         }
                     }
                 }
                 
-                // Render panel content
-                renderPanelContent(panelId, panelData, bodyEl, panelDef);
+                // Render panel content (will collapse if panelData is null/empty)
+                const hasData = renderPanelContent(panelId, panelData, bodyEl, panelDef);
+                return hasData;
                 
             } catch (error) {
                 console.error(`Error loading panel ${panelId}:`, error);
-                bodyEl.innerHTML = '<div class="panel-unavailable">Metric unavailable</div>';
+                bodyEl.innerHTML = '';
+                bodyEl.closest('.panel').style.display = 'none';
+                return false; // No data
             }
         }
         
@@ -1100,9 +1124,11 @@
         // ============================================================
         
         function renderPanelContent(panelId, data, bodyEl, panelDef) {
+            // If data is missing or empty, collapse panel (no UI message)
             if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
-                bodyEl.innerHTML = '<div class="panel-unavailable">Metric unavailable</div>';
-                return;
+                bodyEl.innerHTML = '';
+                bodyEl.closest('.panel').style.display = 'none';
+                return false; // No data
             }
             
             // Simple content rendering (can be extended with custom renderers)
@@ -1135,10 +1161,14 @@
                 }
                 content += '</div>';
             } else {
-                content = '<div class="panel-unavailable">Metric unavailable</div>';
+                // Unknown data type - collapse panel (no UI message)
+                bodyEl.innerHTML = '';
+                bodyEl.closest('.panel').style.display = 'none';
+                return false; // No data
             }
             
             bodyEl.innerHTML = content;
+            return true; // Has data
         }
         
         // ============================================================

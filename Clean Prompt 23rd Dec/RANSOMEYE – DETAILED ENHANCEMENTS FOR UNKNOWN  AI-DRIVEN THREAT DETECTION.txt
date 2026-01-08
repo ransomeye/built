@@ -1,0 +1,495 @@
+# RANSOMEYE – COMPLETE SYSTEM SPECIFICATION
+
+*(Unknown, Zero-Day, AI-Driven Threat Resilience – Low Compute)*
+
+---
+
+## 0. CORE ARCHITECTURAL PRINCIPLES (NON-NEGOTIABLE)
+
+1. **Behavior > Signature**
+2. **Contradiction > Anomaly**
+3. **Physics > Heuristics**
+4. **Correlation > Isolation**
+5. **Confidence Accumulation > Classification**
+6. **Edge Sensors = Truth, Core = Intelligence**
+7. **No single module decides alone**
+
+---
+
+# 1. LINUX AGENT – FULL FUNCTIONAL SPEC
+
+## 1.1 Responsibilities
+
+The Linux Agent provides **host-level intent and ground truth**.
+
+### Functional Domains
+
+* Process
+* File system
+* Persistence
+* Network intent
+* Deception
+* Command execution
+* Host health
+
+---
+
+## 1.2 Telemetry Collected
+
+### Process Telemetry
+
+* pid, ppid
+* executable_path
+* command_line
+* binary_hash (sha256)
+* entropy_score
+* execution_time
+* user / uid
+* privilege_level
+* parent_process
+* execution_location
+
+### File System Telemetry
+
+* file_path
+* operation (create/write/delete/rename)
+* before_hash
+* after_hash
+* entropy_delta
+* write_rate
+* owning_process
+
+### Persistence Telemetry
+
+* cron jobs
+* systemd units
+* rc scripts
+* startup files
+* modification timestamps
+
+### Network Intent (NOT DPI)
+
+* process_pid
+* dest_ip
+* dest_port
+* protocol
+* timestamp
+
+### Deception
+
+* honeyfile access
+* honeyport access
+* fake credential touch
+* fake metadata endpoint access
+
+### Agent Health
+
+* heartbeat
+* cpu/memory
+* version
+* tamper detection
+
+---
+
+## 1.3 Local Intelligence (No Heavy ML)
+
+* Context violation detection
+* Temporal gravity checks
+* Rarity budget counters
+* Behavioral ceilings
+* Immediate deception confirmation
+
+---
+
+## 1.4 Linux Agent DB Writes (Via Ingest)
+
+### Tables
+
+#### `process_events`
+
+| Column    | Type      |
+| --------- | --------- |
+| event_id  | UUID (PK) |
+| host_id   | TEXT      |
+| pid       | INT       |
+| ppid      | INT       |
+| exe_path  | TEXT      |
+| cmdline   | TEXT      |
+| sha256    | TEXT      |
+| entropy   | FLOAT     |
+| user      | TEXT      |
+| privilege | TEXT      |
+| timestamp | TIMESTAMP |
+
+**Indexes**
+
+* `(host_id, timestamp)`
+* `(sha256)`
+* `(exe_path)`
+
+---
+
+#### `file_events`
+
+| Column        | Type      |
+| ------------- | --------- |
+| event_id      | UUID      |
+| host_id       | TEXT      |
+| file_path     | TEXT      |
+| operation     | TEXT      |
+| entropy_delta | FLOAT     |
+| process_pid   | INT       |
+| timestamp     | TIMESTAMP |
+
+**Indexes**
+
+* `(file_path)`
+* `(host_id, timestamp)`
+* `(entropy_delta DESC)`
+
+---
+
+#### `deception_events`
+
+| Column         | Type      |
+| -------------- | --------- |
+| event_id       | UUID      |
+| host_id        | TEXT      |
+| deception_type | TEXT      |
+| process        | TEXT      |
+| timestamp      | TIMESTAMP |
+| severity       | TEXT      |
+
+**Indexes**
+
+* `(host_id)`
+* `(severity)`
+
+---
+
+# 2. WINDOWS AGENT – FULL FUNCTIONAL SPEC
+
+## 2.1 Responsibilities
+
+Same philosophy as Linux Agent, adapted for Windows internals.
+
+---
+
+## 2.2 Telemetry Collected
+
+### Process & Execution
+
+* Image path
+* Command line
+* Parent chain
+* DLL loads
+* Code injection attempts
+* LOLBins usage (powershell, wmic, rundll32)
+
+### File System
+
+* User directories
+* System directories
+* Encryption behavior
+* Alternate data streams
+
+### Registry & Persistence
+
+* Run keys
+* Services
+* Scheduled tasks
+* WMI persistence
+
+### Network Intent
+
+* Process → connection mapping
+
+### Deception
+
+* Honeyfiles
+* Fake credentials
+* Fake registry keys
+
+---
+
+## 2.3 Windows Agent DB Tables
+
+#### `windows_process_events`
+
+(similar to Linux, plus DLLs)
+
+#### `registry_events`
+
+| Column    | Type      |
+| --------- | --------- |
+| event_id  | UUID      |
+| key_path  | TEXT      |
+| operation | TEXT      |
+| process   | TEXT      |
+| timestamp | TIMESTAMP |
+
+---
+
+# 3. DPI PROBE – FULL FUNCTIONAL SPEC
+
+## 3.1 Responsibilities
+
+Network-level **truth**, independent of host trust.
+
+---
+
+## 3.2 Telemetry
+
+### Packet Metadata
+
+* src/dst IP
+* ports
+* protocol
+* timestamps
+* flags
+
+### Flow Aggregation
+
+* bytes
+* packets
+* duration
+* asymmetry
+* periodicity
+
+### Protocol Fingerprinting
+
+* HTTP/HTTPS
+* DNS
+* SMB
+* SSH
+* RDP
+* TOR
+* UNKNOWN
+
+### TLS Metadata
+
+* JA3 / JA3S
+* cipher
+* SNI
+* cert hash
+* validity
+
+### DNS Intelligence
+
+* entropy
+* NXDOMAIN ratios
+* DGA likelihood
+
+### Network Physics
+
+* beacon detection
+* infra churn
+* impossible timing
+* low-and-slow exfil
+
+### Sensor Integrity
+
+* drop rate
+* gaps
+* tampering
+
+---
+
+## 3.3 DPI DB Tables
+
+#### `network_flows`
+
+| Column    | Type      |
+| --------- | --------- |
+| flow_id   | UUID      |
+| src_ip    | INET      |
+| dst_ip    | INET      |
+| src_port  | INT       |
+| dst_port  | INT       |
+| protocol  | TEXT      |
+| bytes     | BIGINT    |
+| packets   | BIGINT    |
+| asymmetry | FLOAT     |
+| start_ts  | TIMESTAMP |
+| end_ts    | TIMESTAMP |
+
+**Indexes**
+
+* `(src_ip, start_ts)`
+* `(dst_ip, start_ts)`
+* `(protocol)`
+
+---
+
+#### `dns_events`
+
+| Column    | Type      |
+| --------- | --------- |
+| query     | TEXT      |
+| entropy   | FLOAT     |
+| nxdomain  | BOOL      |
+| client_ip | INET      |
+| timestamp | TIMESTAMP |
+
+**Indexes**
+
+* `(query)`
+* `(entropy DESC)`
+
+---
+
+#### `exfiltration_events`
+
+| Column     | Type      |
+| ---------- | --------- |
+| src_host   | INET      |
+| dst_ip     | INET      |
+| bytes_sent | BIGINT    |
+| duration   | INT       |
+| score      | FLOAT     |
+| timestamp  | TIMESTAMP |
+
+---
+
+# 4. CORRELATION ENGINE – SYSTEM BRAIN
+
+## 4.1 Responsibilities
+
+* Merge Agent + DPI
+* Detect contradictions
+* Accumulate confidence
+* Drive state machine
+
+---
+
+## 4.2 Detection Logic
+
+### Contradiction Detection
+
+* Host claims vs network truth
+* Execution vs timing
+* Persistence vs silence
+
+### Confidence Accumulator
+
+| Signal            | Weight |
+| ----------------- | ------ |
+| Context violation | 0.3    |
+| Network physics   | 0.3    |
+| Rarity exhaustion | 0.2    |
+| Deception         | 0.6    |
+
+Thresholds:
+
+* 0.5 → Suspicious
+* 0.8 → Probable
+* 1.0 → Confirmed
+
+---
+
+## 4.3 Correlation Tables
+
+#### `correlated_incidents`
+
+| Column      | Type      |
+| ----------- | --------- |
+| incident_id | UUID      |
+| host_id     | TEXT      |
+| confidence  | FLOAT     |
+| stage       | TEXT      |
+| created_ts  | TIMESTAMP |
+
+---
+
+# 5. AI / ML / LLM – CLEAR SEPARATION OF ROLES
+
+## 5.1 ML (Low Compute, Core Only)
+
+### What ML Does
+
+* Unsupervised clustering
+* Novelty detection
+* Drift tracking
+* Feature attribution (SHAP)
+
+### What ML Does NOT Do
+
+* No real-time inference on edge
+* No heavy deep learning
+* No signature matching
+
+---
+
+## 5.2 LLM (Explainability & SOC Only)
+
+### LLM Responsibilities
+
+* Incident summarization
+* Analyst explanations
+* “Why this is malicious”
+* Playbook generation
+* Report writing
+
+### LLM Input
+
+* Structured facts only
+* No raw packets
+* No secrets
+
+### LLM Output
+
+* Text only
+* No decisions
+* No enforcement
+
+---
+
+# 6. DATABASE – READ / WRITE MODEL
+
+## 6.1 Write Sources
+
+* Linux Agent → Ingest
+* Windows Agent → Ingest
+* DPI Probe → Ingest
+* Correlation Engine → DB
+* AI Core → Metadata only
+
+## 6.2 Read Consumers
+
+* Correlation Engine
+* AI Core
+* SOC Dashboards
+* LLM Summarizer
+* Reports
+
+---
+
+# 7. WHY THIS SYSTEM HANDLES UNKNOWN & AI-DRIVEN THREATS
+
+| Threat Property      | Why It Fails          |
+| -------------------- | --------------------- |
+| Zero-day code        | Behavior exposed      |
+| Polymorphism         | Irrelevant            |
+| AI-generated malware | Faster → noisier      |
+| Encrypted C2         | Metadata leaks        |
+| Fileless attacks     | Network truth         |
+| LOLBins              | Context contradiction |
+| Autonomous worms     | Graph explosion       |
+
+---
+
+# FINAL STATEMENT (IMPORTANT)
+
+> **RansomEye does not attempt to recognize every attack.**
+> It **proves that benign explanations are impossible** using:
+>
+> * Host intent
+> * Network truth
+> * Mathematical invariants
+> * Deception
+> * Cross-domain contradiction
+
+This approach is **future-proof**, **AI-resistant**, and **compute-bounded**.
+
+---
+

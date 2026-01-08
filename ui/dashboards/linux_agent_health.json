@@ -1,0 +1,98 @@
+{
+  "name": "linux_agent_health",
+  "title": "Linux Agent Health",
+  "description": "Ground-truth operational health and liveness of Linux agents. Purely operational, not threat-oriented.",
+  "folder_id": "general",
+  "panels": [
+    {
+      "id": "agent_liveness",
+      "title": "Agent Liveness",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "agent_liveness"
+      }
+    },
+    {
+      "id": "cpu_health",
+      "title": "CPU Health",
+      "x": 0,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "cpu_health"
+      }
+    },
+    {
+      "id": "memory_health",
+      "title": "Memory Health",
+      "x": 4,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "memory_health"
+      }
+    },
+    {
+      "id": "disk_io_health",
+      "title": "Disk I/O Health",
+      "x": 8,
+      "y": 2,
+      "w": 4,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "disk_io_health"
+      }
+    },
+    {
+      "id": "network_health",
+      "title": "Network Health",
+      "x": 0,
+      "y": 4,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "network_health"
+      }
+    },
+    {
+      "id": "system_state",
+      "title": "System State",
+      "x": 6,
+      "y": 4,
+      "w": 6,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "system_state"
+      }
+    }
+  ]
+}
