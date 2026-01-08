@@ -292,7 +292,13 @@ impl SystemMetricsCollector {
                             if total_diff > 0 {
                                 let used = total_diff.saturating_sub(idle_diff);
                                 metrics.utilization = Some((used as f64 / total_diff as f64) * 100.0);
+                            } else {
+                                // No time has passed, utilization is 0
+                                metrics.utilization = Some(0.0);
                             }
+                        } else {
+                            // First collection - set to 0.0 (will be calculated on next collection)
+                            metrics.utilization = Some(0.0);
                         }
                         
                         self.last_cpu_time = Some(cpu_time);
@@ -491,11 +497,23 @@ impl SystemMetricsCollector {
                     metrics.write_bytes = Some(write_bytes_diff);
                     metrics.read_iops = Some(read_ios_diff);
                     metrics.write_iops = Some(write_ios_diff);
+                } else {
+                    // No time has passed, set to 0
+                    metrics.read_bytes = Some(0);
+                    metrics.write_bytes = Some(0);
+                    metrics.read_iops = Some(0);
+                    metrics.write_iops = Some(0);
                 }
+            } else {
+                // First collection - set to 0 (will be calculated on next collection)
+                metrics.read_bytes = Some(0);
+                metrics.write_bytes = Some(0);
+                metrics.read_iops = Some(0);
+                metrics.write_iops = Some(0);
             }
             
-                self.last_disk_stats = Some(current_stats);
-                self.last_disk_time = now;
+            self.last_disk_stats = Some(current_stats);
+            self.last_disk_time = now;
             }
             Err(e) => {
                 error!("[SYS_METRICS][ERROR] collect_disk failed: cannot read /proc/diskstats: {}", e);
@@ -638,6 +656,12 @@ impl SystemMetricsCollector {
                     // Format: interface: bytes_in packets_in errs_in drops_in bytes_out packets_out errs_out drops_out
                     let parts: Vec<&str> = line.split(':').collect();
                     if parts.len() == 2 {
+                        let interface_name = parts[0].trim();
+                        // Skip loopback interface
+                        if interface_name == "lo" {
+                            continue;
+                        }
+                        
                         let stats: Vec<&str> = parts[1].trim().split_whitespace().collect();
                         if stats.len() >= 16 {
                             if let (Ok(bytes_in), Ok(packets_in), Ok(errs_in), Ok(drops_in),
@@ -687,7 +711,19 @@ impl SystemMetricsCollector {
                         metrics.bytes_out = Some(bytes_out_diff);
                         metrics.packets_in = Some(packets_in_diff);
                         metrics.packets_out = Some(packets_out_diff);
+                    } else {
+                        // No time has passed, set to 0
+                        metrics.bytes_in = Some(0);
+                        metrics.bytes_out = Some(0);
+                        metrics.packets_in = Some(0);
+                        metrics.packets_out = Some(0);
                     }
+                } else {
+                    // First collection - set to 0 (will be calculated on next collection)
+                    metrics.bytes_in = Some(0);
+                    metrics.bytes_out = Some(0);
+                    metrics.packets_in = Some(0);
+                    metrics.packets_out = Some(0);
                 }
                 
                 self.last_network_stats = Some(current_stats);
