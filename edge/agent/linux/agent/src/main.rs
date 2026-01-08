@@ -7,7 +7,7 @@ use tracing::{info, error, warn};
 use tokio::runtime::Runtime;
 use libsystemd::daemon::{notify, NotifyState};
 use crossbeam_channel;
-use process::ProcessEvent;
+use process::{ProcessEvent, ProcessEventType};
 
 mod errors;
 mod process;
@@ -287,11 +287,26 @@ fn main() -> Result<(), AgentError> {
     // Start periodic system metrics collection (every 20 seconds)
     let metrics_state_clone = system_metrics_state.clone();
     std::thread::spawn(move || {
+        info!("[SYS_METRICS] collection thread started (interval=20s)");
         let mut collector = system_metrics::SystemMetricsCollector::new();
         loop {
             std::thread::sleep(std::time::Duration::from_secs(20));
-            if let Ok(mut state) = metrics_state_clone.lock() {
-                *state = Some(collector.collect());
+            info!("[SYS_METRICS] tick");
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| collector.collect())) {
+                Ok(metrics) => {
+                    if metrics.has_real_metrics() {
+                        if let Ok(mut state) = metrics_state_clone.lock() {
+                            *state = Some(metrics);
+                            info!("[SYS_METRICS] collected and stored successfully");
+                        }
+                    } else {
+                        warn!("[SYS_METRICS][WARN] collected metrics but all values are null — discarding");
+                    }
+                }
+                Err(_) => {
+                    error!("[SYS_METRICS][PANIC] collector panicked, metrics collection stopped");
+                    break;
+                }
             }
         }
     });
@@ -446,7 +461,7 @@ fn main() -> Result<(), AgentError> {
                         process_event.uid,
                         process_event.gid,
                         exec,
-                        cmd,
+                        Some(cmd),
                     );
                 }
                 
@@ -460,32 +475,49 @@ fn main() -> Result<(), AgentError> {
                 
                 let mut envelope = envelope_builder.build_from_process(&process_event, &features, signature)?;
                 
-                // Inject system metrics into envelope.data.system (always include, even if empty)
-                let system_json = if let Ok(metrics_guard) = system_metrics_state.lock() {
+                // Inject system metrics into envelope.data.system (only if valid)
+                let (system_json, has_metrics) = if let Ok(metrics_guard) = system_metrics_state.lock() {
                     if let Some(ref metrics) = *metrics_guard {
-                        serde_json::to_value(metrics)
-                            .unwrap_or_else(|_| serde_json::json!({}))
+                        if metrics.has_real_metrics() {
+                            (serde_json::to_value(metrics)
+                                .unwrap_or_else(|_| serde_json::json!({})), true)
+                        } else {
+                            warn!("[ENVELOPE][WARN] system metrics present but invalid (all null), injecting empty object");
+                            (serde_json::json!({
+                                "cpu": {},
+                                "memory": {},
+                                "disk": {},
+                                "filesystem": {"mounts": []},
+                                "network": {},
+                                "system_state": {}
+                            }), false)
+                        }
                     } else {
                         // Empty system metrics structure if not yet collected
-                        serde_json::json!({
+                        (serde_json::json!({
                             "cpu": {},
                             "memory": {},
                             "disk": {},
                             "filesystem": {"mounts": []},
                             "network": {},
                             "system_state": {}
-                        })
+                        }), false)
                     }
                 } else {
-                    serde_json::json!({
+                    (serde_json::json!({
                         "cpu": {},
                         "memory": {},
                         "disk": {},
                         "filesystem": {"mounts": []},
                         "network": {},
                         "system_state": {}
-                    })
+                    }), false)
                 };
+                if has_metrics {
+                    info!("[ENVELOPE] system metrics injected (non-empty)");
+                } else {
+                    warn!("[ENVELOPE][WARN] system metrics missing, injecting empty object");
+                }
                 envelope.data.system = Some(system_json);
                 
                 health_monitor.record_event();

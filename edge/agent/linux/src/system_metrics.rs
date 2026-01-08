@@ -5,6 +5,7 @@
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs;
+use tracing::{error, warn};
 
 /// System metrics structure matching dashboard API expectations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +81,37 @@ pub struct SystemStateMetrics {
     pub agent_process_status: Option<String>,
 }
 
+impl SystemMetrics {
+    pub fn has_real_metrics(&self) -> bool {
+        // CPU utilization
+        if self.cpu.utilization.is_some() {
+            return true;
+        }
+        
+        // Memory total or used
+        if self.memory.total.is_some() || self.memory.used.is_some() {
+            return true;
+        }
+        
+        // Disk read/write bytes
+        if self.disk.read_bytes.is_some() || self.disk.write_bytes.is_some() {
+            return true;
+        }
+        
+        // Network bytes in/out
+        if self.network.bytes_in.is_some() || self.network.bytes_out.is_some() {
+            return true;
+        }
+        
+        // Host uptime
+        if self.system_state.host_uptime.is_some() {
+            return true;
+        }
+        
+        false
+    }
+}
+
 pub struct SystemMetricsCollector {
     pid: u32,
     start_time: u64,
@@ -119,7 +151,7 @@ impl SystemMetricsCollector {
         let pid = std::process::id();
         let start_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         
         Self {
@@ -135,12 +167,78 @@ impl SystemMetricsCollector {
     
     pub fn collect(&mut self) -> SystemMetrics {
         SystemMetrics {
-            cpu: self.collect_cpu(),
-            memory: self.collect_memory(),
-            disk: self.collect_disk(),
-            filesystem: self.collect_filesystem(),
-            network: self.collect_network(),
-            system_state: self.collect_system_state(),
+            cpu: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_cpu())) {
+                Ok(metrics) => metrics,
+                Err(e) => {
+                    error!("[SYS_METRICS][ERROR] collect_cpu failed: panic occurred");
+                    CpuMetrics {
+                        utilization: None,
+                        load_avg_1m: None,
+                        load_avg_5m: None,
+                        load_avg_15m: None,
+                        core_count: None,
+                        agent_process_cpu: None,
+                    }
+                }
+            },
+            memory: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_memory())) {
+                Ok(metrics) => metrics,
+                Err(_) => {
+                    error!("[SYS_METRICS][ERROR] collect_memory failed: panic occurred");
+                    MemoryMetrics {
+                        total: None,
+                        used: None,
+                        free: None,
+                        swap_used: None,
+                        agent_process_rss: None,
+                    }
+                }
+            },
+            disk: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_disk())) {
+                Ok(metrics) => metrics,
+                Err(_) => {
+                    error!("[SYS_METRICS][ERROR] collect_disk failed: panic occurred");
+                    DiskMetrics {
+                        read_bytes: None,
+                        write_bytes: None,
+                        read_iops: None,
+                        write_iops: None,
+                        utilization: None,
+                    }
+                }
+            },
+            filesystem: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_filesystem())) {
+                Ok(metrics) => metrics,
+                Err(_) => {
+                    error!("[SYS_METRICS][ERROR] collect_filesystem failed: panic occurred");
+                    FilesystemMetrics { mounts: Vec::new() }
+                }
+            },
+            network: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_network())) {
+                Ok(metrics) => metrics,
+                Err(_) => {
+                    error!("[SYS_METRICS][ERROR] collect_network failed: panic occurred");
+                    NetworkMetrics {
+                        bytes_in: None,
+                        bytes_out: None,
+                        packets_in: None,
+                        packets_out: None,
+                        errors: None,
+                        drops: None,
+                    }
+                }
+            },
+            system_state: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_system_state())) {
+                Ok(metrics) => metrics,
+                Err(_) => {
+                    error!("[SYS_METRICS][ERROR] collect_system_state failed: panic occurred");
+                    SystemStateMetrics {
+                        host_uptime: None,
+                        process_count: None,
+                        agent_process_status: None,
+                    }
+                }
+            },
         }
     }
     
@@ -155,17 +253,23 @@ impl SystemMetricsCollector {
         };
         
         // Read load average from /proc/loadavg
-        if let Ok(loadavg) = fs::read_to_string("/proc/loadavg") {
-            let parts: Vec<&str> = loadavg.split_whitespace().collect();
-            if parts.len() >= 3 {
-                metrics.load_avg_1m = parts[0].parse().ok();
-                metrics.load_avg_5m = parts[1].parse().ok();
-                metrics.load_avg_15m = parts[2].parse().ok();
+        match fs::read_to_string("/proc/loadavg") {
+            Ok(loadavg) => {
+                let parts: Vec<&str> = loadavg.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    metrics.load_avg_1m = parts[0].parse().ok();
+                    metrics.load_avg_5m = parts[1].parse().ok();
+                    metrics.load_avg_15m = parts[2].parse().ok();
+                }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_cpu failed: cannot read /proc/loadavg: {}", e);
             }
         }
         
         // Read CPU stats from /proc/stat
-        if let Ok(stat) = fs::read_to_string("/proc/stat") {
+        match fs::read_to_string("/proc/stat") {
+            Ok(stat) => {
             if let Some(first_line) = stat.lines().next() {
                 if first_line.starts_with("cpu ") {
                     let parts: Vec<&str> = first_line.split_whitespace().collect();
@@ -195,21 +299,31 @@ impl SystemMetricsCollector {
                     }
                 }
             }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_cpu failed: cannot read /proc/stat: {}", e);
+            }
         }
         
         // Count CPU cores from /proc/cpuinfo
-        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
+        match fs::read_to_string("/proc/cpuinfo") {
+            Ok(cpuinfo) => {
             let core_count = cpuinfo.lines()
                 .filter(|line| line.starts_with("processor"))
                 .count() as u32;
-            if core_count > 0 {
-                metrics.core_count = Some(core_count);
+                if core_count > 0 {
+                    metrics.core_count = Some(core_count);
+                }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_cpu failed: cannot read /proc/cpuinfo: {}", e);
             }
         }
         
         // Get agent process CPU from /proc/{pid}/stat
         let proc_stat_path = format!("/proc/{}/stat", self.pid);
-        if let Ok(stat_line) = fs::read_to_string(&proc_stat_path) {
+        match fs::read_to_string(&proc_stat_path) {
+            Ok(stat_line) => {
             let parts: Vec<&str> = stat_line.split_whitespace().collect();
             if parts.len() >= 15 {
                 let utime: u64 = parts[13].parse().unwrap_or(0);
@@ -228,6 +342,10 @@ impl SystemMetricsCollector {
                     }
                 }
             }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_cpu failed: cannot read /proc/{}/stat: {}", self.pid, e);
+            }
         }
         
         metrics
@@ -243,7 +361,8 @@ impl SystemMetricsCollector {
         };
         
         // Read memory info from /proc/meminfo
-        if let Ok(meminfo) = fs::read_to_string("/proc/meminfo") {
+        match fs::read_to_string("/proc/meminfo") {
+            Ok(meminfo) => {
             let mut mem_total = None;
             let mut mem_free = None;
             let mut mem_available = None;
@@ -280,14 +399,19 @@ impl SystemMetricsCollector {
                 metrics.used = Some(total.saturating_sub(free));
             }
             
-            if let (Some(swap_t), Some(swap_f)) = (swap_total, swap_free) {
-                metrics.swap_used = Some(swap_t.saturating_sub(swap_f));
+                if let (Some(swap_t), Some(swap_f)) = (swap_total, swap_free) {
+                    metrics.swap_used = Some(swap_t.saturating_sub(swap_f));
+                }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_memory failed: cannot read /proc/meminfo: {}", e);
             }
         }
         
         // Get agent process RSS from /proc/{pid}/status
         let proc_status_path = format!("/proc/{}/status", self.pid);
-        if let Ok(status) = fs::read_to_string(&proc_status_path) {
+        match fs::read_to_string(&proc_status_path) {
+            Ok(status) => {
             for line in status.lines() {
                 if line.starts_with("VmRSS:") {
                     if let Some(val) = line.split_whitespace().nth(1) {
@@ -297,6 +421,10 @@ impl SystemMetricsCollector {
                     }
                     break;
                 }
+            }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_memory failed: cannot read /proc/{}/status: {}", self.pid, e);
             }
         }
         
@@ -315,10 +443,11 @@ impl SystemMetricsCollector {
         // Read disk stats from /proc/diskstats
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         
-        if let Ok(diskstats) = fs::read_to_string("/proc/diskstats") {
+        match fs::read_to_string("/proc/diskstats") {
+            Ok(diskstats) => {
             let mut total_read_bytes = 0u64;
             let mut total_write_bytes = 0u64;
             let mut total_read_ios = 0u64;
@@ -365,8 +494,12 @@ impl SystemMetricsCollector {
                 }
             }
             
-            self.last_disk_stats = Some(current_stats);
-            self.last_disk_time = now;
+                self.last_disk_stats = Some(current_stats);
+                self.last_disk_time = now;
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_disk failed: cannot read /proc/diskstats: {}", e);
+            }
         }
         
         metrics
@@ -376,7 +509,8 @@ impl SystemMetricsCollector {
         let mut mounts = Vec::new();
         
         // Read mount info from /proc/mounts
-        if let Ok(mounts_content) = fs::read_to_string("/proc/mounts") {
+        match fs::read_to_string("/proc/mounts") {
+            Ok(mounts_content) => {
             for line in mounts_content.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {
@@ -393,6 +527,10 @@ impl SystemMetricsCollector {
                         mounts.push(mount_metrics);
                     }
                 }
+            }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_filesystem failed: cannot read /proc/mounts: {}", e);
             }
         }
         
@@ -487,72 +625,77 @@ impl SystemMetricsCollector {
             .unwrap()
             .as_secs();
         
-        if let Ok(netdev) = fs::read_to_string("/proc/net/dev") {
-            let mut total_bytes_in = 0u64;
-            let mut total_bytes_out = 0u64;
-            let mut total_packets_in = 0u64;
-            let mut total_packets_out = 0u64;
-            let mut total_drops = 0u64;
-            let mut total_errors = 0u64;
-            
-            for line in netdev.lines().skip(2) {
-                // Format: interface: bytes_in packets_in errs_in drops_in bytes_out packets_out errs_out drops_out
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() == 2 {
-                    let stats: Vec<&str> = parts[1].trim().split_whitespace().collect();
-                    if stats.len() >= 16 {
-                        if let (Ok(bytes_in), Ok(packets_in), Ok(errs_in), Ok(drops_in),
-                                Ok(bytes_out), Ok(packets_out), Ok(errs_out), Ok(drops_out)) = (
-                            stats[0].parse::<u64>(),
-                            stats[1].parse::<u64>(),
-                            stats[2].parse::<u64>(),
-                            stats[3].parse::<u64>(),
-                            stats[8].parse::<u64>(),
-                            stats[9].parse::<u64>(),
-                            stats[10].parse::<u64>(),
-                            stats[11].parse::<u64>(),
-                        ) {
-                            total_bytes_in += bytes_in;
-                            total_bytes_out += bytes_out;
-                            total_packets_in += packets_in;
-                            total_packets_out += packets_out;
-                            total_drops += drops_in + drops_out;
-                            total_errors += errs_in + errs_out;
+        match fs::read_to_string("/proc/net/dev") {
+            Ok(netdev) => {
+                let mut total_bytes_in = 0u64;
+                let mut total_bytes_out = 0u64;
+                let mut total_packets_in = 0u64;
+                let mut total_packets_out = 0u64;
+                let mut total_drops = 0u64;
+                let mut total_errors = 0u64;
+                
+                for line in netdev.lines().skip(2) {
+                    // Format: interface: bytes_in packets_in errs_in drops_in bytes_out packets_out errs_out drops_out
+                    let parts: Vec<&str> = line.split(':').collect();
+                    if parts.len() == 2 {
+                        let stats: Vec<&str> = parts[1].trim().split_whitespace().collect();
+                        if stats.len() >= 16 {
+                            if let (Ok(bytes_in), Ok(packets_in), Ok(errs_in), Ok(drops_in),
+                                    Ok(bytes_out), Ok(packets_out), Ok(errs_out), Ok(drops_out)) = (
+                                stats[0].parse::<u64>(),
+                                stats[1].parse::<u64>(),
+                                stats[2].parse::<u64>(),
+                                stats[3].parse::<u64>(),
+                                stats[8].parse::<u64>(),
+                                stats[9].parse::<u64>(),
+                                stats[10].parse::<u64>(),
+                                stats[11].parse::<u64>(),
+                            ) {
+                                total_bytes_in += bytes_in;
+                                total_bytes_out += bytes_out;
+                                total_packets_in += packets_in;
+                                total_packets_out += packets_out;
+                                total_drops += drops_in + drops_out;
+                                total_errors += errs_in + errs_out;
+                            }
                         }
                     }
                 }
-            }
-            
-            let current_stats = NetworkStats {
-                bytes_in: total_bytes_in,
-                bytes_out: total_bytes_out,
-                packets_in: total_packets_in,
-                packets_out: total_packets_out,
-                drops: total_drops,
-                errors: total_errors,
-            };
-            
-            metrics.drops = Some(total_drops);
-            metrics.errors = Some(total_errors);
-            
-            // Calculate rates if we have previous stats
-            if let Some(ref last_stats) = self.last_network_stats {
-                let time_diff = now.saturating_sub(self.last_network_time);
-                if time_diff > 0 {
-                    let bytes_in_diff = current_stats.bytes_in.saturating_sub(last_stats.bytes_in);
-                    let bytes_out_diff = current_stats.bytes_out.saturating_sub(last_stats.bytes_out);
-                    let packets_in_diff = current_stats.packets_in.saturating_sub(last_stats.packets_in);
-                    let packets_out_diff = current_stats.packets_out.saturating_sub(last_stats.packets_out);
-                    
-                    metrics.bytes_in = Some(bytes_in_diff);
-                    metrics.bytes_out = Some(bytes_out_diff);
-                    metrics.packets_in = Some(packets_in_diff);
-                    metrics.packets_out = Some(packets_out_diff);
+                
+                let current_stats = NetworkStats {
+                    bytes_in: total_bytes_in,
+                    bytes_out: total_bytes_out,
+                    packets_in: total_packets_in,
+                    packets_out: total_packets_out,
+                    drops: total_drops,
+                    errors: total_errors,
+                };
+                
+                metrics.drops = Some(total_drops);
+                metrics.errors = Some(total_errors);
+                
+                // Calculate rates if we have previous stats
+                if let Some(ref last_stats) = self.last_network_stats {
+                    let time_diff = now.saturating_sub(self.last_network_time);
+                    if time_diff > 0 {
+                        let bytes_in_diff = current_stats.bytes_in.saturating_sub(last_stats.bytes_in);
+                        let bytes_out_diff = current_stats.bytes_out.saturating_sub(last_stats.bytes_out);
+                        let packets_in_diff = current_stats.packets_in.saturating_sub(last_stats.packets_in);
+                        let packets_out_diff = current_stats.packets_out.saturating_sub(last_stats.packets_out);
+                        
+                        metrics.bytes_in = Some(bytes_in_diff);
+                        metrics.bytes_out = Some(bytes_out_diff);
+                        metrics.packets_in = Some(packets_in_diff);
+                        metrics.packets_out = Some(packets_out_diff);
+                    }
                 }
+                
+                self.last_network_stats = Some(current_stats);
+                self.last_network_time = now;
             }
-            
-            self.last_network_stats = Some(current_stats);
-            self.last_network_time = now;
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_network failed: cannot read /proc/net/dev: {}", e);
+            }
         }
         
         metrics
@@ -566,16 +709,22 @@ impl SystemMetricsCollector {
         };
         
         // Read host uptime from /proc/uptime
-        if let Ok(uptime_str) = fs::read_to_string("/proc/uptime") {
-            if let Some(uptime_secs) = uptime_str.split_whitespace().next() {
-                if let Ok(uptime) = uptime_secs.parse::<f64>() {
-                    metrics.host_uptime = Some(uptime as u64);
+        match fs::read_to_string("/proc/uptime") {
+            Ok(uptime_str) => {
+                if let Some(uptime_secs) = uptime_str.split_whitespace().next() {
+                    if let Ok(uptime) = uptime_secs.parse::<f64>() {
+                        metrics.host_uptime = Some(uptime as u64);
+                    }
                 }
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_system_state failed: cannot read /proc/uptime: {}", e);
             }
         }
         
         // Count processes from /proc
-        if let Ok(entries) = fs::read_dir("/proc") {
+        match fs::read_dir("/proc") {
+            Ok(entries) => {
             let count = entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| {
@@ -584,16 +733,24 @@ impl SystemMetricsCollector {
                         .and_then(|s| s.parse::<u32>().ok())
                         .is_some()
                 })
-                .count() as u32;
-            metrics.process_count = Some(count);
+                    .count() as u32;
+                metrics.process_count = Some(count);
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_system_state failed: cannot read /proc: {}", e);
+            }
         }
         
         // Check agent process status
         let proc_stat_path = format!("/proc/{}/stat", self.pid);
-        if fs::metadata(&proc_stat_path).is_ok() {
-            metrics.agent_process_status = Some("running".to_string());
-        } else {
-            metrics.agent_process_status = Some("stopped".to_string());
+        match fs::metadata(&proc_stat_path) {
+            Ok(_) => {
+                metrics.agent_process_status = Some("running".to_string());
+            }
+            Err(e) => {
+                error!("[SYS_METRICS][ERROR] collect_system_state failed: cannot read /proc/{}/stat: {}", self.pid, e);
+                metrics.agent_process_status = Some("stopped".to_string());
+            }
         }
         
         metrics

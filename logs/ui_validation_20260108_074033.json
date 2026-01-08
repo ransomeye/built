@@ -1,0 +1,73 @@
+{
+  "part1_database": {
+    "status": "FAILED",
+    "details": [
+      "[INFO] Total rows: 88650",
+      "[INFO] Unique agents: 1842",
+      "[INFO] Oldest record: 2026-01-03 11:06:49.000036+00:00",
+      "[INFO] Newest record: 2026-01-08 07:39:14.902319+00:00",
+      "[INFO] Rows with system metrics: 0",
+      "[ERROR] BLOCKER: No system metrics in payload",
+      "[INFO] Total rows: 198737",
+      "[INFO] Unique probes: 5",
+      "[INFO] Oldest record: 2026-01-06 13:17:27.378143+00:00",
+      "[INFO] Newest record: 2026-01-08 07:39:20.529197+00:00",
+      "[INFO] Rows with system metrics: 8",
+      "[INFO] Sample payload has 'system' key: False",
+      "[INFO] Active connections: 3/100",
+      "[INFO] Cache hits: 84623108, Disk reads: 50986519",
+      "[INFO] Total transactions: 2042114",
+      "[INFO] linux_agent: Last seen -1.1 minutes ago (2026-01-08 07:40:18.634404+00:00)",
+      "[INFO] dpi_probe: Last seen -1.1 minutes ago (2026-01-08 07:40:18.840839+00:00)"
+    ]
+  },
+  "part2_backend": {
+    "status": "FAILED",
+    "details": [
+      "[ERROR] Core System Health: EXCEPTION - HTTPConnectionPool(host='localhost', port=8081): Read timed out. (read timeout=5)",
+      "[WARN] Core System Health: Instance not found (404) - may be offline",
+      "[INFO] Core System Health: Invalid instance correctly returns 404",
+      "[INFO] DPI Probe Health: GET /api/dashboards/dpi-probe-health returned 200",
+      "[WARN] DPI Probe Health: WARNING - Response may contain only placeholders",
+      "[WARN] DPI Probe Health: Instance not found (404) - may be offline",
+      "[INFO] DPI Probe Health: Invalid instance correctly returns 404",
+      "[INFO] DB Health: GET /api/dashboards/db-health returned 200",
+      "[INFO] DB Health: Response contains real numeric data",
+      "[INFO] DB Health: Instance filtering works (instance_id=db-01)",
+      "[INFO] DB Health: Invalid instance correctly returns 404",
+      "[INFO] Instance discovery: Core=2, DPI=5, DB=1"
+    ]
+  },
+  "part3_ui": {
+    "status": "MANUAL_REQUIRED",
+    "details": [
+      "[INFO] 1. Network Access: Access UI via: http://localhost:8081",
+      "[INFO] 2. Core System Health Dashboard: Panels render numeric data (not placeholders)",
+      "[INFO] 3. DPI Probe Health Dashboard: Panels render numeric data (not placeholders)",
+      "[INFO] 4. DB Health Dashboard: Panels render numeric data (not placeholders)",
+      "[INFO] 5. Refresh Updates: Dashboard values change over time when refreshed",
+      "[INFO] 6. Instance Selector (Core): Switch between instances - panel values change",
+      "[INFO] 7. Instance Selector (DPI): Switch between probes - panel values change",
+      "[INFO] 8. Instance Selector (DB): Switch between DB instances - panel values change",
+      "[INFO] 9. URL Query Params: URL updates correctly when instance changes",
+      "[INFO] 10. Offline Instance: Offline instance shows graceful error (not crash)"
+    ]
+  },
+  "part4_failsoft": {
+    "status": "PASSED",
+    "details": [
+      "[INFO] /api/dashboards/core-system-health: Invalid instance correctly returns 404",
+      "[INFO] /api/dashboards/dpi-probe-health: Invalid instance correctly returns 404",
+      "[INFO] /api/dashboards/db-health: Invalid instance correctly returns 404",
+      "[INFO] Malformed parameter handled safely",
+      "[INFO] Found 88689 rows without system metrics - APIs should handle gracefully"
+    ]
+  },
+  "overall": {
+    "status": "BLOCKED",
+    "blockers": [
+      "Linux Agent telemetry missing system metrics",
+      "Backend API validation failed"
+    ]
+  }
+}

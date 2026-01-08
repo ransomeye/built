@@ -12,7 +12,7 @@
 
 use std::sync::Arc;
 use tokio::signal;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 use crossbeam_channel::bounded;
 
 mod process;
@@ -80,8 +80,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             while run.load(std::sync::atomic::Ordering::Relaxed) {
                 interval.tick().await;
                 let metrics = collector.collect();
-                if let Ok(mut state) = metrics_state.lock() {
-                    *state = Some(metrics);
+                if metrics.has_real_metrics() {
+                    if let Ok(mut state) = metrics_state.lock() {
+                        *state = Some(metrics);
+                    }
+                } else {
+                    warn!("[SYS_METRICS][WARN] collected metrics but all values are null — discarding");
                 }
             }
         })
@@ -175,13 +179,20 @@ async fn process_loop(
         // Convert to JSON
         let mut event_json = event.to_json_value();
         
-        // Include system metrics in payload if available
+        // Include system metrics in payload if available and valid
         if let Ok(metrics_guard) = metrics_state.lock() {
             if let Some(ref metrics) = *metrics_guard {
-                if let Some(event_obj) = event_json.as_object_mut() {
-                    let system_json = serde_json::to_value(metrics)
-                        .unwrap_or_else(|_| serde_json::json!({}));
-                    event_obj.insert("system".to_string(), system_json);
+                if metrics.has_real_metrics() {
+                    if let Some(event_obj) = event_json.as_object_mut() {
+                        let system_json = serde_json::to_value(metrics)
+                            .unwrap_or_else(|_| serde_json::json!({}));
+                        event_obj.insert("system".to_string(), system_json);
+                    }
+                } else {
+                    warn!("[ENVELOPE][WARN] system metrics present but invalid (all null), injecting empty object");
+                    if let Some(event_obj) = event_json.as_object_mut() {
+                        event_obj.insert("system".to_string(), serde_json::json!({}));
+                    }
                 }
             }
         }

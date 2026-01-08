@@ -178,5 +178,30 @@
       "timestamp": "2026-01-08T06:04:11.753673Z"
     },
     "evolution_version": "1.6.0"
+  },
+  {
+    "event_id": "evolution_20260108_070245",
+    "timestamp": "2026-01-08T07:02:45.582663Z",
+    "novel_threats_count": 1621,
+    "training_result": {
+      "status": "success",
+      "results": {
+        "threat_classifier": {
+          "model_path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
+          "metrics": {
+            "accuracy": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1_score": 1.0,
+            "n_samples": 1621,
+            "n_features": 256,
+            "training_timestamp": "2026-01-08T07:02:45.559787Z"
+          }
+        }
+      },
+      "n_samples": 1621,
+      "timestamp": "2026-01-08T07:02:45.580281Z"
+    },
+    "evolution_version": "1.7.0"
   }
 ]

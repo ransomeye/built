@@ -3,6 +3,7 @@
 // Details of functionality of this file: HTTP ingestion server with POST /ingest/linux and /ingest/dpi endpoints - verifies signatures and writes to database
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::net::IpAddr;
 use axum::{
     extract::State,
@@ -102,10 +103,33 @@ impl HttpIngestionServer {
     }
 }
 
+// Static flags for one-time logging per startup
+static LOGGED_INCOMING_PAYLOAD: AtomicBool = AtomicBool::new(false);
+static LOGGED_PAYLOAD_JSON: AtomicBool = AtomicBool::new(false);
+
 async fn handle_linux_ingest(
     State(db): State<Arc<Client>>,
     Json(payload): Json<SignedEvent>,
 ) -> Result<Json<IngestResponse>, StatusCode> {
+    // TEMPORARY: Log full incoming JSON once per startup
+    if !LOGGED_INCOMING_PAYLOAD.swap(true, Ordering::Relaxed) {
+        if let Some(data_obj) = payload.envelope.get("data").and_then(|v| v.as_object()) {
+            let has_system_key = data_obj.contains_key("system");
+            let system_value = data_obj.get("system");
+            let system_is_object = system_value.and_then(|v| v.as_object()).is_some();
+            error!("[TEMPORARY DEBUG] First incoming payload structure:");
+            error!("  envelope.data has 'system' key: {}", has_system_key);
+            error!("  envelope.data.system value type: {:?}", system_value.map(|v| {
+                if v.is_object() { "object" } else if v.is_array() { "array" } else if v.is_string() { "string" } else if v.is_number() { "number" } else if v.is_boolean() { "boolean" } else if v.is_null() { "null" } else { "unknown" }
+            }));
+            error!("  envelope.data.system is object: {}", system_is_object);
+            if let Some(sys) = system_value {
+                error!("  envelope.data.system content: {}", serde_json::to_string(sys).unwrap_or_default());
+            }
+            error!("  Full envelope.data keys: {:?}", data_obj.keys().collect::<Vec<_>>());
+        }
+    }
+    
     // Log received payload for debugging (redact signature for security)
     info!("Received Linux ingest request | signer_id={} | payload_hash={} | envelope_keys={:?}", 
         payload.signer_id, 
@@ -396,17 +420,24 @@ async fn handle_linux_ingest(
     let event_category_str: &str = event_category.as_deref().unwrap_or("");
     
     // PART 3: INGESTION CONTRACT ENFORCEMENT - Validate payload.system exists and is non-null
-    // Ensure system metrics are present in data (fail-closed if missing)
+    // Ensure system metrics are present in data (preserve valid metrics, inject empty if missing)
     let mut data_with_system = data.clone();
     if let Some(data_obj) = data_with_system.as_object_mut() {
-        if !data_obj.contains_key("system") {
-            // System metrics not present - inject empty object to satisfy contract
-            warn!("VALIDATION: payload.system missing in Linux Agent telemetry - injecting empty object");
+        let system_value = data_obj.get("system");
+        let has_system = system_value.is_some();
+        let system_is_valid_object = system_value.and_then(|v| v.as_object()).is_some();
+        
+        if !has_system || !system_is_valid_object {
+            // System metrics missing or invalid - inject empty object to satisfy contract
+            if !has_system {
+                warn!("VALIDATION: payload.system missing in Linux Agent telemetry - injecting empty object");
+            } else {
+                warn!("VALIDATION: payload.system is null or invalid in Linux Agent telemetry - replacing with empty object");
+            }
             data_obj.insert("system".to_string(), serde_json::json!({}));
-        } else if data_obj.get("system").is_none() || data_obj.get("system").and_then(|v| v.as_object()).is_none() {
-            // System is null or not an object - replace with empty object
-            warn!("VALIDATION: payload.system is null or invalid in Linux Agent telemetry - replacing with empty object");
-            data_obj.insert("system".to_string(), serde_json::json!({}));
+        } else {
+            // System metrics present and valid - preserve them
+            info!("VALIDATION: payload.system present and valid - preserving system metrics");
         }
     } else {
         error!("VALIDATION ERROR: data field is not an object - cannot inject system metrics");
@@ -414,7 +445,25 @@ async fn handle_linux_ingest(
         return Err(StatusCode::BAD_REQUEST);
     }
     
+    // OPTION A (Preferred, validator-aligned): Write JSON with system at top level
+    // Structure: { "system": { ... }, ...rest of data fields... }
+    // This ensures payload.system exists when validator queries the DB column
     let payload_json = serde_json::to_string(&data_with_system).unwrap_or_else(|_| "{}".to_string());
+    
+    // TEMPORARY: Log payload_json once to verify system metrics are included at top level
+    if !LOGGED_PAYLOAD_JSON.swap(true, Ordering::Relaxed) {
+        error!("[TEMPORARY DEBUG] First payload_json written to DB (system at top level): {}", 
+            if payload_json.len() > 500 { format!("{}...", &payload_json[..500]) } else { payload_json.clone() });
+        // Verify system key exists in the JSON structure
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&payload_json) {
+            if let Some(obj) = parsed.as_object() {
+                error!("[TEMPORARY DEBUG] payload_json has 'system' key at top level: {}", obj.contains_key("system"));
+                if let Some(system_val) = obj.get("system") {
+                    error!("[TEMPORARY DEBUG] payload_json.system is object: {}", system_val.is_object());
+                }
+            }
+        }
+    }
     let payload_sha256 = {
         let data_json_bytes = serde_json::to_vec(data).unwrap_or_default();
         let mut data_hasher = Sha256::new();
@@ -472,6 +521,8 @@ async fn handle_linux_ingest(
     match insert_result {
         Ok(_) => {
             // UPDATE #2 — OPTIONAL FIELDS (within transaction)
+            error!("[DB WRITE] linux_agent_telemetry.payload bound with system key = {}",
+                   payload_json.contains("\"system\""));
             let update_result = db.execute(
                 r#"
                 UPDATE linux_agent_telemetry
