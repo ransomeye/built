@@ -3026,6 +3026,15 @@ def dashboard_linux_agent_health():
                     "agent_process_status": system_state_data.get("agent_process_status")
                 }
             }
+            
+            # Extract metrics_status from system_state.system_metrics_status (fail-soft if missing)
+            metrics_status_data = system_state_data.get("system_metrics_status")
+            if metrics_status_data and isinstance(metrics_status_data, dict):
+                agent_entry["metrics_status"] = {
+                    "cpu": metrics_status_data.get("cpu"),
+                    "disk": metrics_status_data.get("disk"),
+                    "network": metrics_status_data.get("network")
+                }
             agents_data.append(agent_entry)
         
         cursor.close()
@@ -3039,6 +3048,7 @@ def dashboard_linux_agent_health():
             "disk_io_health": agents_data,
             "network_health": agents_data,
             "system_state": agents_data,
+            "metrics_collection_status": agents_data,
             "timestamp": current_time.isoformat()
         })
 

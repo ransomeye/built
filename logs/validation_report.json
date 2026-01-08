@@ -291,10 +291,10 @@
           "exists": true,
           "info": {
             "path": "/home/ransomeye/rebuild/ransomeye_intelligence/threat_intel/models/threat_classifier_continuous.model",
-            "size_bytes": 95486,
-            "size_mb": 0.09,
-            "hash": "8f678010831930c21715a55f65558e057a92c4d19bad158967bccbb7519d3db3",
-            "modified": "2026-01-07T15:03:39.651965"
+            "size_bytes": 897736,
+            "size_mb": 0.86,
+            "hash": "b4c6a8f894b192d8e67d85a8925bf5985b0504a09608af84a9a3bf764a5ba65a",
+            "modified": "2026-01-08T12:32:46.397518"
           }
         }
       },
@@ -313,7 +313,7 @@
           "f1_score": 1.0,
           "n_samples": 1621,
           "n_features": 256,
-          "training_timestamp": "2026-01-07T09:33:39.647788Z"
+          "training_timestamp": "2026-01-08T07:02:46.385607Z"
         }
       },
       "status": "complete"

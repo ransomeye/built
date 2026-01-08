@@ -14,22 +14,36 @@
             "trained_on": "unknown"
           },
           {
-            "name": "anomaly_baseline.model",
+            "name": "anomaly_detector.model",
             "version": "1.0.0",
             "hash": "sha256:0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
             "has_shap": true,
             "trained_on": "unknown"
           },
           {
-            "name": "confidence_calibration.model",
+            "name": "confidence_calibrator.model",
             "version": "1.0.0",
-            "hash": "sha256:a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
+            "hash": "sha256:c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
             "has_shap": true,
             "trained_on": "unknown"
           }
         ],
         "has_signature": true,
         "has_training_date": true,
+        "issues": []
+      }
+    },
+    {
+      "module": "Baseline Pack",
+      "model": {
+        "module": "Baseline Pack",
+        "model_name": "anomaly_detector",
+        "file_path": "ransomeye_intelligence/baseline_pack/models/anomaly_detector.model",
+        "exists": true,
+        "size_bytes": 1001196,
+        "hash": "0375b875c7342cb3d320c3efbf38db19700b4cf5d4bde9fb0f74b95b6b14392e",
+        "is_dummy": false,
+        "status": "REAL",
         "issues": []
       }
     },
@@ -55,7 +69,7 @@
         "file_path": "ransomeye_intelligence/baseline_pack/models/confidence_calibration.model",
         "exists": true,
         "size_bytes": 9922981,
-        "hash": "a5b8499700353c4b3484cd9a08186d5f5385b06fcc0b3cdff21758396d7065ec",
+        "hash": "c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -70,6 +84,20 @@
         "exists": true,
         "size_bytes": 3108596,
         "hash": "5210a7c441a2d768b417a69848009f5d70bdc6a6390a7a61923f69ea3084c893",
+        "is_dummy": false,
+        "status": "REAL",
+        "issues": []
+      }
+    },
+    {
+      "module": "Baseline Pack",
+      "model": {
+        "module": "Baseline Pack",
+        "model_name": "confidence_calibrator",
+        "file_path": "ransomeye_intelligence/baseline_pack/models/confidence_calibrator.model",
+        "exists": true,
+        "size_bytes": 9922981,
+        "hash": "c480031c731ed76547607fede434118c416dda77294212d57a7d55e92d3772fa",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -94,7 +122,7 @@
         "file_path": "core/ai/models/risk_model.model",
         "exists": true,
         "size_bytes": 1055801,
-        "hash": "1236cb4a402d16a441276b3679d60deb8314a6691b5319b60006864fedae11a0",
+        "hash": "0be251a9e35a52dcdb2945397522146d0b8dfac5f9bd5f9931b5f6b4f60939c4",
         "is_dummy": false,
         "status": "REAL",
         "issues": []
@@ -179,8 +207,8 @@
   ],
   "issues": [],
   "summary": {
-    "total_models": 7,
-    "real_models": 7,
+    "total_models": 9,
+    "real_models": 9,
     "dummy_models": 0,
     "missing_models": 0,
     "placeholder_models": 0,

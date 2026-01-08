@@ -280,6 +280,50 @@
         "endpoint": "/api/dashboards/linux-agent-health",
         "path": "system_state"
       }
+    },
+    {
+      "id": "metrics_collection_status",
+      "title": "Metrics Collection Status",
+      "x": 0,
+      "y": 6,
+      "w": 12,
+      "h": 2,
+      "refresh_interval": 30,
+      "status": "healthy",
+      "content": "",
+      "renderer": {
+        "type": "table",
+        "config": {
+          "columns": [
+            {
+              "field": "agent_id",
+              "label": "Agent ID",
+              "type": "string"
+            },
+            {
+              "field": "metrics_status.cpu",
+              "label": "CPU",
+              "type": "string"
+            },
+            {
+              "field": "metrics_status.disk",
+              "label": "Disk",
+              "type": "string"
+            },
+            {
+              "field": "metrics_status.network",
+              "label": "Network",
+              "type": "string"
+            }
+          ],
+          "sortable": true,
+          "filterable": true
+        }
+      },
+      "data_source": {
+        "endpoint": "/api/dashboards/linux-agent-health",
+        "path": "metrics_collection_status"
+      }
     }
   ]
 }

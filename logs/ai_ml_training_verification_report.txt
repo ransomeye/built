@@ -11,8 +11,8 @@ EXECUTIVE SUMMARY
 
 Overall Status: PASS - All models are real
 
-Total Models Found: 7
-  ✓ Real Models: 7
+Total Models Found: 9
+  ✓ Real Models: 9
   ✗ Dummy Models: 0
   ✗ Placeholder Models: 0
   ⚠ Missing Models: 0
@@ -20,6 +20,13 @@ Total Models Found: 7
 ================================================================================
 DETAILED FINDINGS
 ================================================================================
+
+Module: Baseline Pack
+  Model: anomaly_detector
+  Status: REAL
+  File: ransomeye_intelligence/baseline_pack/models/anomaly_detector.model
+  Size: 1001196 bytes
+  Hash: 0375b875c7342cb3...
 
 Module: Baseline Pack
   Model: anomaly_baseline
@@ -33,7 +40,7 @@ Module: Baseline Pack
   Status: REAL
   File: ransomeye_intelligence/baseline_pack/models/confidence_calibration.model
   Size: 9922981 bytes
-  Hash: a5b8499700353c4b...
+  Hash: c480031c731ed765...
 
 Module: Baseline Pack
   Model: ransomware_behavior
@@ -42,12 +49,19 @@ Module: Baseline Pack
   Size: 3108596 bytes
   Hash: 5210a7c441a2d768...
 
+Module: Baseline Pack
+  Model: confidence_calibrator
+  Status: REAL
+  File: ransomeye_intelligence/baseline_pack/models/confidence_calibrator.model
+  Size: 9922981 bytes
+  Hash: c480031c731ed765...
+
 Module: Core AI
   Model: risk_model
   Status: REAL
   File: core/ai/models/risk_model.model
   Size: 1055801 bytes
-  Hash: 1236cb4a402d16a4...
+  Hash: 0be251a9e35a52dc...
 
 Module: Inference
   Model: anomaly_baseline

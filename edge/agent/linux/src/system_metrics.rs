@@ -79,6 +79,14 @@ pub struct SystemStateMetrics {
     pub host_uptime: Option<u64>,
     pub process_count: Option<u32>,
     pub agent_process_status: Option<String>,
+    pub system_metrics_status: SystemMetricsStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemMetricsStatus {
+    pub cpu: String,      // "ok" | "error"
+    pub disk: String,     // "ok" | "error"
+    pub network: String,  // "ok" | "error"
 }
 
 impl SystemMetrics {
@@ -166,83 +174,137 @@ impl SystemMetricsCollector {
     }
     
     pub fn collect(&mut self) -> SystemMetrics {
+        // Track collection success for CPU, disk, and network
+        let mut cpu_status = "error".to_string();
+        let mut disk_status = "error".to_string();
+        let mut network_status = "error".to_string();
+        
+        // Collect CPU metrics
+        let cpu_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_cpu())) {
+            Ok(metrics) => {
+                // Check if CPU utilization was successfully collected
+                if metrics.utilization.is_some() {
+                    cpu_status = "ok".to_string();
+                }
+                metrics
+            }
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_cpu failed: panic occurred");
+                CpuMetrics {
+                    utilization: None,
+                    load_avg_1m: None,
+                    load_avg_5m: None,
+                    load_avg_15m: None,
+                    core_count: None,
+                    agent_process_cpu: None,
+                }
+            }
+        };
+        
+        // Collect memory metrics
+        let memory_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_memory())) {
+            Ok(metrics) => metrics,
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_memory failed: panic occurred");
+                MemoryMetrics {
+                    total: None,
+                    used: None,
+                    free: None,
+                    swap_used: None,
+                    agent_process_rss: None,
+                }
+            }
+        };
+        
+        // Collect disk metrics
+        let disk_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_disk())) {
+            Ok(metrics) => {
+                // Check if disk metrics were successfully collected
+                if metrics.read_bytes.is_some() || metrics.write_bytes.is_some() {
+                    disk_status = "ok".to_string();
+                }
+                metrics
+            }
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_disk failed: panic occurred");
+                DiskMetrics {
+                    read_bytes: None,
+                    write_bytes: None,
+                    read_iops: None,
+                    write_iops: None,
+                    utilization: None,
+                }
+            }
+        };
+        
+        // Collect filesystem metrics
+        let filesystem_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_filesystem())) {
+            Ok(metrics) => metrics,
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_filesystem failed: panic occurred");
+                FilesystemMetrics { mounts: Vec::new() }
+            }
+        };
+        
+        // Collect network metrics
+        let network_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_network())) {
+            Ok(metrics) => {
+                // Check if network metrics were successfully collected
+                if metrics.bytes_in.is_some() || metrics.bytes_out.is_some() {
+                    network_status = "ok".to_string();
+                }
+                metrics
+            }
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_network failed: panic occurred");
+                NetworkMetrics {
+                    bytes_in: None,
+                    bytes_out: None,
+                    packets_in: None,
+                    packets_out: None,
+                    errors: None,
+                    drops: None,
+                }
+            }
+        };
+        
+        // Collect system state metrics with status flags
+        let mut system_state_metrics = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_system_state())) {
+            Ok(metrics) => metrics,
+            Err(_) => {
+                error!("[SYS_METRICS][ERROR] collect_system_state failed: panic occurred");
+                SystemStateMetrics {
+                    host_uptime: None,
+                    process_count: None,
+                    agent_process_status: None,
+                    system_metrics_status: SystemMetricsStatus {
+                        cpu: "error".to_string(),
+                        disk: "error".to_string(),
+                        network: "error".to_string(),
+                    },
+                }
+            }
+        };
+        
+        // Set status flags in system_state
+        system_state_metrics.system_metrics_status = SystemMetricsStatus {
+            cpu: cpu_status,
+            disk: disk_status,
+            network: network_status,
+        };
+        
         SystemMetrics {
-            cpu: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_cpu())) {
-                Ok(metrics) => metrics,
-                Err(e) => {
-                    error!("[SYS_METRICS][ERROR] collect_cpu failed: panic occurred");
-                    CpuMetrics {
-                        utilization: None,
-                        load_avg_1m: None,
-                        load_avg_5m: None,
-                        load_avg_15m: None,
-                        core_count: None,
-                        agent_process_cpu: None,
-                    }
-                }
-            },
-            memory: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_memory())) {
-                Ok(metrics) => metrics,
-                Err(_) => {
-                    error!("[SYS_METRICS][ERROR] collect_memory failed: panic occurred");
-                    MemoryMetrics {
-                        total: None,
-                        used: None,
-                        free: None,
-                        swap_used: None,
-                        agent_process_rss: None,
-                    }
-                }
-            },
-            disk: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_disk())) {
-                Ok(metrics) => metrics,
-                Err(_) => {
-                    error!("[SYS_METRICS][ERROR] collect_disk failed: panic occurred");
-                    DiskMetrics {
-                        read_bytes: None,
-                        write_bytes: None,
-                        read_iops: None,
-                        write_iops: None,
-                        utilization: None,
-                    }
-                }
-            },
-            filesystem: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_filesystem())) {
-                Ok(metrics) => metrics,
-                Err(_) => {
-                    error!("[SYS_METRICS][ERROR] collect_filesystem failed: panic occurred");
-                    FilesystemMetrics { mounts: Vec::new() }
-                }
-            },
-            network: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_network())) {
-                Ok(metrics) => metrics,
-                Err(_) => {
-                    error!("[SYS_METRICS][ERROR] collect_network failed: panic occurred");
-                    NetworkMetrics {
-                        bytes_in: None,
-                        bytes_out: None,
-                        packets_in: None,
-                        packets_out: None,
-                        errors: None,
-                        drops: None,
-                    }
-                }
-            },
-            system_state: match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.collect_system_state())) {
-                Ok(metrics) => metrics,
-                Err(_) => {
-                    error!("[SYS_METRICS][ERROR] collect_system_state failed: panic occurred");
-                    SystemStateMetrics {
-                        host_uptime: None,
-                        process_count: None,
-                        agent_process_status: None,
-                    }
-                }
-            },
+            cpu: cpu_metrics,
+            memory: memory_metrics,
+            disk: disk_metrics,
+            filesystem: filesystem_metrics,
+            network: network_metrics,
+            system_state: system_state_metrics,
         }
     }
     
     fn collect_cpu(&mut self) -> CpuMetrics {
+        // Initialize with None - metrics will be set only on successful collection
         let mut metrics = CpuMetrics {
             utilization: None,
             load_avg_1m: None,
@@ -267,7 +329,7 @@ impl SystemMetricsCollector {
             }
         }
         
-        // Read CPU stats from /proc/stat
+        // Read CPU stats from /proc/stat - utilization calculated from delta
         match fs::read_to_string("/proc/stat") {
             Ok(stat) => {
             if let Some(first_line) = stat.lines().next() {
@@ -297,8 +359,8 @@ impl SystemMetricsCollector {
                                 metrics.utilization = Some(0.0);
                             }
                         } else {
-                            // First collection - set to 0.0 (will be calculated on next collection)
-                            metrics.utilization = Some(0.0);
+                            // First collection - set to None (will be calculated on next collection)
+                            metrics.utilization = None;
                         }
                         
                         self.last_cpu_time = Some(cpu_time);
@@ -308,6 +370,7 @@ impl SystemMetricsCollector {
             }
             Err(e) => {
                 error!("[SYS_METRICS][ERROR] collect_cpu failed: cannot read /proc/stat: {}", e);
+                // On error, utilization remains None
             }
         }
         
@@ -438,6 +501,7 @@ impl SystemMetricsCollector {
     }
     
     fn collect_disk(&mut self) -> DiskMetrics {
+        // Initialize with None - metrics will be set only on successful collection
         let mut metrics = DiskMetrics {
             read_bytes: None,
             write_bytes: None,
@@ -505,11 +569,11 @@ impl SystemMetricsCollector {
                     metrics.write_iops = Some(0);
                 }
             } else {
-                // First collection - set to 0 (will be calculated on next collection)
-                metrics.read_bytes = Some(0);
-                metrics.write_bytes = Some(0);
-                metrics.read_iops = Some(0);
-                metrics.write_iops = Some(0);
+                // First collection - set to None (will be calculated on next collection)
+                metrics.read_bytes = None;
+                metrics.write_bytes = None;
+                metrics.read_iops = None;
+                metrics.write_iops = None;
             }
             
             self.last_disk_stats = Some(current_stats);
@@ -517,6 +581,7 @@ impl SystemMetricsCollector {
             }
             Err(e) => {
                 error!("[SYS_METRICS][ERROR] collect_disk failed: cannot read /proc/diskstats: {}", e);
+                // On error, metrics remain None
             }
         }
         
@@ -628,6 +693,7 @@ impl SystemMetricsCollector {
     }
     
     fn collect_network(&mut self) -> NetworkMetrics {
+        // Initialize with None - metrics will be set only on successful collection
         let mut metrics = NetworkMetrics {
             bytes_in: None,
             bytes_out: None,
@@ -640,7 +706,7 @@ impl SystemMetricsCollector {
         // Read network stats from /proc/net/dev
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
         
         match fs::read_to_string("/proc/net/dev") {
@@ -719,11 +785,11 @@ impl SystemMetricsCollector {
                         metrics.packets_out = Some(0);
                     }
                 } else {
-                    // First collection - set to 0 (will be calculated on next collection)
-                    metrics.bytes_in = Some(0);
-                    metrics.bytes_out = Some(0);
-                    metrics.packets_in = Some(0);
-                    metrics.packets_out = Some(0);
+                    // First collection - set to None (will be calculated on next collection)
+                    metrics.bytes_in = None;
+                    metrics.bytes_out = None;
+                    metrics.packets_in = None;
+                    metrics.packets_out = None;
                 }
                 
                 self.last_network_stats = Some(current_stats);
@@ -731,6 +797,7 @@ impl SystemMetricsCollector {
             }
             Err(e) => {
                 error!("[SYS_METRICS][ERROR] collect_network failed: cannot read /proc/net/dev: {}", e);
+                // On error, metrics remain None
             }
         }
         
@@ -742,6 +809,11 @@ impl SystemMetricsCollector {
             host_uptime: None,
             process_count: None,
             agent_process_status: None,
+            system_metrics_status: SystemMetricsStatus {
+                cpu: "error".to_string(),
+                disk: "error".to_string(),
+                network: "error".to_string(),
+            },
         };
         
         // Read host uptime from /proc/uptime
