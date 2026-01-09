@@ -6,10 +6,12 @@ use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs;
 use tracing::{error, warn};
+use hostname;
 
 /// System metrics structure matching dashboard API expectations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemMetrics {
+    pub hostname: Option<String>,
     pub cpu: CpuMetrics,
     pub memory: MemoryMetrics,
     pub disk: DiskMetrics,
@@ -76,6 +78,12 @@ pub struct NetworkMetrics {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemStateMetrics {
+    pub hostname: Option<String>,
+    pub fqdn: Option<String>,
+    pub os_name: Option<String>,
+    pub os_version: Option<String>,
+    pub machine_id: Option<String>,
+    pub boot_id: Option<String>,
     pub host_uptime: Option<u64>,
     pub process_count: Option<u32>,
     pub agent_process_status: Option<String>,
@@ -274,6 +282,12 @@ impl SystemMetricsCollector {
             Err(_) => {
                 error!("[SYS_METRICS][ERROR] collect_system_state failed: panic occurred");
                 SystemStateMetrics {
+                    hostname: None,
+                    fqdn: None,
+                    os_name: None,
+                    os_version: None,
+                    machine_id: None,
+                    boot_id: None,
                     host_uptime: None,
                     process_count: None,
                     agent_process_status: None,
@@ -286,6 +300,11 @@ impl SystemMetricsCollector {
             }
         };
         
+        // Collect hostname at system root level (not in system_state)
+        let hostname = hostname::get()
+            .ok()
+            .and_then(|h| h.into_string().ok());
+        
         // Set status flags in system_state
         system_state_metrics.system_metrics_status = SystemMetricsStatus {
             cpu: cpu_status,
@@ -294,6 +313,7 @@ impl SystemMetricsCollector {
         };
         
         SystemMetrics {
+            hostname,
             cpu: cpu_metrics,
             memory: memory_metrics,
             disk: disk_metrics,
@@ -806,6 +826,12 @@ impl SystemMetricsCollector {
     
     fn collect_system_state(&self) -> SystemStateMetrics {
         let mut metrics = SystemStateMetrics {
+            hostname: None,
+            fqdn: None,
+            os_name: None,
+            os_version: None,
+            machine_id: None,
+            boot_id: None,
             host_uptime: None,
             process_count: None,
             agent_process_status: None,
@@ -815,6 +841,78 @@ impl SystemMetricsCollector {
                 network: "error".to_string(),
             },
         };
+        
+        // Get hostname using hostname crate or system call
+        match hostname::get() {
+            Ok(hostname) => {
+                metrics.hostname = Some(hostname.to_string_lossy().to_string());
+            }
+            Err(e) => {
+                warn!("[SYS_METRICS][WARN] Failed to get hostname: {}", e);
+            }
+        }
+        
+        // Get FQDN (try hostname -f command)
+        match std::process::Command::new("hostname").arg("-f").output() {
+            Ok(output) => {
+                if let Ok(fqdn_str) = String::from_utf8(output.stdout) {
+                    let fqdn_trimmed = fqdn_str.trim().to_string();
+                    if !fqdn_trimmed.is_empty() {
+                        metrics.fqdn = Some(fqdn_trimmed);
+                    }
+                }
+            }
+            Err(_) => {
+                // Fallback: use hostname if FQDN not available
+                if let Some(ref hostname) = metrics.hostname {
+                    metrics.fqdn = Some(hostname.clone());
+                }
+            }
+        }
+        
+        // Read OS name and version from /etc/os-release
+        match fs::read_to_string("/etc/os-release") {
+            Ok(os_release) => {
+                for line in os_release.lines() {
+                    if line.starts_with("NAME=") {
+                        let name = line.trim_start_matches("NAME=").trim_matches('"').to_string();
+                        metrics.os_name = Some(name);
+                    } else if line.starts_with("VERSION_ID=") {
+                        let version = line.trim_start_matches("VERSION_ID=").trim_matches('"').to_string();
+                        metrics.os_version = Some(version);
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("[SYS_METRICS][WARN] Failed to read /etc/os-release: {}", e);
+            }
+        }
+        
+        // Read machine_id from /etc/machine-id
+        match fs::read_to_string("/etc/machine-id") {
+            Ok(machine_id) => {
+                let machine_id_trimmed = machine_id.trim().to_string();
+                if !machine_id_trimmed.is_empty() {
+                    metrics.machine_id = Some(machine_id_trimmed);
+                }
+            }
+            Err(e) => {
+                warn!("[SYS_METRICS][WARN] Failed to read /etc/machine-id: {}", e);
+            }
+        }
+        
+        // Read boot_id from /proc/sys/kernel/random/boot_id
+        match fs::read_to_string("/proc/sys/kernel/random/boot_id") {
+            Ok(boot_id) => {
+                let boot_id_trimmed = boot_id.trim().to_string();
+                if !boot_id_trimmed.is_empty() {
+                    metrics.boot_id = Some(boot_id_trimmed);
+                }
+            }
+            Err(e) => {
+                warn!("[SYS_METRICS][WARN] Failed to read /proc/sys/kernel/random/boot_id: {}", e);
+            }
+        }
         
         // Read host uptime from /proc/uptime
         match fs::read_to_string("/proc/uptime") {

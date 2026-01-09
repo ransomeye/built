@@ -1226,7 +1226,7 @@
                 );
                 switch (rendererType) {
                     case 'table':
-                        content = renderTable(data, renderer.config);
+                        content = renderTable(data, renderer.config, panelDef.id);
                         hasData = content !== '';
                         break;
                     case 'stat_grid':
@@ -1235,6 +1235,10 @@
                         break;
                     case 'key_value':
                         content = renderKeyValue(data, renderer.config);
+                        hasData = content !== '';
+                        break;
+                    case 'timeseries':
+                        content = renderTimeseries(data, renderer.config);
                         hasData = content !== '';
                         break;
                     default:
@@ -1272,7 +1276,7 @@
         // PANEL RENDERERS
         // ============================================================
         
-        function renderTable(data, config) {
+        function renderTable(data, config, panelId) {
             if (!Array.isArray(data) || data.length === 0) {
                 return '';
             }
@@ -1471,6 +1475,108 @@
             }
             
             html += '</div>';
+            return html;
+        }
+        
+        function renderTimeseries(data, config) {
+            if (!Array.isArray(data) || data.length === 0) {
+                return '';
+            }
+            
+            const series = config?.series || [];
+            const xAxis = config?.x_axis || {};
+            const xAxisField = xAxis.field || 'observed_at';
+            const groupBy = config?.group_by;
+            
+            if (series.length === 0) {
+                return '';
+            }
+            
+            // Group data if groupBy is specified
+            let dataToRender = data;
+            if (groupBy) {
+                const grouped = {};
+                for (const item of data) {
+                    const groupKey = getNestedValue(item, groupBy);
+                    const key = groupKey !== null && groupKey !== undefined ? String(groupKey) : 'default';
+                    if (!grouped[key]) {
+                        grouped[key] = [];
+                    }
+                    grouped[key].push(item);
+                }
+                dataToRender = Object.entries(grouped).map(([key, items]) => ({
+                    _group_key: key,
+                    _group_items: items
+                }));
+            }
+            
+            // Build a simple table-based timeseries visualization
+            // (Can be enhanced with actual charting library if needed)
+            let html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; font-size: var(--font-size-sm);">';
+            
+            // Table header
+            html += '<thead><tr style="border-bottom: 2px solid var(--border-primary);">';
+            html += `<th style="padding: var(--spacing-sm); text-align: left; color: var(--text-secondary); font-weight: var(--font-weight-semibold);">${escapeHtml(xAxis.label || xAxisField)}</th>`;
+            if (groupBy) {
+                html += `<th style="padding: var(--spacing-sm); text-align: left; color: var(--text-secondary); font-weight: var(--font-weight-semibold);">Group</th>`;
+            }
+            for (const s of series) {
+                html += `<th style="padding: var(--spacing-sm); text-align: right; color: var(--text-secondary); font-weight: var(--font-weight-semibold);">${escapeHtml(s.label || s.field)}</th>`;
+            }
+            html += '</tr></thead>';
+            
+            // Table body
+            html += '<tbody>';
+            
+            if (groupBy) {
+                // Render grouped data
+                for (const group of dataToRender) {
+                    for (const item of group._group_items || []) {
+                        html += '<tr style="border-bottom: 1px solid var(--border-primary);">';
+                        
+                        // X-axis value
+                        const xValue = getNestedValue(item, xAxisField);
+                        const xFormatted = formatValue(xValue, xAxis.type, xAxis.format);
+                        html += `<td style="padding: var(--spacing-sm); color: var(--text-primary);">${xFormatted}</td>`;
+                        
+                        // Group key
+                        html += `<td style="padding: var(--spacing-sm); color: var(--text-secondary);">${escapeHtml(group._group_key)}</td>`;
+                        
+                        // Series values
+                        for (const s of series) {
+                            const field = s.field || s.path;
+                            const value = getNestedValue(item, field);
+                            const formatted = formatValue(value, s.type, s.format, s.unit);
+                            html += `<td style="padding: var(--spacing-sm); text-align: right; color: var(--text-primary);">${formatted}</td>`;
+                        }
+                        
+                        html += '</tr>';
+                    }
+                }
+            } else {
+                // Render flat data
+                for (const item of dataToRender) {
+                    html += '<tr style="border-bottom: 1px solid var(--border-primary);">';
+                    
+                    // X-axis value
+                    const xValue = getNestedValue(item, xAxisField);
+                    const xFormatted = formatValue(xValue, xAxis.type, xAxis.format);
+                    html += `<td style="padding: var(--spacing-sm); color: var(--text-primary);">${xFormatted}</td>`;
+                    
+                    // Series values
+                    for (const s of series) {
+                        const field = s.field || s.path;
+                        const value = getNestedValue(item, field);
+                        const formatted = formatValue(value, s.type, s.format, s.unit);
+                        html += `<td style="padding: var(--spacing-sm); text-align: right; color: var(--text-primary);">${formatted}</td>`;
+                    }
+                    
+                    html += '</tr>';
+                }
+            }
+            
+            html += '</tbody></table></div>';
+            
             return html;
         }
         

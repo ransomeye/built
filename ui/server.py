@@ -443,10 +443,10 @@ def _check_linux_agent_health_visibility() -> bool:
                 return False
         
         # Use EXACT same SQL predicate as main endpoint
-        # Reuse the same WITH latest CTE and check if it returns any rows
+        # Deduplicate by machine_id (one row per machine, not per agent_id)
         visibility_query = """
             WITH latest AS (
-              SELECT DISTINCT ON (agent_id)
+              SELECT DISTINCT ON (COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text))
                 agent_id,
                 observed_at,
                 payload->'system' AS system
@@ -454,7 +454,7 @@ def _check_linux_agent_health_visibility() -> bool:
               WHERE payload ? 'system'
                 AND payload->'system' != '{}'::jsonb
                 AND observed_at > NOW() - INTERVAL '10 minutes'
-              ORDER BY agent_id, observed_at DESC
+              ORDER BY COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text), observed_at DESC
             )
             SELECT COUNT(*)
             FROM latest
@@ -2902,7 +2902,7 @@ def dashboard_linux_agent_health():
             # When agent_id is provided, add it to WHERE clause in SQL
             base_query = """
                 WITH latest AS (
-                  SELECT DISTINCT ON (agent_id)
+                  SELECT DISTINCT ON (COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text))
                     agent_id,
                     observed_at,
                     payload->'system' AS system
@@ -2911,11 +2911,12 @@ def dashboard_linux_agent_health():
                     AND payload->'system' != '{}'::jsonb
                     AND observed_at > NOW() - INTERVAL '%s minutes'
                     AND agent_id::text = %s
-                  ORDER BY agent_id, observed_at DESC
+                  ORDER BY COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text), observed_at DESC
                 )
                 SELECT
                   agent_id,
                   observed_at,
+                  system AS system_full,
                   system->'cpu' AS cpu,
                   system->'memory' AS memory,
                   system->'disk' AS disk,
@@ -2925,10 +2926,10 @@ def dashboard_linux_agent_health():
             """ % (since_minutes, agent_id)
             params = ()
         else:
-            # Exact SQL as per spec (no agent_id filter)
+            # Deduplicate by machine_id (one row per machine, not per agent_id)
             base_query = """
                 WITH latest AS (
-                  SELECT DISTINCT ON (agent_id)
+                  SELECT DISTINCT ON (COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text))
                     agent_id,
                     observed_at,
                     payload->'system' AS system
@@ -2936,16 +2937,17 @@ def dashboard_linux_agent_health():
                   WHERE payload ? 'system'
                     AND payload->'system' != '{}'::jsonb
                     AND observed_at > NOW() - INTERVAL '%s minutes'
-                  ORDER BY agent_id, observed_at DESC
+                  ORDER BY COALESCE(payload->'system'->'system_state'->>'machine_id', agent_id::text), observed_at DESC
                 )
                 SELECT
                   agent_id,
                   observed_at,
-                  system->'cpu' AS cpu,
-                  system->'memory' AS memory,
-                  system->'disk' AS disk,
-                  system->'network' AS network,
-                  system->'system_state' AS system_state
+                  system                    AS system_full,
+                  system->'cpu'              AS cpu,
+                  system->'memory'           AS memory,
+                  system->'disk'             AS disk,
+                  system->'network'          AS network,
+                  system->'system_state'     AS system_state
                 FROM latest
             """ % since_minutes
             params = ()
@@ -2968,11 +2970,12 @@ def dashboard_linux_agent_health():
         for row in rows:
             agent_id_val = str(row[0]) if row[0] else None
             observed_at_val = row[1]
-            cpu_json = row[2]
-            memory_json = row[3]
-            disk_json = row[4]
-            network_json = row[5]
-            system_state_json = row[6]
+            system_full_json = row[2]
+            cpu_json = row[3]
+            memory_json = row[4]
+            disk_json = row[5]
+            network_json = row[6]
+            system_state_json = row[7]
             
             # Calculate status based on time since last observation
             if observed_at_val:
@@ -2987,6 +2990,7 @@ def dashboard_linux_agent_health():
                 status = "OFFLINE"
             
             # Parse JSONB fields (they come as dict or None)
+            system_data = system_full_json if isinstance(system_full_json, dict) else {}
             cpu_data = cpu_json if isinstance(cpu_json, dict) else {}
             memory_data = memory_json if isinstance(memory_json, dict) else {}
             disk_data = disk_json if isinstance(disk_json, dict) else {}
@@ -3021,11 +3025,30 @@ def dashboard_linux_agent_health():
                     "errors": network_data.get("errors")
                 },
                 "system_state": {
+                    "hostname": system_state_data.get("hostname"),
+                    "fqdn": system_state_data.get("fqdn"),
+                    "os_name": system_state_data.get("os_name"),
+                    "os_version": system_state_data.get("os_version"),
+                    "machine_id": system_state_data.get("machine_id"),
+                    "boot_id": system_state_data.get("boot_id"),
                     "host_uptime": system_state_data.get("host_uptime"),
                     "process_count": system_state_data.get("process_count"),
                     "agent_process_status": system_state_data.get("agent_process_status")
                 }
             }
+            
+            # Lift system identity fields to top-level for dashboards (CORRECT SOURCES)
+            # hostname is at system.hostname (primary) or system.system_state.hostname (fallback)
+            # machine_id is at system.system_state.machine_id
+            # Fail-soft: hostname and machine_id may be null if agent doesn't populate them
+            hostname = system_data.get("hostname") or system_state_data.get("hostname")
+            machine_id = system_state_data.get("machine_id")
+            
+            if hostname:
+                agent_entry["system_name"] = hostname
+            
+            if machine_id:
+                agent_entry["machine_id"] = machine_id
             
             # Extract metrics_status from system_state.system_metrics_status (fail-soft if missing)
             metrics_status_data = system_state_data.get("system_metrics_status")

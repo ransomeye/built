@@ -19,8 +19,13 @@
         "config": {
           "columns": [
             {
-              "field": "agent_id",
-              "label": "Agent ID",
+              "field": "system_name",
+              "label": "System Name",
+              "type": "string"
+            },
+            {
+              "field": "machine_id",
+              "label": "Machine ID",
               "type": "string"
             },
             {
@@ -180,7 +185,7 @@
               "unit": "iops"
             }
           ],
-          "group_by": "agent_id"
+          "group_by": "system_state.machine_id"
         }
       },
       "data_source": {
@@ -233,7 +238,7 @@
               "unit": "packets"
             }
           ],
-          "group_by": "agent_id"
+          "group_by": "system_state.machine_id"
         }
       },
       "data_source": {
@@ -272,7 +277,7 @@
               "type": "string"
             }
           ],
-          "group_by": "agent_id",
+          "group_by": "system_state.machine_id",
           "flatten": true
         }
       },
@@ -296,8 +301,13 @@
         "config": {
           "columns": [
             {
-              "field": "agent_id",
-              "label": "Agent ID",
+              "field": "system_name",
+              "label": "System Name",
+              "type": "string"
+            },
+            {
+              "field": "machine_id",
+              "label": "Machine ID",
               "type": "string"
             },
             {
@@ -322,7 +332,7 @@
       },
       "data_source": {
         "endpoint": "/api/dashboards/linux-agent-health",
-        "path": "metrics_collection_status"
+        "path": "agent_liveness"
       }
     }
   ]
